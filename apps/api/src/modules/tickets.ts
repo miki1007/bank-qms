@@ -908,9 +908,19 @@ export class TicketWorkflowService {
         });
         if (!lane)
           throw new DomainError("QUEUE_EMPTY", "No customers waiting.", 409);
-        const candidates = await tx.$queryRaw<Array<LockedTicket>>(
+        let candidates = await tx.$queryRaw<Array<LockedTicket>>(
           Prisma.sql`SELECT * FROM tickets WHERE branch_id = ${user.branchId}::uuid AND current_service_type_id = ${session.service_type_id}::uuid AND status = 'WAITING'::"TicketStatus" AND priority = ${lane === "priority"} ORDER BY queue_entered_at ASC, daily_sequence ASC FOR UPDATE SKIP LOCKED LIMIT 1`,
         );
+        // Concurrent tellers can select the same preferred lane just before its
+        // final rows are locked. Keep the operation non-blocking and use the
+        // other eligible lane rather than reporting an empty queue while work
+        // remains. A standard row locked by another teller is already being
+        // served, so this fallback does not starve standard customers.
+        if (!candidates[0]) {
+          candidates = await tx.$queryRaw<Array<LockedTicket>>(
+            Prisma.sql`SELECT * FROM tickets WHERE branch_id = ${user.branchId}::uuid AND current_service_type_id = ${session.service_type_id}::uuid AND status = 'WAITING'::"TicketStatus" AND priority = ${lane !== "priority"} ORDER BY queue_entered_at ASC, daily_sequence ASC FOR UPDATE SKIP LOCKED LIMIT 1`,
+          );
+        }
         const ticket = candidates[0];
         if (!ticket)
           throw new DomainError("QUEUE_EMPTY", "No customers waiting.", 409);
