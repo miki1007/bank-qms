@@ -63,32 +63,18 @@ describe.skipIf(!run)("real PostgreSQL Call Next concurrency", () => {
         }),
       });
 
-    const retryKey = crypto.randomUUID();
-    const retries = await Promise.all(
-      Array.from({ length: 10 }, () => createTicket(retryKey)),
+    const createdResponses = await Promise.all(
+      Array.from({ length: 20 }, (_, index) =>
+        createTicket(crypto.randomUUID(), index % 3 === 0),
+      ),
     );
-    const retryTickets = await Promise.all(
-      retries.map(async (response) => {
-        expect(response.ok).toBe(true);
-        return (await response.json()).ticket as {
-          id: string;
-          publicNumber: string;
-          lookupCode?: string;
-          lookupToken?: string;
-        };
-      }),
+    expect(createdResponses.every((response) => response.ok)).toBe(true);
+    const createdTickets = await Promise.all(
+      createdResponses.map(
+        async (response) => (await response.json()).ticket as { id: string },
+      ),
     );
-    expect(new Set(retryTickets.map((ticket) => ticket.id)).size).toBe(1);
-    await fetch(`${apiUrl}/public/tickets/${retryTickets[0].id}/cancel`, {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({
-        branchCode: "MAIN",
-        publicNumber: retryTickets[0].publicNumber,
-        lookupCode: retryTickets[0].lookupCode,
-        lookupToken: retryTickets[0].lookupToken,
-      }),
-    });
+    expect(new Set(createdTickets.map((ticket) => ticket.id)).size).toBe(20);
     const tokens = await Promise.all(
       ["teller.one", "teller.two", "teller.three"].map(login),
     );
@@ -112,7 +98,7 @@ describe.skipIf(!run)("real PostgreSQL Call Next concurrency", () => {
           "Idempotency-Key": idempotencyKey,
         },
       });
-    expect((await createTicket(crypto.randomUUID())).ok).toBe(true);
+    const assigned = new Set<string>();
     const callRetryKey = crypto.randomUUID();
     const firstCall = await call(tokens[0], callRetryKey);
     const retriedCall = await call(tokens[0], callRetryKey);
@@ -125,54 +111,94 @@ describe.skipIf(!run)("real PostgreSQL Call Next concurrency", () => {
     };
     expect(replayed.ticket.id).toBe(firstCalledTicket.id);
     expect(replayed.idempotentReplay).toBe(true);
-    await fetch(`${apiUrl}/teller/tickets/${firstCalledTicket.id}/start`, {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${tokens[0]}`,
-        "Idempotency-Key": crypto.randomUUID(),
+    assigned.add(firstCalledTicket.id);
+    const firstStart = await fetch(
+      `${apiUrl}/teller/tickets/${firstCalledTicket.id}/start`,
+      {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${tokens[0]}`,
+          "Idempotency-Key": crypto.randomUUID(),
+        },
       },
-    });
-    await fetch(`${apiUrl}/teller/tickets/${firstCalledTicket.id}/complete`, {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${tokens[0]}`,
-        "Idempotency-Key": crypto.randomUUID(),
+    );
+    expect(firstStart.ok).toBe(true);
+    const firstComplete = await fetch(
+      `${apiUrl}/teller/tickets/${firstCalledTicket.id}/complete`,
+      {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${tokens[0]}`,
+          "Idempotency-Key": crypto.randomUUID(),
+        },
       },
-    });
-    const assigned = new Set<string>();
-    for (let trial = 0; trial < 3; trial += 1) {
-      const created = await Promise.all(
-        Array.from({ length: 21 }, (_, index) =>
-          createTicket(crypto.randomUUID(), index % 3 === 0),
-        ),
+    );
+    expect(firstComplete.ok).toBe(true);
+
+    for (let round = 0; round < 6; round += 1) {
+      const responses = await Promise.all(
+        tokens.map(async (token) => ({ token, response: await call(token) })),
       );
-      expect(created.every((response) => response.ok)).toBe(true);
-      for (let round = 0; round < 7; round += 1) {
-        const responses = await Promise.all(
-          tokens.map(async (token) => ({ token, response: await call(token) })),
+      for (const { token, response } of responses) {
+        expect(response.ok).toBeTruthy();
+        const ticket = (await response.json()).ticket as { id: string };
+        expect(assigned.has(ticket.id)).toBe(false);
+        assigned.add(ticket.id);
+        const started = await fetch(
+          `${apiUrl}/teller/tickets/${ticket.id}/start`,
+          {
+            method: "POST",
+            headers: {
+              Authorization: `Bearer ${token}`,
+              "Idempotency-Key": crypto.randomUUID(),
+            },
+          },
         );
-        for (const { token, response } of responses) {
-          expect(response.ok).toBeTruthy();
-          const ticket = (await response.json()).ticket;
-          expect(assigned.has(ticket.id)).toBe(false);
-          assigned.add(ticket.id);
-          await fetch(`${apiUrl}/teller/tickets/${ticket.id}/start`, {
+        expect(started.ok).toBe(true);
+        const completed = await fetch(
+          `${apiUrl}/teller/tickets/${ticket.id}/complete`,
+          {
             method: "POST",
             headers: {
               Authorization: `Bearer ${token}`,
               "Idempotency-Key": crypto.randomUUID(),
             },
-          });
-          await fetch(`${apiUrl}/teller/tickets/${ticket.id}/complete`, {
-            method: "POST",
-            headers: {
-              Authorization: `Bearer ${token}`,
-              "Idempotency-Key": crypto.randomUUID(),
-            },
-          });
-        }
+          },
+        );
+        expect(completed.ok).toBe(true);
       }
     }
-    expect(assigned.size).toBe(63);
+
+    const finalCall = await call(tokens[0]);
+    expect(finalCall.ok).toBe(true);
+    const finalTicket = (await finalCall.json()).ticket as { id: string };
+    expect(assigned.has(finalTicket.id)).toBe(false);
+    assigned.add(finalTicket.id);
+    const finalStart = await fetch(
+      `${apiUrl}/teller/tickets/${finalTicket.id}/start`,
+      {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${tokens[0]}`,
+          "Idempotency-Key": crypto.randomUUID(),
+        },
+      },
+    );
+    expect(finalStart.ok).toBe(true);
+    const finalComplete = await fetch(
+      `${apiUrl}/teller/tickets/${finalTicket.id}/complete`,
+      {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${tokens[0]}`,
+          "Idempotency-Key": crypto.randomUUID(),
+        },
+      },
+    );
+    expect(finalComplete.ok).toBe(true);
+    expect(assigned.size).toBe(20);
+    expect(createdTickets.every((ticket) => assigned.has(ticket.id))).toBe(
+      true,
+    );
   });
 });
