@@ -1,35 +1,35 @@
-# Testing report — 2026-08-29 checkpoint
+# Testing report — 2026-08-29 final CI checkpoint
 
-## Executed successfully
+## Clean GitHub CI evidence
 
-- Prisma schema validation: passed after generation against the PostgreSQL schema.
-- API TypeScript check: passed.
-- Kiosk TypeScript check: passed.
-- Display TypeScript check: passed.
-- Staff TypeScript check: passed.
-- API unit tests: 13 passed across ticket transitions, number formatting, wait estimation, fairness, and report definitions.
+- The final `qms-ci` run passed in two isolated Ubuntu jobs against separate clean PostgreSQL 16 service databases: [run 33266274170](https://github.com/miki1007/bank-qms/actions/runs/33266274170).
+- Prisma client generation, all three migrations, and development seeding passed from a clean database.
+- Type checks passed for the API, all four Vite clients, shared packages, and hosted showcase.
+- API unit tests: 16 passed across ticket transitions, number formatting, wait estimation, fairness, report definitions, and request-shape hardening.
 - Shared validation tests: 4 passed, including customer email and password validation.
 - Testing Library component tests: 2 passed for disabled-action and non-color-only status semantics.
-- API production TypeScript build: passed.
-- Kiosk Vite production build: passed.
-- Display Vite production build: passed.
-- Staff Vite production build: passed. Vendor, chart, and icon chunks are separated; the largest generated chunk is 365.77 kB before gzip.
+- PostgreSQL/Supertest integration tests: 4 passed, covering teller privilege escalation, inactive-account login, cross-branch mutation rejection, customer/staff token isolation, ticket ownership, and logout revocation.
+- Playwright acceptance tests: 3 passed, covering teller/manager permission isolation, authenticated customer ticket creation/lookup/cancellation, and CSV export with its audit record.
+- Dedicated PostgreSQL concurrency test: 1 passed in 5.26 seconds. It created 20 tickets, verified unique issuance, checked Call Next idempotent replay, ran six repeated three-staff simultaneous-call rounds, completed every ticket, and confirmed all 20 issued IDs were assigned exactly once.
+- API and all four Vite production builds passed. The hosted showcase build also passed for `/`, `/customer-app`, `/staff-app`, `/display`, `/manager`, `/teller`, and the optional `/kiosk` route.
+- All five runtime readiness checks passed before Playwright execution: API, customer, staff/manager, display, and kiosk.
 - Hosted and repository contract tests: 13 passed, including clean production metadata, separate Android package IDs, iOS targets, manifest hardening, HTTPS-only navigation, SSL cancellation, customer token-storage policy, owner-authenticated showcase access, GitHub mobile-build wiring, and PostgreSQL Call Next idempotency wiring.
-- Hosted Bank QMS TypeScript check: passed.
-- Hosted Bank QMS ESLint check: passed.
-- Hosted Bank QMS production build: passed for `/`, `/customer-app`, `/staff-app`, `/display`, `/manager`, and the optional `/kiosk` route.
 - Private hosted deployment: platform status reached `succeeded` for the owner-only Bank QMS checkpoint.
 
-## Not executable in this environment
+## Mobile build evidence
 
-The runtime reports no `docker`, `docker compose`, `postgres`, `psql`, or `pg_isready`. Therefore database migration execution, seed execution, Supertest/API integration, Playwright, Socket.IO end-to-end behavior, backup restore, and real `FOR UPDATE SKIP LOCKED` contention remain unverified here. Tests and CI service definitions are included for execution on a Docker-capable machine. No passing claim is made for them.
+- Android customer and staff debug APKs compiled successfully in [Android workflow run 33241212700](https://github.com/miki1007/bank-qms/actions/runs/33241212700). The retained artifacts are `bank-qms-customer-apk` and `bank-qms-staff-apk`; both ZIP archives passed integrity checks after download.
+- Both iOS targets compiled successfully in the macOS simulator workflow: [iOS workflow run 33241450855](https://github.com/miki1007/bank-qms/actions/runs/33241450855).
+- Android release signing and Apple distribution signing were intentionally not configured because signing credentials must stay owner-controlled.
 
-The runtime also reports no Android SDK, Android build tools, Gradle, `adb`, `aapt`, or APK signing/verification tools. The two Android projects were therefore validated structurally and by repository tests, but APK compilation, installation, device behavior, and Android JVM tests were not executed here. The `android-apks` GitHub Actions workflow is the executable build path for a clean GitHub checkout.
+## Verification still requiring a deployment/device exercise
 
-The Linux runtime has no Xcode, XcodeGen, Swift compiler, iOS Simulator, Apple signing identity, or provisioning profile. Both iOS targets and their shared secure WebView shell were validated structurally, but iOS compilation and device installation were not executed. The `ios-builds` macOS GitHub Actions workflow is the clean-checkout build path.
+- The debug APKs have not been installed on a physical Android device in this checkpoint.
+- No signed Android AAB/APK or signed iOS IPA was produced.
+- Observed kiosk usability, printer-driver behavior, backup/restore rehearsal, and sustained production-like load remain operational acceptance activities.
+- Socket.IO is implemented and covered by repository contracts, but a browser-level reconnect/display event test is not yet part of the three Playwright cases.
+- The complete 17-step academic final acceptance script has not been executed as one uninterrupted manual session; its automated components pass separately as reported above.
 
-The browser QA surface loaded the product launcher and all five launch choices. The customer mobile route rendered its complete shell, but the isolated browser-preview D1 instance did not have its local tables applied, and the managed runtime blocked the local migration command. Therefore data-changing browser flows were not counted as passing; the deployed D1 migration is packaged in the validated Site artifact, while deployment health is verified separately by platform status.
+## Environment note
 
-## Exact validation note
-
-The generated Prisma client and `prisma validate` succeeded against a syntactically valid PostgreSQL connection URL. TypeScript was checked directly for the API, all four Vite clients, shared packages, and the hosted Site. The project-level `pnpm` wrapper was not used as evidence when this managed runtime intercepted it for network approval; the exact underlying local compiler, test, lint, formatter, and build commands were executed instead.
+The local authoring container does not expose Docker, Android SDK, or Xcode. Database, Playwright, concurrency, Android, and iOS claims above come from the linked clean GitHub-hosted jobs, not from inferred or skipped local commands.
