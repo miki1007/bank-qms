@@ -1,5 +1,5 @@
 import { Test } from "@nestjs/testing";
-import { type INestApplication, ValidationPipe } from "@nestjs/common";
+import { type INestApplication } from "@nestjs/common";
 import request from "supertest";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import cookieParser from "cookie-parser";
@@ -7,6 +7,7 @@ import { randomUUID } from "node:crypto";
 import { AppModule } from "../../src/app.module";
 import { PrismaService } from "../../src/prisma.service";
 import { DomainExceptionFilter } from "../../src/shared/domain-exception.filter";
+import { RequestValidationPipe } from "../../src/shared/request-validation.pipe";
 
 const run = process.env.RUN_DATABASE_TESTS === "1";
 const tellerPassword = process.env.DEV_TELLER_PASSWORD ?? "";
@@ -23,9 +24,7 @@ describe.skipIf(!run)("authorization integration with PostgreSQL", () => {
     app = moduleRef.createNestApplication();
     app.setGlobalPrefix("api/v1", { exclude: ["health/live", "health/ready"] });
     app.use(cookieParser());
-    app.useGlobalPipes(
-      new ValidationPipe({ whitelist: true, transform: true }),
-    );
+    app.useGlobalPipes(new RequestValidationPipe());
     app.useGlobalFilters(new DomainExceptionFilter());
     await app.init();
     prisma = app.get(PrismaService);

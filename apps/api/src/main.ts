@@ -1,11 +1,11 @@
 import "reflect-metadata";
 import cookieParser from "cookie-parser";
 import helmet from "helmet";
-import { ValidationPipe } from "@nestjs/common";
 import { NestFactory } from "@nestjs/core";
 import { SwaggerModule, DocumentBuilder } from "@nestjs/swagger";
 import { AppModule } from "./app.module";
 import { DomainExceptionFilter } from "./shared/domain-exception.filter";
+import { RequestValidationPipe } from "./shared/request-validation.pipe";
 import {
   allowedOrigins,
   apiPort,
@@ -25,7 +25,7 @@ async function bootstrap() {
     credentials: true,
     methods: ["GET", "POST", "PATCH", "OPTIONS"],
   });
-  app.useGlobalPipes(new ValidationPipe({ whitelist: true, transform: true }));
+  app.useGlobalPipes(new RequestValidationPipe());
   app.useGlobalFilters(new DomainExceptionFilter());
   app.enableShutdownHooks();
 
