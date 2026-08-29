@@ -102,6 +102,10 @@ export function MobileStaffClient() {
       }
       if (!response.ok)
         throw new Error(data.error || "Staff queue unavailable.");
+      if (data.actor?.role === "MANAGER") {
+        window.location.replace("/manager");
+        return;
+      }
       setSnapshot(data);
       setOnline(true);
       if (!quiet) setError("");

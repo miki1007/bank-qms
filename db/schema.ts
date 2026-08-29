@@ -12,7 +12,8 @@ export const showcaseTickets = sqliteTable(
   "qms_demo_tickets",
   {
     id: text("id").primaryKey(),
-    publicNumber: text("public_number").notNull().unique(),
+    publicNumber: text("public_number").notNull(),
+    businessDate: text("business_date").notNull(),
     serviceCode: text("service_code").notNull(),
     serviceName: text("service_name").notNull(),
     priority: integer("priority", { mode: "boolean" })
@@ -27,6 +28,10 @@ export const showcaseTickets = sqliteTable(
     lookupTokenHash: text("lookup_token_hash"),
   },
   (table) => [
+    uniqueIndex("qms_demo_ticket_number_per_day_unique").on(
+      table.businessDate,
+      table.publicNumber,
+    ),
     index("qms_demo_queue_idx").on(
       table.status,
       table.serviceCode,

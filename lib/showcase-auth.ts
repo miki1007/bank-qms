@@ -119,14 +119,28 @@ export async function ensureShowcaseStaff(db = getShowcaseDb()) {
 }
 
 export async function getWorkspaceShowcaseActor(role: ShowcaseRole) {
-  await ensureShowcaseStaff();
+  const db = getShowcaseDb();
+  await ensureShowcaseStaff(db);
   const staff = showcaseStaff.find((candidate) => candidate.role === role);
   if (!staff) return null;
+  const persisted = await db
+    .prepare(
+      `SELECT id, username, display_name, role
+       FROM qms_demo_staff WHERE username = ? AND active = 1 LIMIT 1`,
+    )
+    .bind(staff.username)
+    .first<{
+      id: string;
+      username: string;
+      display_name: string;
+      role: ShowcaseRole;
+    }>();
+  if (!persisted || persisted.role !== role) return null;
   return {
-    id: staff.id,
-    username: staff.username,
-    displayName: staff.displayName,
-    role: staff.role,
+    id: persisted.id,
+    username: persisted.username,
+    displayName: persisted.display_name,
+    role: persisted.role,
   } satisfies ShowcaseActor;
 }
 

@@ -31,12 +31,16 @@ async function issueTicket(payload: Record<string, unknown>) {
   const sequence = await db
     .prepare(
       `INSERT INTO qms_demo_sequences (service_code, business_date, next_value)
-       VALUES (?, ?, 1)
+       VALUES (?, ?, COALESCE(
+         (SELECT MAX(CAST(substr(public_number, instr(public_number, '-') + 1) AS INTEGER))
+          FROM qms_demo_tickets WHERE service_code = ? AND business_date = ?),
+         0
+       ) + 1)
        ON CONFLICT(service_code, business_date)
        DO UPDATE SET next_value = next_value + 1
        RETURNING next_value`,
     )
-    .bind(service.code, date)
+    .bind(service.code, date, service.code, date)
     .first<{ next_value: number }>();
   if (!sequence) return error("A ticket number could not be allocated.", 500);
 
@@ -48,12 +52,13 @@ async function issueTicket(payload: Record<string, unknown>) {
   await db
     .prepare(
       `INSERT INTO qms_demo_tickets
-       (id, public_number, service_code, service_name, priority, status, created_at, lookup_token_hash)
-       VALUES (?, ?, ?, ?, ?, 'WAITING', ?, ?)`,
+       (id, public_number, business_date, service_code, service_name, priority, status, created_at, lookup_token_hash)
+       VALUES (?, ?, ?, ?, ?, ?, 'WAITING', ?, ?)`,
     )
     .bind(
       id,
       publicNumber,
+      date,
       service.code,
       service.name,
       priority,

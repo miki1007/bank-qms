@@ -61,8 +61,26 @@ test("enforces staff sessions, manager roles, and private cancellation proof", a
   assert.match(authRoute, /oai-authenticated-user-email/);
   assert.match(authRoute, /workspace_showcase/);
   assert.match(authRoute, /sign-in service is temporarily unavailable/i);
+  assert.match(auth, /FROM qms_demo_staff WHERE username = \?/);
   assert.match(queueRoute, /Manager permission required/);
   assert.match(queueRoute, /lookup_token_hash/);
+});
+
+test("routes managers to the full dashboard and keeps daily ticket identities", async () => {
+  const login = await read("../app/staff-login-client.tsx");
+  const staffApp = await read("../app/mobile-staff-client.tsx");
+  const schema = await read("../db/schema.ts");
+  const migration = await read("../drizzle/0002_daily_ticket_identity.sql");
+  const queueRoute = await read("../app/api/showcase/route.ts");
+
+  assert.match(login, /actor\.role === "MANAGER"/);
+  assert.match(login, /window\.location\.replace\("\/manager"\)/);
+  assert.match(staffApp, /data\.actor\?\.role === "MANAGER"/);
+  assert.match(schema, /qms_demo_ticket_number_per_day_unique/);
+  assert.match(migration, /DROP INDEX `qms_demo_tickets_public_number_unique`/);
+  assert.match(migration, /datetime\(`created_at`, '\+3 hours'\)/);
+  assert.match(queueRoute, /business_date, service_code/);
+  assert.match(queueRoute, /WHERE service_code = \? AND business_date = \?/);
 });
 
 test("keeps reconnect and reduced-motion safety states visible", async () => {

@@ -184,6 +184,10 @@ export function QmsClient({ surface }: { surface: QmsSurface }) {
         }
         if (!response.ok)
           throw new Error(data.error || "Queue data is unavailable.");
+        if (surface === "teller" && data.actor?.role === "MANAGER") {
+          window.location.replace("/manager");
+          return;
+        }
         setSnapshot(data);
         setConnected(true);
         setError("");

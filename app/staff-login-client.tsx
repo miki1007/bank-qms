@@ -31,18 +31,15 @@ export function StaffLoginClient() {
   const [error, setError] = useState("");
 
   function enterWorkspace(actor: LoginActor) {
+    if (actor.role === "MANAGER") {
+      window.location.replace("/manager");
+      return;
+    }
     const requested = new URLSearchParams(window.location.search).get("next");
-    const allowed =
-      actor.role === "MANAGER"
-        ? ["/manager", "/teller", "/staff-app"]
-        : ["/teller", "/staff-app"];
+    const allowed = ["/teller", "/staff-app"];
     const destination =
-      requested && allowed.includes(requested)
-        ? requested
-        : actor.role === "MANAGER"
-          ? "/manager"
-          : "/teller";
-    window.location.assign(destination);
+      requested && allowed.includes(requested) ? requested : "/teller";
+    window.location.replace(destination);
   }
 
   async function openShowcase(role: "TELLER" | "MANAGER") {
