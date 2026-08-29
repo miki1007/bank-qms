@@ -4,6 +4,7 @@
 
 - The final `qms-ci` run passed in two isolated Ubuntu jobs against separate clean PostgreSQL 16 service databases: [run 33266274170](https://github.com/miki1007/bank-qms/actions/runs/33266274170).
 - Prisma client generation, all three migrations, and development seeding passed from a clean database.
+- Prettier formatting and ESLint checks passed and are enforced as CI gates.
 - Type checks passed for the API, all four Vite clients, shared packages, and hosted showcase.
 - API unit tests: 16 passed across ticket transitions, number formatting, wait estimation, fairness, report definitions, and request-shape hardening.
 - Shared validation tests: 4 passed, including customer email and password validation.

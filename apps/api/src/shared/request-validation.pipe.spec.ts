@@ -18,7 +18,7 @@ describe("RequestValidationPipe", () => {
   });
 
   it("rejects excessively deep payloads", () => {
-    let body: Record<string, unknown> = {};
+    const body: Record<string, unknown> = {};
     let cursor = body;
     for (let index = 0; index < 14; index += 1) {
       cursor.next = {};

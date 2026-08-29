@@ -45,6 +45,8 @@ jobs:
       - run: pnpm db:generate
       - run: pnpm db:migrate
       - run: NODE_ENV=development pnpm db:seed
+      - run: pnpm format:check
+      - run: pnpm lint
       - run: pnpm typecheck
       - run: pnpm test
       - run: RUN_DATABASE_TESTS=1 pnpm test:integration
