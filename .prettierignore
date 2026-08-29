@@ -1,0 +1,17 @@
+node_modules
+dist
+**/dist
+.next
+.sites-runtime
+.wrangler
+components
+vendor
+build
+worker
+examples
+db
+hooks
+public
+pnpm-lock.yaml
+package-lock.json
+next.config.ts

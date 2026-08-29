@@ -1,0 +1,57 @@
+name: qms-ci
+on: [push, pull_request]
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          {
+            POSTGRES_DB: bank_qms,
+            POSTGRES_USER: qms_user,
+            POSTGRES_PASSWORD: qms_password,
+          }
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U qms_user -d bank_qms"
+          --health-interval 5s --health-timeout 5s --health-retries 12
+    env:
+      DATABASE_URL: postgresql://qms_user:qms_password@localhost:5432/bank_qms
+      JWT_ACCESS_SECRET: ci-access-secret-at-least-32-characters
+      JWT_REFRESH_SECRET: ci-refresh-secret-at-least-32-characters
+      APP_ORIGIN: http://localhost:5173
+      CUSTOMER_ORIGIN: http://localhost:5176
+      KIOSK_ORIGIN: http://localhost:5174
+      DISPLAY_ORIGIN: http://localhost:5175
+      DEV_MANAGER_PASSWORD: CIManagerPassword2026
+      DEV_TELLER_PASSWORD: CITellerPassword2026
+      KIOSK_DEVICE_SECRET: ci-kiosk-device-secret
+      DISPLAY_DEVICE_SECRET: ci-display-device-secret
+      VITE_API_URL: http://localhost:3000/api/v1
+      VITE_SOCKET_URL: http://localhost:3000
+      VITE_BRANCH_CODE: MAIN
+      VITE_KIOSK_DEVICE_CODE: MAIN-KIOSK-01
+      VITE_KIOSK_DEVICE_SECRET: ci-kiosk-device-secret
+      VITE_DISPLAY_DEVICE_CODE: MAIN-DISPLAY-01
+      VITE_DISPLAY_DEVICE_SECRET: ci-display-device-secret
+      NODE_ENV: test
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with: { version: 10 }
+      - uses: actions/setup-node@v4
+        with: { node-version: 22, cache: pnpm }
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm db:generate
+      - run: pnpm db:migrate
+      - run: NODE_ENV=development pnpm db:seed
+      - run: pnpm typecheck
+      - run: pnpm test
+      - run: RUN_DATABASE_TESTS=1 pnpm test:integration
+      - run: pnpm build
+      - run: pnpm exec playwright install --with-deps chromium
+      - run: pnpm dev > /tmp/qms-dev.log 2>&1 &
+      - run: npx wait-on http://localhost:3000/health/ready http://localhost:5173 http://localhost:5174 http://localhost:5175 http://localhost:5176
+      - run: pnpm test:e2e
+      - run: RUN_DATABASE_TESTS=1 pnpm test:performance

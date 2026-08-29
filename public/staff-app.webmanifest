@@ -1,0 +1,13 @@
+{
+  "name": "Bank QMS Staff",
+  "short_name": "QMS Staff",
+  "description": "Secure teller and manager queue operations.",
+  "start_url": "/staff-app",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#081f19",
+  "theme_color": "#08634d",
+  "icons": [
+    { "src": "/favicon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any maskable" }
+  ]
+}

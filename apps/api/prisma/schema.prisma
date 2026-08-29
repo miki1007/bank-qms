@@ -1,0 +1,376 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum BranchStatus {
+  ACTIVE
+  INACTIVE
+}
+
+enum ServiceStatus {
+  ACTIVE
+  INACTIVE
+}
+
+enum CounterStatus {
+  CLOSED
+  OPEN
+  PAUSED
+}
+
+enum StaffRole {
+  TELLER
+  MANAGER
+}
+
+enum StaffStatus {
+  ACTIVE
+  INACTIVE
+  LOCKED
+}
+
+enum CustomerStatus {
+  ACTIVE
+  INACTIVE
+  LOCKED
+}
+
+enum SessionStatus {
+  OPEN
+  PAUSED
+  CLOSED
+}
+
+enum TicketStatus {
+  ISSUED
+  WAITING
+  CALLED
+  IN_SERVICE
+  COMPLETED
+  CANCELLED
+}
+
+enum TicketEventType {
+  ISSUED
+  ENQUEUED
+  CALLED
+  RECALLED
+  SERVICE_STARTED
+  COMPLETED
+  CANCELLED
+  NO_SHOW
+  TRANSFERRED
+}
+
+enum DeviceType {
+  KIOSK
+  DISPLAY
+}
+
+enum DeviceStatus {
+  ACTIVE
+  INACTIVE
+}
+
+model Branch {
+  id              String              @id @default(uuid()) @db.Uuid
+  code            String              @unique @db.VarChar(20)
+  name            String              @db.VarChar(120)
+  location        String?             @db.VarChar(255)
+  timezone        String              @default("Africa/Addis_Ababa") @db.VarChar(64)
+  status          BranchStatus        @default(ACTIVE)
+  settings        Json
+  createdAt       DateTime            @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt       DateTime            @updatedAt @map("updated_at") @db.Timestamptz(6)
+  services        ServiceType[]
+  counters        Counter[]
+  staff           Staff[]
+  sessions        CounterSession[]
+  tickets         Ticket[]
+  ticketEvents    TicketEvent[]
+  devices         Device[]
+  auditLogs       AuditLog[]
+  dailySequences  DailySequence[]
+  refreshSessions RefreshSession[]
+  idempotency     IdempotencyRecord[]
+
+  @@map("branches")
+}
+
+model Customer {
+  id               String                   @id @default(uuid()) @db.Uuid
+  email            String                   @unique @db.VarChar(254)
+  name             String                   @db.VarChar(120)
+  passwordHash     String                   @map("password_hash")
+  status           CustomerStatus           @default(ACTIVE)
+  failedLoginCount Int                      @default(0) @map("failed_login_count")
+  authVersion      Int                      @default(1) @map("auth_version")
+  lockedUntil      DateTime?                @map("locked_until") @db.Timestamptz(6)
+  lastLoginAt      DateTime?                @map("last_login_at") @db.Timestamptz(6)
+  createdAt        DateTime                 @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt        DateTime                 @updatedAt @map("updated_at") @db.Timestamptz(6)
+  tickets          Ticket[]
+  refreshSessions  CustomerRefreshSession[]
+
+  @@index([status, createdAt])
+  @@map("customers")
+}
+
+model ServiceType {
+  id                    String           @id @default(uuid()) @db.Uuid
+  branchId              String           @map("branch_id") @db.Uuid
+  code                  String           @db.VarChar(10)
+  name                  String           @db.VarChar(100)
+  description           String?          @db.VarChar(255)
+  averageServiceMinutes Int              @map("average_service_minutes")
+  priorityEnabled       Boolean          @default(false) @map("priority_enabled")
+  displayOrder          Int              @default(0) @map("display_order")
+  status                ServiceStatus    @default(ACTIVE)
+  createdAt             DateTime         @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt             DateTime         @updatedAt @map("updated_at") @db.Timestamptz(6)
+  branch                Branch           @relation(fields: [branchId], references: [id])
+  counters              Counter[]
+  sessions              CounterSession[]
+  currentTickets        Ticket[]         @relation("CurrentService")
+  originalTickets       Ticket[]         @relation("OriginalService")
+  events                TicketEvent[]
+  sequences             DailySequence[]
+
+  @@unique([branchId, code])
+  @@index([branchId, status, displayOrder])
+  @@map("service_types")
+}
+
+model Counter {
+  id                String           @id @default(uuid()) @db.Uuid
+  branchId          String           @map("branch_id") @db.Uuid
+  label             String           @db.VarChar(40)
+  assignedServiceId String?          @map("assigned_service_id") @db.Uuid
+  status            CounterStatus    @default(CLOSED)
+  isActive          Boolean          @default(true) @map("is_active")
+  createdAt         DateTime         @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt         DateTime         @updatedAt @map("updated_at") @db.Timestamptz(6)
+  branch            Branch           @relation(fields: [branchId], references: [id])
+  assignedService   ServiceType?     @relation(fields: [assignedServiceId], references: [id])
+  sessions          CounterSession[]
+  tickets           Ticket[]
+  events            TicketEvent[]
+
+  @@unique([branchId, label])
+  @@map("counters")
+}
+
+model Staff {
+  id               String           @id @default(uuid()) @db.Uuid
+  branchId         String           @map("branch_id") @db.Uuid
+  staffCode        String           @unique @map("staff_code") @db.VarChar(30)
+  name             String           @db.VarChar(120)
+  username         String           @unique @db.VarChar(80)
+  passwordHash     String           @map("password_hash")
+  role             StaffRole
+  status           StaffStatus      @default(ACTIVE)
+  failedLoginCount Int              @default(0) @map("failed_login_count")
+  authVersion      Int              @default(1) @map("auth_version")
+  lockedUntil      DateTime?        @map("locked_until") @db.Timestamptz(6)
+  lastLoginAt      DateTime?        @map("last_login_at") @db.Timestamptz(6)
+  createdAt        DateTime         @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt        DateTime         @updatedAt @map("updated_at") @db.Timestamptz(6)
+  branch           Branch           @relation(fields: [branchId], references: [id])
+  sessions         CounterSession[]
+  tickets          Ticket[]
+  events           TicketEvent[]
+  refreshSessions  RefreshSession[]
+
+  @@index([branchId, role, status])
+  @@map("staff")
+}
+
+model CounterSession {
+  id            String        @id @default(uuid()) @db.Uuid
+  branchId      String        @map("branch_id") @db.Uuid
+  counterId     String        @map("counter_id") @db.Uuid
+  staffId       String        @map("staff_id") @db.Uuid
+  serviceTypeId String        @map("service_type_id") @db.Uuid
+  status        SessionStatus @default(OPEN)
+  openedAt      DateTime      @default(now()) @map("opened_at") @db.Timestamptz(6)
+  pausedAt      DateTime?     @map("paused_at") @db.Timestamptz(6)
+  closedAt      DateTime?     @map("closed_at") @db.Timestamptz(6)
+  branch        Branch        @relation(fields: [branchId], references: [id])
+  counter       Counter       @relation(fields: [counterId], references: [id])
+  staff         Staff         @relation(fields: [staffId], references: [id])
+  serviceType   ServiceType   @relation(fields: [serviceTypeId], references: [id])
+  tickets       Ticket[]
+
+  @@index([branchId, status])
+  @@map("counter_sessions")
+}
+
+model DailySequence {
+  branchId      String      @map("branch_id") @db.Uuid
+  serviceTypeId String      @map("service_type_id") @db.Uuid
+  businessDate  DateTime    @map("business_date") @db.Date
+  lastValue     Int         @default(0) @map("last_value")
+  branch        Branch      @relation(fields: [branchId], references: [id])
+  serviceType   ServiceType @relation(fields: [serviceTypeId], references: [id])
+
+  @@id([branchId, serviceTypeId, businessDate])
+  @@map("daily_sequences")
+}
+
+model Ticket {
+  id                    String          @id @default(uuid()) @db.Uuid
+  branchId              String          @map("branch_id") @db.Uuid
+  currentServiceTypeId  String          @map("current_service_type_id") @db.Uuid
+  originalServiceTypeId String          @map("original_service_type_id") @db.Uuid
+  publicNumber          String          @map("public_number") @db.VarChar(30)
+  businessDate          DateTime        @map("business_date") @db.Date
+  dailySequence         Int             @map("daily_sequence")
+  status                TicketStatus
+  priority              Boolean         @default(false)
+  priorityReason        String?         @map("priority_reason") @db.VarChar(50)
+  queueEnteredAt        DateTime        @map("queue_entered_at") @db.Timestamptz(6)
+  issuedAt              DateTime        @default(now()) @map("issued_at") @db.Timestamptz(6)
+  calledAt              DateTime?       @map("called_at") @db.Timestamptz(6)
+  serviceStartedAt      DateTime?       @map("service_started_at") @db.Timestamptz(6)
+  completedAt           DateTime?       @map("completed_at") @db.Timestamptz(6)
+  cancelledAt           DateTime?       @map("cancelled_at") @db.Timestamptz(6)
+  assignedCounterId     String?         @map("assigned_counter_id") @db.Uuid
+  assignedStaffId       String?         @map("assigned_staff_id") @db.Uuid
+  counterSessionId      String?         @map("counter_session_id") @db.Uuid
+  customerId            String?         @map("customer_id") @db.Uuid
+  noShowCount           Int             @default(0) @map("no_show_count")
+  recallCount           Int             @default(0) @map("recall_count")
+  lookupSecretHash      String          @map("lookup_secret_hash")
+  version               Int             @default(1)
+  createdAt             DateTime        @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt             DateTime        @updatedAt @map("updated_at") @db.Timestamptz(6)
+  branch                Branch          @relation(fields: [branchId], references: [id])
+  currentService        ServiceType     @relation("CurrentService", fields: [currentServiceTypeId], references: [id])
+  originalService       ServiceType     @relation("OriginalService", fields: [originalServiceTypeId], references: [id])
+  assignedCounter       Counter?        @relation(fields: [assignedCounterId], references: [id])
+  assignedStaff         Staff?          @relation(fields: [assignedStaffId], references: [id])
+  counterSession        CounterSession? @relation(fields: [counterSessionId], references: [id])
+  customer              Customer?       @relation(fields: [customerId], references: [id])
+  events                TicketEvent[]
+
+  @@unique([branchId, businessDate, publicNumber])
+  @@index([branchId, currentServiceTypeId, status, priority, queueEnteredAt, dailySequence])
+  @@index([assignedCounterId, status])
+  @@index([issuedAt])
+  @@index([completedAt])
+  @@index([customerId, issuedAt])
+  @@map("tickets")
+}
+
+model TicketEvent {
+  id            String          @id @default(uuid()) @db.Uuid
+  ticketId      String          @map("ticket_id") @db.Uuid
+  branchId      String          @map("branch_id") @db.Uuid
+  eventType     TicketEventType @map("event_type")
+  fromStatus    TicketStatus?   @map("from_status")
+  toStatus      TicketStatus?   @map("to_status")
+  serviceTypeId String          @map("service_type_id") @db.Uuid
+  counterId     String?         @map("counter_id") @db.Uuid
+  staffId       String?         @map("staff_id") @db.Uuid
+  occurredAt    DateTime        @default(now()) @map("occurred_at") @db.Timestamptz(6)
+  reason        String?         @db.VarChar(255)
+  metadata      Json?
+  ticket        Ticket          @relation(fields: [ticketId], references: [id])
+  branch        Branch          @relation(fields: [branchId], references: [id])
+  serviceType   ServiceType     @relation(fields: [serviceTypeId], references: [id])
+  counter       Counter?        @relation(fields: [counterId], references: [id])
+  staff         Staff?          @relation(fields: [staffId], references: [id])
+
+  @@index([ticketId, occurredAt])
+  @@index([branchId, eventType, occurredAt])
+  @@map("ticket_events")
+}
+
+model Device {
+  id             String       @id @default(uuid()) @db.Uuid
+  branchId       String       @map("branch_id") @db.Uuid
+  type           DeviceType
+  name           String       @db.VarChar(100)
+  deviceCode     String       @unique @map("device_code") @db.VarChar(50)
+  credentialHash String       @map("credential_hash")
+  status         DeviceStatus @default(ACTIVE)
+  lastSeenAt     DateTime?    @map("last_seen_at") @db.Timestamptz(6)
+  createdAt      DateTime     @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt      DateTime     @updatedAt @map("updated_at") @db.Timestamptz(6)
+  branch         Branch       @relation(fields: [branchId], references: [id])
+
+  @@map("devices")
+}
+
+model AuditLog {
+  id         String   @id @default(uuid()) @db.Uuid
+  branchId   String?  @map("branch_id") @db.Uuid
+  actorType  String   @map("actor_type") @db.VarChar(30)
+  actorId    String?  @map("actor_id") @db.Uuid
+  action     String   @db.VarChar(100)
+  targetType String?  @map("target_type") @db.VarChar(50)
+  targetId   String?  @map("target_id") @db.Uuid
+  outcome    String   @db.VarChar(30)
+  reason     String?  @db.VarChar(255)
+  requestId  String?  @map("request_id") @db.VarChar(80)
+  ipAddress  String?  @map("ip_address") @db.VarChar(64)
+  userAgent  String?  @map("user_agent") @db.VarChar(255)
+  metadata   Json?
+  createdAt  DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  branch     Branch?  @relation(fields: [branchId], references: [id])
+
+  @@index([branchId, action, createdAt])
+  @@map("audit_logs")
+}
+
+model RefreshSession {
+  id        String    @id @default(uuid()) @db.Uuid
+  branchId  String    @map("branch_id") @db.Uuid
+  staffId   String    @map("staff_id") @db.Uuid
+  tokenHash String    @map("token_hash")
+  expiresAt DateTime  @map("expires_at") @db.Timestamptz(6)
+  revokedAt DateTime? @map("revoked_at") @db.Timestamptz(6)
+  createdAt DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  branch    Branch    @relation(fields: [branchId], references: [id])
+  staff     Staff     @relation(fields: [staffId], references: [id])
+
+  @@index([staffId, expiresAt])
+  @@map("refresh_sessions")
+}
+
+model CustomerRefreshSession {
+  id         String    @id @default(uuid()) @db.Uuid
+  customerId String    @map("customer_id") @db.Uuid
+  tokenHash  String    @map("token_hash")
+  expiresAt  DateTime  @map("expires_at") @db.Timestamptz(6)
+  revokedAt  DateTime? @map("revoked_at") @db.Timestamptz(6)
+  createdAt  DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  customer   Customer  @relation(fields: [customerId], references: [id])
+
+  @@index([customerId, expiresAt])
+  @@map("customer_refresh_sessions")
+}
+
+model IdempotencyRecord {
+  id           String   @id @default(uuid()) @db.Uuid
+  branchId     String   @map("branch_id") @db.Uuid
+  operation    String   @db.VarChar(80)
+  actorScope   String   @map("actor_scope") @db.VarChar(120)
+  key          String   @db.VarChar(100)
+  requestHash  String   @map("request_hash")
+  responseCode Int      @map("response_code")
+  responseBody Json     @map("response_body")
+  resultId     String?  @map("result_id") @db.Uuid
+  expiresAt    DateTime @map("expires_at") @db.Timestamptz(6)
+  createdAt    DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  branch       Branch   @relation(fields: [branchId], references: [id])
+
+  @@unique([branchId, operation, actorScope, key])
+  @@index([expiresAt])
+  @@map("idempotency_records")
+}
