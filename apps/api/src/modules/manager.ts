@@ -3,6 +3,7 @@ import {
   Controller,
   Get,
   Header,
+  Inject,
   Injectable,
   Param,
   Patch,
@@ -33,7 +34,7 @@ type ReportFilters = {
 
 @Injectable()
 export class ReportQueryService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(@Inject(PrismaService) private readonly prisma: PrismaService) {}
 
   private range(filters: ReportFilters) {
     const from = filters.from
@@ -284,8 +285,8 @@ export class ReportQueryService {
 @Injectable()
 export class ManagerService {
   constructor(
-    private readonly prisma: PrismaService,
-    private readonly realtime: RealtimePublisher,
+    @Inject(PrismaService) private readonly prisma: PrismaService,
+    @Inject(RealtimePublisher) private readonly realtime: RealtimePublisher,
   ) {}
 
   async dashboard(branchId: string) {
@@ -849,8 +850,8 @@ export class ManagerService {
 @Controller("manager")
 export class ManagerController {
   constructor(
-    private readonly manager: ManagerService,
-    private readonly reports: ReportQueryService,
+    @Inject(ManagerService) private readonly manager: ManagerService,
+    @Inject(ReportQueryService) private readonly reports: ReportQueryService,
   ) {}
   @Get("dashboard/live") dashboard(@CurrentUser() user: RequestUser) {
     return this.manager.dashboard(user.branchId);

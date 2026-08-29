@@ -3,6 +3,7 @@ import {
   Controller,
   Get,
   Headers,
+  Inject,
   Injectable,
   Param,
   Post,
@@ -24,8 +25,8 @@ import { TicketWorkflowService } from "./tickets";
 @Injectable()
 export class CounterSessionService {
   constructor(
-    private readonly prisma: PrismaService,
-    private readonly realtime: RealtimePublisher,
+    @Inject(PrismaService) private readonly prisma: PrismaService,
+    @Inject(RealtimePublisher) private readonly realtime: RealtimePublisher,
   ) {}
 
   async available(user: RequestUser) {
@@ -274,7 +275,9 @@ export class CounterSessionService {
 @Controller("teller")
 export class TellerController {
   constructor(
+    @Inject(CounterSessionService)
     private readonly sessions: CounterSessionService,
+    @Inject(TicketWorkflowService)
     private readonly workflow: TicketWorkflowService,
   ) {}
 

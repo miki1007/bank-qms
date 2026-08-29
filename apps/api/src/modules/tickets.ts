@@ -3,6 +3,7 @@ import {
   Controller,
   Get,
   Headers,
+  Inject,
   Injectable,
   Param,
   Post,
@@ -106,10 +107,11 @@ export class TicketWorkflowService {
   private readonly policy = new TicketTransitionPolicy();
 
   constructor(
-    private readonly prisma: PrismaService,
-    private readonly jwt: JwtService,
+    @Inject(PrismaService) private readonly prisma: PrismaService,
+    @Inject(JwtService) private readonly jwt: JwtService,
+    @Inject(QueueSelectionService)
     private readonly selector: QueueSelectionService,
-    private readonly realtime: RealtimePublisher,
+    @Inject(RealtimePublisher) private readonly realtime: RealtimePublisher,
   ) {}
 
   private settings(value: Prisma.JsonValue) {
@@ -1361,7 +1363,10 @@ export class TicketWorkflowService {
 @PublicRoute()
 @Controller("public")
 export class PublicController {
-  constructor(private readonly workflow: TicketWorkflowService) {}
+  constructor(
+    @Inject(TicketWorkflowService)
+    private readonly workflow: TicketWorkflowService,
+  ) {}
 
   @Get("branches/:branchCode/services")
   services(@Param("branchCode") branchCode: string) {
@@ -1407,7 +1412,10 @@ export class PublicController {
 @Controller("customers")
 @UseGuards(CustomerJwtAuthGuard)
 export class CustomerQueueController {
-  constructor(private readonly workflow: TicketWorkflowService) {}
+  constructor(
+    @Inject(TicketWorkflowService)
+    private readonly workflow: TicketWorkflowService,
+  ) {}
 
   @Get("branches")
   branches() {

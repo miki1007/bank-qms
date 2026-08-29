@@ -5,6 +5,7 @@ import {
   createParamDecorator,
   ExecutionContext,
   Get,
+  Inject,
   Injectable,
   Post,
   Req,
@@ -45,8 +46,8 @@ export const CurrentCustomer = createParamDecorator(
 @Injectable()
 export class CustomerJwtAuthGuard implements CanActivate {
   constructor(
-    private readonly jwt: JwtService,
-    private readonly prisma: PrismaService,
+    @Inject(JwtService) private readonly jwt: JwtService,
+    @Inject(PrismaService) private readonly prisma: PrismaService,
   ) {}
 
   async canActivate(context: ExecutionContext) {
@@ -81,8 +82,8 @@ export class CustomerJwtAuthGuard implements CanActivate {
 @Injectable()
 export class CustomerAuthService {
   constructor(
-    private readonly prisma: PrismaService,
-    private readonly jwt: JwtService,
+    @Inject(PrismaService) private readonly prisma: PrismaService,
+    @Inject(JwtService) private readonly jwt: JwtService,
   ) {}
 
   private async audit(
@@ -327,7 +328,9 @@ const customerCookieOptions = () => ({
 
 @Controller("customer-auth")
 export class CustomerAuthController {
-  constructor(private readonly auth: CustomerAuthService) {}
+  constructor(
+    @Inject(CustomerAuthService) private readonly auth: CustomerAuthService,
+  ) {}
 
   @PublicRoute()
   @Throttle({ default: { limit: 5, ttl: 60_000 } })

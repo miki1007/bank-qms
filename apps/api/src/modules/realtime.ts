@@ -1,4 +1,4 @@
-import { Injectable } from "@nestjs/common";
+import { Inject, Injectable } from "@nestjs/common";
 import { JwtService } from "@nestjs/jwt";
 import { PrismaService } from "../prisma.service";
 import {
@@ -26,8 +26,8 @@ export class RealtimeGateway implements OnGatewayConnection {
   @WebSocketServer() server!: Server;
 
   constructor(
-    private readonly jwt: JwtService,
-    private readonly prisma: PrismaService,
+    @Inject(JwtService) private readonly jwt: JwtService,
+    @Inject(PrismaService) private readonly prisma: PrismaService,
   ) {}
 
   async handleConnection(@ConnectedSocket() socket: Socket) {
@@ -101,7 +101,9 @@ export class RealtimeGateway implements OnGatewayConnection {
 
 @Injectable()
 export class RealtimePublisher {
-  constructor(private readonly gateway: RealtimeGateway) {}
+  constructor(
+    @Inject(RealtimeGateway) private readonly gateway: RealtimeGateway,
+  ) {}
 
   publish(
     branchId: string,

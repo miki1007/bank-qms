@@ -6,6 +6,7 @@ import {
   ExecutionContext,
   ForbiddenException,
   Get,
+  Inject,
   Injectable,
   Post,
   Req,
@@ -45,9 +46,9 @@ export const CurrentUser = createParamDecorator(
 @Injectable()
 export class JwtAuthGuard implements CanActivate {
   constructor(
-    private readonly jwt: JwtService,
-    private readonly reflector: Reflector,
-    private readonly prisma: PrismaService,
+    @Inject(JwtService) private readonly jwt: JwtService,
+    @Inject(Reflector) private readonly reflector: Reflector,
+    @Inject(PrismaService) private readonly prisma: PrismaService,
   ) {}
 
   async canActivate(context: ExecutionContext) {
@@ -88,7 +89,7 @@ export class JwtAuthGuard implements CanActivate {
 
 @Injectable()
 export class RolesGuard implements CanActivate {
-  constructor(private readonly reflector: Reflector) {}
+  constructor(@Inject(Reflector) private readonly reflector: Reflector) {}
   canActivate(context: ExecutionContext) {
     const roles = this.reflector.getAllAndOverride<Array<RequestUser["role"]>>(
       "roles",
@@ -109,8 +110,8 @@ export class RolesGuard implements CanActivate {
 @Injectable()
 export class AuthService {
   constructor(
-    private readonly prisma: PrismaService,
-    private readonly jwt: JwtService,
+    @Inject(PrismaService) private readonly prisma: PrismaService,
+    @Inject(JwtService) private readonly jwt: JwtService,
   ) {}
 
   private async audit(
@@ -348,7 +349,7 @@ export class AuthService {
 
 @Controller("auth")
 export class AuthController {
-  constructor(private readonly auth: AuthService) {}
+  constructor(@Inject(AuthService) private readonly auth: AuthService) {}
 
   @PublicRoute()
   @Throttle({ default: { limit: 5, ttl: 60_000 } })
