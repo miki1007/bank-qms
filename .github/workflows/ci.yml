@@ -49,8 +49,8 @@ jobs:
       - run: pnpm test
       - run: RUN_DATABASE_TESTS=1 pnpm test:integration
       - run: pnpm build
-      - run: pnpm exec playwright install --with-deps chromium
+      - run: pnpm --filter @qms/e2e exec playwright install --with-deps chromium
       - run: pnpm dev > /tmp/qms-dev.log 2>&1 &
-      - run: npx wait-on http://localhost:3000/health/ready http://localhost:5173 http://localhost:5174 http://localhost:5175 http://localhost:5176
+      - run: bash scripts/wait-for-services.sh http://localhost:3000/health/ready http://localhost:5173 http://localhost:5174 http://localhost:5175 http://localhost:5176
       - run: pnpm test:e2e
       - run: RUN_DATABASE_TESTS=1 pnpm test:performance
