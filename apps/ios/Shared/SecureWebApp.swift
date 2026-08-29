@@ -85,7 +85,9 @@ private struct SecureWebView: UIViewRepresentable {
         webView.navigationDelegate = context.coordinator
         webView.uiDelegate = context.coordinator
         webView.allowsBackForwardNavigationGestures = true
-        webView.isInspectable = _isDebugAssertConfiguration()
+        if #available(iOS 16.4, *) {
+            webView.isInspectable = _isDebugAssertConfiguration()
+        }
         webView.customUserAgent = "BankQMS-iOS/1.0"
         context.coordinator.observe(webView)
         state.webView = webView
