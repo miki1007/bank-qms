@@ -134,6 +134,16 @@ export class TicketWorkflowService {
     return parsed.data;
   }
 
+  private async acquireAdvisoryLock(
+    tx: Prisma.TransactionClient,
+    lockKey: string,
+  ) {
+    await tx.$queryRaw<Array<{ locked: number }>>(Prisma.sql`
+      SELECT 1::int AS locked
+      FROM (SELECT pg_advisory_xact_lock(hashtext(${lockKey}))) AS acquired
+    `);
+  }
+
   private async beginStaffTicketMutation(
     tx: Prisma.TransactionClient,
     user: RequestUser,
@@ -146,9 +156,7 @@ export class TicketWorkflowService {
       .update(JSON.stringify({ ticketId, ...request }))
       .digest("hex");
     const lockKey = `${user.branchId}:${operation}:${user.sub}:${idempotencyKey}`;
-    await tx.$queryRaw(
-      Prisma.sql`SELECT pg_advisory_xact_lock(hashtext(${lockKey}))`,
-    );
+    await this.acquireAdvisoryLock(tx, lockKey);
     const previous = await tx.idempotencyRecord.findUnique({
       where: {
         branchId_operation_actorScope_key: {
@@ -432,9 +440,7 @@ export class TicketWorkflowService {
     const creation = await this.prisma.$transaction(
       async (tx) => {
         const lockKey = `${branch.id}:CREATE_TICKET:${actorScope}:${parsed.data.idempotencyKey}`;
-        await tx.$queryRaw(
-          Prisma.sql`SELECT pg_advisory_xact_lock(hashtext(${lockKey}))`,
-        );
+        await this.acquireAdvisoryLock(tx, lockKey);
         const existing = await tx.idempotencyRecord.findUnique({
           where: {
             branchId_operation_actorScope_key: {
@@ -822,9 +828,7 @@ export class TicketWorkflowService {
           )
           .digest("hex");
         const lockKey = `${user.branchId}:${operation}:${actorScope}:${parsedKey}`;
-        await tx.$queryRaw(
-          Prisma.sql`SELECT pg_advisory_xact_lock(hashtext(${lockKey}))`,
-        );
+        await this.acquireAdvisoryLock(tx, lockKey);
         const previous = await tx.idempotencyRecord.findUnique({
           where: {
             branchId_operation_actorScope_key: {
