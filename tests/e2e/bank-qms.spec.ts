@@ -3,7 +3,6 @@ import { expect, test, type APIRequestContext } from "@playwright/test";
 const apiUrl = process.env.E2E_API_URL ?? "http://localhost:3000/api/v1";
 const tellerPassword = process.env.DEV_TELLER_PASSWORD ?? "";
 const managerPassword = process.env.DEV_MANAGER_PASSWORD ?? "";
-const kioskSecret = process.env.KIOSK_DEVICE_SECRET ?? "";
 
 async function login(
   request: APIRequestContext,
@@ -35,40 +34,45 @@ test("teller login is isolated from manager endpoints", async ({ request }) => {
 test("customer creates, looks up, and cancels a ticket", async ({
   request,
 }) => {
-  const services = await request.get(`${apiUrl}/public/branches/MAIN/services`);
+  const registered = await request.post(`${apiUrl}/customer-auth/register`, {
+    data: {
+      name: "E2E Customer",
+      email: `e2e-${crypto.randomUUID()}@example.test`,
+      password: "CustomerE2E2026",
+    },
+  });
+  expect(registered.ok()).toBeTruthy();
+  const customerToken = (await registered.json()).accessToken as string;
+  const customerHeaders = { Authorization: `Bearer ${customerToken}` };
+  const services = await request.get(
+    `${apiUrl}/customers/branches/MAIN/services`,
+    { headers: customerHeaders },
+  );
   const service = (await services.json()).find(
     (item: { code: string }) => item.code === "DEP",
   );
-  const created = await request.post(`${apiUrl}/public/branches/MAIN/tickets`, {
-    headers: {
-      "x-device-code": "MAIN-KIOSK-01",
-      "x-device-secret": kioskSecret,
+  const created = await request.post(
+    `${apiUrl}/customers/branches/MAIN/tickets`,
+    {
+      headers: customerHeaders,
+      data: {
+        serviceTypeId: service.id,
+        priority: false,
+        priorityReason: null,
+        idempotencyKey: crypto.randomUUID(),
+      },
     },
-    data: {
-      serviceTypeId: service.id,
-      priority: false,
-      priorityReason: null,
-      idempotencyKey: crypto.randomUUID(),
-    },
-  });
+  );
   expect(created.ok()).toBeTruthy();
   const ticket = (await created.json()).ticket;
-  const lookup = await request.post(`${apiUrl}/public/tickets/lookup`, {
-    data: {
-      branchCode: "MAIN",
-      publicNumber: ticket.publicNumber,
-      lookupCode: ticket.lookupCode,
-    },
+  const lookup = await request.get(`${apiUrl}/customers/tickets/${ticket.id}`, {
+    headers: customerHeaders,
   });
   expect((await lookup.json()).ticket.status).toBe("WAITING");
   const cancelled = await request.post(
-    `${apiUrl}/public/tickets/${ticket.id}/cancel`,
+    `${apiUrl}/customers/tickets/${ticket.id}/cancel`,
     {
-      data: {
-        branchCode: "MAIN",
-        publicNumber: ticket.publicNumber,
-        lookupCode: ticket.lookupCode,
-      },
+      headers: customerHeaders,
     },
   );
   expect((await cancelled.json()).ticket.status).toBe("CANCELLED");
