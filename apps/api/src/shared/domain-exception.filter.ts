@@ -35,12 +35,26 @@ export class DomainExceptionFilter implements ExceptionFilter {
       });
       return;
     }
+    const diagnostic =
+      error instanceof Error
+        ? {
+            errorType: error.name,
+            errorCode:
+              typeof (error as Error & { code?: unknown }).code === "string"
+                ? (error as Error & { code: string }).code
+                : undefined,
+            ...(process.env.NODE_ENV === "test"
+              ? { errorMessage: error.message }
+              : {}),
+          }
+        : { errorType: "UnknownError" };
     console.error(
       JSON.stringify({
         level: "error",
         requestId,
         path: request.url,
         message: "Unhandled server error",
+        ...diagnostic,
       }),
     );
     response.status(500).json({
