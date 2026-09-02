@@ -56,6 +56,48 @@ describe.skipIf(!run)("authorization integration with PostgreSQL", () => {
     }
   });
 
+  it("locks a teller session to the counter assigned by the manager", async () => {
+    const teller = await login("teller.one", tellerPassword);
+    expect(teller.status).toBe(201);
+    const account = await prisma.staff.findUniqueOrThrow({
+      where: { username: "teller.one" },
+      include: { assignedCounter: true },
+    });
+    expect(account.assignedCounter).not.toBeNull();
+    const otherCounter = await prisma.counter.findFirstOrThrow({
+      where: {
+        branchId: account.branchId,
+        id: { not: account.assignedCounter!.id },
+      },
+    });
+
+    const available = await request(app.getHttpServer())
+      .get("/api/v1/teller/counters/available")
+      .set("Authorization", `Bearer ${teller.body.accessToken}`);
+    expect(available.status).toBe(200);
+    expect(available.body).toHaveLength(1);
+    expect(available.body[0].id).toBe(account.assignedCounterId);
+
+    const forgedOpen = await request(app.getHttpServer())
+      .post("/api/v1/teller/counter-sessions")
+      .set("Authorization", `Bearer ${teller.body.accessToken}`)
+      .send({ counterId: otherCounter.id });
+    expect(forgedOpen.status).toBe(403);
+    expect(forgedOpen.body.error.code).toBe("FORBIDDEN");
+
+    const assignedOpen = await request(app.getHttpServer())
+      .post("/api/v1/teller/counter-sessions")
+      .set("Authorization", `Bearer ${teller.body.accessToken}`)
+      .send({ counterId: account.assignedCounterId });
+    expect(assignedOpen.status).toBe(201);
+    expect(assignedOpen.body.session.counterId).toBe(account.assignedCounterId);
+
+    const close = await request(app.getHttpServer())
+      .post("/api/v1/teller/counter-session/close")
+      .set("Authorization", `Bearer ${teller.body.accessToken}`);
+    expect(close.status).toBe(201);
+  });
+
   it("rejects inactive accounts with a generic login message", async () => {
     await prisma.staff.update({
       where: { username: "teller.two" },

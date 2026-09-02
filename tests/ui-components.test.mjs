@@ -215,3 +215,26 @@ test("makes canonical Call Next retries idempotent inside PostgreSQL", async () 
   assert.match(staff, /"Idempotency-Key": idempotencyKey/);
   assert.match(staff, /crypto\.randomUUID\(\)/);
 });
+
+test("locks teller accounts to manager-controlled counters and scopes fairness per service", async () => {
+  const prisma = await read("../apps/api/prisma/schema.prisma");
+  const teller = await read("../apps/api/src/modules/teller.ts");
+  const workflow = await read("../apps/api/src/modules/tickets.ts");
+  const staffWeb = await read("../apps/staff-web/src/main.tsx");
+  const showcaseAuth = await read("../lib/showcase-auth.ts");
+  const showcaseQueue = await read("../app/api/showcase/route.ts");
+  const showcaseStaff = await read("../app/mobile-staff-client.tsx");
+
+  assert.match(prisma, /assignedCounterId\s+String\?\s+@unique/);
+  assert.match(
+    teller,
+    /You may open only the counter assigned by your manager/,
+  );
+  assert.match(staffWeb, /Open your assigned counter/);
+  assert.doesNotMatch(showcaseStaff, /setCounter\(/);
+  assert.match(showcaseAuth, /assignedCounter: "Counter 4"/);
+  assert.match(workflow, /PRIORITY_FAIRNESS/);
+  assert.match(showcaseQueue, /qms_demo_priority_state/);
+  assert.match(showcaseQueue, /service_code = \?/);
+  assert.match(showcaseQueue, /priorityReason/);
+});

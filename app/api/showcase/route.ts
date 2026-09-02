@@ -23,9 +23,23 @@ function serviceByCode(code: unknown) {
   return services.find((service) => service.code === code);
 }
 
+const priorityReasons = new Set([
+  "ELDERLY",
+  "DISABILITY",
+  "PREGNANCY",
+  "OTHER",
+]);
+
 async function issueTicket(payload: Record<string, unknown>) {
   const service = serviceByCode(payload.serviceCode);
   if (!service) return error("Choose a valid service.");
+  const priority = payload.priority === true ? 1 : 0;
+  const priorityReason =
+    priority && typeof payload.priorityReason === "string"
+      ? payload.priorityReason
+      : null;
+  if (priority && (!priorityReason || !priorityReasons.has(priorityReason)))
+    return error("Choose a valid priority eligibility reason.");
   const db = getShowcaseDb();
   const date = businessDate();
   const sequence = await db
@@ -48,12 +62,12 @@ async function issueTicket(payload: Record<string, unknown>) {
   const lookupToken = `${crypto.randomUUID()}${crypto.randomUUID()}`;
   const publicNumber = `${service.code}-${String(sequence.next_value).padStart(3, "0")}`;
   const createdAt = new Date().toISOString();
-  const priority = payload.priority === true ? 1 : 0;
   await db
     .prepare(
       `INSERT INTO qms_demo_tickets
-       (id, public_number, business_date, service_code, service_name, priority, status, created_at, lookup_token_hash)
-       VALUES (?, ?, ?, ?, ?, ?, 'WAITING', ?, ?)`,
+       (id, public_number, business_date, service_code, service_name, priority, priority_reason,
+        status, created_at, queue_entered_at, lookup_token_hash)
+       VALUES (?, ?, ?, ?, ?, ?, ?, 'WAITING', ?, ?, ?)`,
     )
     .bind(
       id,
@@ -62,6 +76,8 @@ async function issueTicket(payload: Record<string, unknown>) {
       service.code,
       service.name,
       priority,
+      priorityReason,
+      createdAt,
       createdAt,
       await sha256Hex(lookupToken),
     )
@@ -87,16 +103,29 @@ async function issueTicket(payload: Record<string, unknown>) {
 }
 
 async function callNext(
-  payload: Record<string, unknown>,
+  _payload: Record<string, unknown>,
   actor: ShowcaseActor,
 ) {
-  const counter = typeof payload.counter === "string" ? payload.counter : "";
-  if (!/^Counter [1-4]$/.test(counter)) return error("Choose a valid counter.");
+  if (
+    actor.role !== "TELLER" ||
+    !actor.assignedCounter ||
+    !actor.assignedServiceCode
+  )
+    return error("A manager-assigned teller counter is required.", 403);
+  const counter = actor.assignedCounter;
+  const serviceCode = actor.assignedServiceCode;
   const db = getShowcaseDb();
   await db
     .prepare(
       "INSERT INTO qms_demo_settings (id, priority_streak, priority_limit) VALUES (1, 0, 2) ON CONFLICT(id) DO NOTHING",
     )
+    .run();
+  await db
+    .prepare(
+      `INSERT INTO qms_demo_priority_state (service_code, priority_streak)
+       VALUES (?, 0) ON CONFLICT(service_code) DO NOTHING`,
+    )
+    .bind(serviceCode)
     .run();
   const active = await db
     .prepare(
@@ -107,36 +136,44 @@ async function callNext(
   if (active) return error(`${counter} already has an active customer.`, 409);
 
   const settings = await db
+    .prepare("SELECT priority_limit FROM qms_demo_settings WHERE id = 1")
+    .first<{ priority_limit: number }>();
+  const fairness = await db
     .prepare(
-      "SELECT priority_streak, priority_limit FROM qms_demo_settings WHERE id = 1",
+      "SELECT priority_streak FROM qms_demo_priority_state WHERE service_code = ?",
     )
-    .first<{ priority_streak: number; priority_limit: number }>();
+    .bind(serviceCode)
+    .first<{ priority_streak: number }>();
   const standardWaiting = await db
     .prepare(
-      "SELECT id FROM qms_demo_tickets WHERE status = 'WAITING' AND priority = 0 LIMIT 1",
+      "SELECT id FROM qms_demo_tickets WHERE status = 'WAITING' AND service_code = ? AND priority = 0 LIMIT 1",
     )
+    .bind(serviceCode)
     .first();
   const forceStandard =
     Boolean(standardWaiting) &&
-    (settings?.priority_streak ?? 0) >= (settings?.priority_limit ?? 2);
+    (fairness?.priority_streak ?? 0) >= (settings?.priority_limit ?? 2);
   const order = forceStandard
-    ? "priority ASC, created_at ASC"
-    : "priority DESC, created_at ASC";
+    ? "priority ASC, queue_entered_at ASC, public_number ASC"
+    : "priority DESC, queue_entered_at ASC, public_number ASC";
   const now = new Date().toISOString();
   const called = await db
     .prepare(
       `UPDATE qms_demo_tickets SET status = 'CALLED', counter = ?, called_at = ?
-       WHERE id = (SELECT id FROM qms_demo_tickets WHERE status = 'WAITING' ORDER BY ${order} LIMIT 1)
+       WHERE id = (SELECT id FROM qms_demo_tickets
+         WHERE status = 'WAITING' AND service_code = ? ORDER BY ${order} LIMIT 1)
        AND status = 'WAITING' RETURNING *`,
     )
-    .bind(counter, now)
+    .bind(counter, now, serviceCode)
     .first<ShowcaseTicket>();
   if (!called) return error("No customers are waiting.", 409);
   await db
     .prepare(
-      "UPDATE qms_demo_settings SET priority_streak = CASE WHEN ? = 1 THEN priority_streak + 1 ELSE 0 END WHERE id = 1",
+      `UPDATE qms_demo_priority_state
+       SET priority_streak = CASE WHEN ? = 1 THEN priority_streak + 1 ELSE 0 END
+       WHERE service_code = ?`,
     )
-    .bind(called.priority)
+    .bind(called.priority, serviceCode)
     .run();
   await appendEvent(
     db,
@@ -187,10 +224,10 @@ async function transition(
       timestamp: true,
     },
     requeue: {
-      sql: "UPDATE qms_demo_tickets SET status='WAITING', counter=NULL, called_at=NULL, completed_at=NULL WHERE id=? AND status='NO_SHOW' RETURNING *",
+      sql: "UPDATE qms_demo_tickets SET status='WAITING', counter=NULL, called_at=NULL, started_at=NULL, completed_at=NULL, queue_entered_at=? WHERE id=? AND status='NO_SHOW' RETURNING *",
       type: "ticket.requeued",
       detail: "Customer returned to queue",
-      timestamp: false,
+      timestamp: true,
     },
     recall: {
       sql: "UPDATE qms_demo_tickets SET called_at=? WHERE id=? AND status='CALLED' RETURNING *",
@@ -225,6 +262,15 @@ async function transition(
     }
   } else if (!actor) {
     return error("Authentication required.", 401);
+  } else {
+    if (actor.role !== "TELLER" || !actor.assignedCounter)
+      return error("A manager-assigned teller counter is required.", 403);
+    const owned = await db
+      .prepare("SELECT counter FROM qms_demo_tickets WHERE id=? LIMIT 1")
+      .bind(id)
+      .first<{ counter: string | null }>();
+    if (!owned || owned.counter !== actor.assignedCounter)
+      return error("This ticket belongs to another teller counter.", 403);
   }
   const ticket = transition.timestamp
     ? await db.prepare(transition.sql).bind(now, id).first<ShowcaseTicket>()
@@ -263,14 +309,18 @@ async function transfer(
   const id = typeof payload.ticketId === "string" ? payload.ticketId : "";
   const service = serviceByCode(payload.serviceCode);
   if (!id || !service) return error("Choose a ticket and destination service.");
+  if (actor.role !== "TELLER" || !actor.assignedCounter)
+    return error("A manager-assigned teller counter is required.", 403);
   const db = getShowcaseDb();
+  const now = new Date().toISOString();
   const ticket = await db
     .prepare(
       `UPDATE qms_demo_tickets
-       SET service_code=?, service_name=?, status='WAITING', counter=NULL, called_at=NULL, started_at=NULL, completed_at=NULL
-       WHERE id=? AND status IN ('WAITING','CALLED','NO_SHOW') RETURNING *`,
+       SET service_code=?, service_name=?, status='WAITING', counter=NULL, called_at=NULL,
+           started_at=NULL, completed_at=NULL, queue_entered_at=?
+       WHERE id=? AND counter=? AND status IN ('CALLED','IN_SERVICE') RETURNING *`,
     )
-    .bind(service.code, service.name, id)
+    .bind(service.code, service.name, now, id, actor.assignedCounter)
     .first<ShowcaseTicket>();
   if (!ticket) return error("This ticket cannot be transferred now.", 409);
   await appendEvent(
@@ -296,6 +346,7 @@ async function resetShowcase(actor: ShowcaseActor) {
     db.prepare("DELETE FROM qms_demo_events"),
     db.prepare("DELETE FROM qms_demo_tickets"),
     db.prepare("DELETE FROM qms_demo_sequences"),
+    db.prepare("DELETE FROM qms_demo_priority_state"),
     db.prepare("UPDATE qms_demo_settings SET priority_streak=0 WHERE id=1"),
   ]);
   await appendAudit(actor, "showcase.reset", "Showcase queue records reset");
@@ -319,6 +370,12 @@ async function setPriorityLimit(
        VALUES (1, 0, ?)
        ON CONFLICT(id) DO UPDATE SET priority_limit=excluded.priority_limit,
          priority_streak=MIN(priority_streak, excluded.priority_limit)`,
+    )
+    .bind(limit)
+    .run();
+  await db
+    .prepare(
+      "UPDATE qms_demo_priority_state SET priority_streak=MIN(priority_streak, ?)",
     )
     .bind(limit)
     .run();
@@ -462,20 +519,27 @@ async function customerTicketLookup(ticketId: string, lookupToken: string) {
 
   let position: number | null = null;
   if (ticket.status === "WAITING") {
-    const [waitingResult, settings] = await Promise.all([
+    const [waitingResult, settings, fairness] = await Promise.all([
       db
         .prepare(
-          "SELECT id, priority, created_at FROM qms_demo_tickets WHERE status='WAITING' ORDER BY created_at ASC",
+          `SELECT id, priority, queue_entered_at FROM qms_demo_tickets
+           WHERE status='WAITING' AND service_code=?
+           ORDER BY queue_entered_at ASC, public_number ASC`,
         )
-        .all<{ id: string; priority: number; created_at: string }>(),
+        .bind(ticket.service_code)
+        .all<{ id: string; priority: number; queue_entered_at: string }>(),
+      db
+        .prepare("SELECT priority_limit FROM qms_demo_settings WHERE id=1")
+        .first<{ priority_limit: number }>(),
       db
         .prepare(
-          "SELECT priority_streak, priority_limit FROM qms_demo_settings WHERE id=1",
+          "SELECT priority_streak FROM qms_demo_priority_state WHERE service_code=?",
         )
-        .first<{ priority_streak: number; priority_limit: number }>(),
+        .bind(ticket.service_code)
+        .first<{ priority_streak: number }>(),
     ]);
     const waiting = [...(waitingResult.results ?? [])];
-    let streak = settings?.priority_streak ?? 0;
+    let streak = fairness?.priority_streak ?? 0;
     const limit = settings?.priority_limit ?? 2;
     for (let index = 1; waiting.length; index += 1) {
       const standards = waiting.filter((item) => item.priority === 0);

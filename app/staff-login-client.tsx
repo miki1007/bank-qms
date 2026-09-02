@@ -27,6 +27,7 @@ export function StaffLoginClient() {
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
+  const [showcaseTeller, setShowcaseTeller] = useState("teller.one");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
 
@@ -49,7 +50,11 @@ export function StaffLoginClient() {
       const response = await fetch("/api/showcase/auth", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ action: "workspace_showcase", role }),
+        body: JSON.stringify({
+          action: "workspace_showcase",
+          role,
+          ...(role === "TELLER" ? { username: showcaseTeller } : {}),
+        }),
       });
       const result = (await response.json()) as {
         actor?: LoginActor;
@@ -171,6 +176,18 @@ export function StaffLoginClient() {
                 Teller view
               </Button>
             </div>
+            <label className="showcase-teller-picker">
+              <span>Independent teller account</span>
+              <select
+                value={showcaseTeller}
+                onChange={(event) => setShowcaseTeller(event.target.value)}
+              >
+                <option value="teller.one">Teller 1 · Counter 1</option>
+                <option value="teller.two">Teller 2 · Counter 2</option>
+                <option value="teller.three">Teller 3 · Counter 3</option>
+                <option value="teller.four">Teller 4 · Counter 4</option>
+              </select>
+            </label>
           </div>
 
           <div className="login-divider">

@@ -87,6 +87,8 @@ type Snapshot = {
     username: string;
     displayName: string;
     role: "TELLER" | "MANAGER";
+    assignedCounter: string | null;
+    assignedServiceCode: string | null;
   };
   metrics: {
     issued: number;
@@ -163,9 +165,9 @@ export function QmsClient({ surface }: { surface: QmsSurface }) {
   const [busy, setBusy] = useState("");
   const [selectedService, setSelectedService] = useState("DEP");
   const [priority, setPriority] = useState(false);
+  const [priorityReason, setPriorityReason] = useState("ELDERLY");
   const [issuedTicket, setIssuedTicket] = useState<Ticket | null>(null);
   const [lookupToken, setLookupToken] = useState("");
-  const [selectedCounter, setSelectedCounter] = useState(counters[0]);
   const [transferService, setTransferService] = useState("WDR");
   const [now, setNow] = useState(new Date());
 
@@ -262,23 +264,24 @@ export function QmsClient({ surface }: { surface: QmsSurface }) {
     }
   }
 
+  const assignedCounter = snapshot.actor?.assignedCounter ?? null;
   const activeTicket = useMemo(
     () =>
       snapshot.tickets.find(
         (ticket) =>
-          ticket.counter === selectedCounter &&
+          ticket.counter === assignedCounter &&
           (ticket.status === "CALLED" || ticket.status === "IN_SERVICE"),
       ) ?? null,
-    [selectedCounter, snapshot.tickets],
+    [assignedCounter, snapshot.tickets],
   );
 
   const recentNoShow = useMemo(
     () =>
       snapshot.tickets.find(
         (ticket) =>
-          ticket.counter === selectedCounter && ticket.status === "NO_SHOW",
+          ticket.counter === assignedCounter && ticket.status === "NO_SHOW",
       ) ?? null,
-    [selectedCounter, snapshot.tickets],
+    [assignedCounter, snapshot.tickets],
   );
 
   const recentCalls = useMemo(
@@ -314,11 +317,20 @@ export function QmsClient({ surface }: { surface: QmsSurface }) {
     (sum, service) => sum + service.waiting * service.minutes,
     0,
   );
+  const assignedQueueWaiting =
+    snapshot.services.find(
+      (service) => service.code === snapshot.actor?.assignedServiceCode,
+    )?.waiting ?? 0;
 
   async function issue() {
     const result = await mutate(
       "issue",
-      { operation: "issue", serviceCode: selectedService, priority },
+      {
+        operation: "issue",
+        serviceCode: selectedService,
+        priority,
+        priorityReason: priority ? priorityReason : null,
+      },
       "Ticket issued successfully.",
     );
     if (result?.ticket) {
@@ -525,6 +537,21 @@ export function QmsClient({ surface }: { surface: QmsSurface }) {
                   <small>For eligible customers</small>
                 </span>
               </label>
+              {priority && (
+                <label className="priority-reason-control">
+                  <span>Eligibility reason</span>
+                  <select
+                    value={priorityReason}
+                    onChange={(event) => setPriorityReason(event.target.value)}
+                  >
+                    <option value="ELDERLY">Elderly customer</option>
+                    <option value="DISABILITY">Customer with disability</option>
+                    <option value="PREGNANCY">Pregnancy</option>
+                    <option value="OTHER">Other eligible need</option>
+                  </select>
+                  <small>Private and never shown on the display.</small>
+                </label>
+              )}
               <Button
                 className="primary-action"
                 size="lg"
@@ -587,17 +614,11 @@ export function QmsClient({ surface }: { surface: QmsSurface }) {
                   Queue changes are immediately reflected across every view.
                 </p>
               </div>
-              <label className="counter-picker">
-                <span>Active counter</span>
-                <select
-                  value={selectedCounter}
-                  onChange={(event) => setSelectedCounter(event.target.value)}
-                >
-                  {counters.map((counter) => (
-                    <option key={counter}>{counter}</option>
-                  ))}
-                </select>
-              </label>
+              <div className="counter-picker locked-counter">
+                <span>Manager-assigned counter</span>
+                <strong>{assignedCounter ?? "Not assigned"}</strong>
+                <small>{snapshot.actor?.username}</small>
+              </div>
             </div>
 
             <div className="teller-grid">
@@ -735,8 +756,8 @@ export function QmsClient({ surface }: { surface: QmsSurface }) {
                     </span>
                     <h2>No active customer</h2>
                     <p>
-                      {snapshot.metrics.waiting
-                        ? `${snapshot.metrics.waiting} customer${snapshot.metrics.waiting === 1 ? " is" : "s are"} ready.`
+                      {assignedQueueWaiting
+                        ? `${assignedQueueWaiting} customer${assignedQueueWaiting === 1 ? " is" : "s are"} ready in your service queue.`
                         : "The queue is clear."}
                     </p>
                     <Button
@@ -745,11 +766,15 @@ export function QmsClient({ surface }: { surface: QmsSurface }) {
                       onClick={() =>
                         void mutate(
                           "call-next",
-                          { operation: "call_next", counter: selectedCounter },
+                          { operation: "call_next" },
                           "Next customer called.",
                         )
                       }
-                      disabled={Boolean(busy) || snapshot.metrics.waiting === 0}
+                      disabled={
+                        Boolean(busy) ||
+                        !assignedCounter ||
+                        assignedQueueWaiting === 0
+                      }
                     >
                       {busy === "call-next" ? (
                         <LoaderCircle className="spin" />
@@ -797,8 +822,8 @@ export function QmsClient({ surface }: { surface: QmsSurface }) {
                   <p>
                     <strong>Fair priority active</strong>
                     <span>
-                      After 2 priority calls, the oldest standard ticket is
-                      selected.
+                      After {snapshot.settings.priorityLimit} consecutive
+                      priority calls, the oldest standard ticket is selected.
                     </span>
                   </p>
                 </div>

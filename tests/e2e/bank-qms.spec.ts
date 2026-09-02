@@ -31,6 +31,42 @@ test("teller login is isolated from manager endpoints", async ({ request }) => {
   }
 });
 
+test("each teller can open only the manager-assigned counter", async ({
+  request,
+}) => {
+  const tellerToken = await login(request, "teller.one", tellerPassword);
+  const managerToken = await login(request, "manager.dev", managerPassword);
+  const tellerHeaders = { Authorization: `Bearer ${tellerToken}` };
+  const assignedResponse = await request.get(
+    `${apiUrl}/teller/counters/available`,
+    { headers: tellerHeaders },
+  );
+  expect(assignedResponse.ok()).toBeTruthy();
+  const assigned = (await assignedResponse.json()) as Array<{
+    id: string;
+    label: string;
+  }>;
+  expect(assigned).toHaveLength(1);
+  expect(assigned[0].label).toBe("Counter 1");
+
+  const allCountersResponse = await request.get(`${apiUrl}/manager/counters`, {
+    headers: { Authorization: `Bearer ${managerToken}` },
+  });
+  const allCounters = (await allCountersResponse.json()) as Array<{
+    id: string;
+    label: string;
+  }>;
+  const anotherCounter = allCounters.find(
+    (counter) => counter.label === "Counter 2",
+  );
+  expect(anotherCounter).toBeTruthy();
+  const rejected = await request.post(`${apiUrl}/teller/counter-sessions`, {
+    headers: tellerHeaders,
+    data: { counterId: anotherCounter!.id },
+  });
+  expect(rejected.status()).toBe(403);
+});
+
 test("customer creates, looks up, and cancels a ticket", async ({
   request,
 }) => {

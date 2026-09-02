@@ -30,31 +30,38 @@ export class CounterSessionService {
   ) {}
 
   async available(user: RequestUser) {
-    const counters = await this.prisma.counter.findMany({
-      where: { branchId: user.branchId, isActive: true },
+    const staff = await this.prisma.staff.findFirst({
+      where: { id: user.sub, branchId: user.branchId, status: "ACTIVE" },
       include: {
-        assignedService: true,
-        sessions: {
-          where: { status: { in: ["OPEN", "PAUSED"] } },
-          select: { staffId: true },
+        assignedCounter: {
+          include: {
+            assignedService: true,
+            sessions: {
+              where: { status: { in: ["OPEN", "PAUSED"] } },
+              select: { staffId: true },
+            },
+          },
         },
       },
-      orderBy: { label: "asc" },
     });
-    return counters.map((counter) => ({
-      id: counter.id,
-      label: counter.label,
-      status: counter.status,
-      service: counter.assignedService && {
-        id: counter.assignedService.id,
-        code: counter.assignedService.code,
-        name: counter.assignedService.name,
+    const counter = staff?.assignedCounter;
+    if (!counter || counter.branchId !== user.branchId) return [];
+    return [
+      {
+        id: counter.id,
+        label: counter.label,
+        status: counter.status,
+        service: counter.assignedService && {
+          id: counter.assignedService.id,
+          code: counter.assignedService.code,
+          name: counter.assignedService.name,
+        },
+        available:
+          counter.sessions.length === 0 &&
+          counter.isActive &&
+          Boolean(counter.assignedServiceId),
       },
-      available:
-        counter.sessions.length === 0 &&
-        counter.isActive &&
-        Boolean(counter.assignedServiceId),
-    }));
+    ];
   }
 
   async current(user: RequestUser) {
@@ -122,6 +129,17 @@ export class CounterSessionService {
 
   async open(user: RequestUser, counterId: string) {
     const session = await this.prisma.$transaction(async (tx) => {
+      const staffRows = await tx.$queryRaw<
+        Array<{ assigned_counter_id: string | null }>
+      >(
+        Prisma.sql`SELECT assigned_counter_id FROM staff WHERE id = ${user.sub}::uuid AND branch_id = ${user.branchId}::uuid AND status = 'ACTIVE'::"StaffStatus" FOR UPDATE`,
+      );
+      if (staffRows[0]?.assigned_counter_id !== counterId)
+        throw new DomainError(
+          "FORBIDDEN",
+          "You may open only the counter assigned by your manager.",
+          403,
+        );
       const rows = await tx.$queryRaw<
         Array<{
           id: string;

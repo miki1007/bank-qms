@@ -1,4 +1,16 @@
-# Testing report — 2026-08-29 final CI checkpoint
+# Testing report
+
+## 2026-09-02 independent-teller and priority-fairness checkpoint
+
+- Prettier, hosted and API ESLint, all TypeScript project checks, and `git diff --check` passed locally.
+- API unit tests: 17 passed, including the six-call continuous-priority sequence (`priority, priority, standard` repeated) and FIFO tie-breaking.
+- Shared validation and Testing Library package tests: 6 passed.
+- Hosted repository and security contracts: 15 passed, including fixed teller ownership, per-service fairness locking, private priority reasons, Android package separation, and PostgreSQL Call Next idempotency wiring.
+- Production builds passed for NestJS, all four Vite clients, and every hosted route (`/customer-app`, `/staff-app`, `/manager`, `/display`, `/kiosk`, and `/teller`).
+- The hosted D1 migration was applied to an in-memory copy containing historical tickets and staff; queue-entry and teller-assignment backfills passed.
+- The new PostgreSQL integration case verifies that `teller.one` sees only its assigned counter, receives `403 FORBIDDEN` when forging another counter ID, can open its assigned counter, and can close the session. It requires the clean PostgreSQL CI environment described below.
+
+## 2026-08-29 clean GitHub CI baseline
 
 ## Clean GitHub CI evidence
 

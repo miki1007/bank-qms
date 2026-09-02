@@ -41,7 +41,11 @@ export async function POST(request: Request) {
           { status: 403 },
         );
       const role = body.role === "MANAGER" ? "MANAGER" : "TELLER";
-      const actor = await getWorkspaceShowcaseActor(role);
+      const requestedUsername =
+        role === "TELLER" && typeof body.username === "string"
+          ? body.username
+          : undefined;
+      const actor = await getWorkspaceShowcaseActor(role, requestedUsername);
       if (!actor) return genericFailure();
       const session = await createSession(actor);
       return Response.json(

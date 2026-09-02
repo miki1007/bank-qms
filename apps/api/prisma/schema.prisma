@@ -160,31 +160,34 @@ model Counter {
   sessions          CounterSession[]
   tickets           Ticket[]
   events            TicketEvent[]
+  assignedStaff     Staff?           @relation("AssignedStaffCounter")
 
   @@unique([branchId, label])
   @@map("counters")
 }
 
 model Staff {
-  id               String           @id @default(uuid()) @db.Uuid
-  branchId         String           @map("branch_id") @db.Uuid
-  staffCode        String           @unique @map("staff_code") @db.VarChar(30)
-  name             String           @db.VarChar(120)
-  username         String           @unique @db.VarChar(80)
-  passwordHash     String           @map("password_hash")
-  role             StaffRole
-  status           StaffStatus      @default(ACTIVE)
-  failedLoginCount Int              @default(0) @map("failed_login_count")
-  authVersion      Int              @default(1) @map("auth_version")
-  lockedUntil      DateTime?        @map("locked_until") @db.Timestamptz(6)
-  lastLoginAt      DateTime?        @map("last_login_at") @db.Timestamptz(6)
-  createdAt        DateTime         @default(now()) @map("created_at") @db.Timestamptz(6)
-  updatedAt        DateTime         @updatedAt @map("updated_at") @db.Timestamptz(6)
-  branch           Branch           @relation(fields: [branchId], references: [id])
-  sessions         CounterSession[]
-  tickets          Ticket[]
-  events           TicketEvent[]
-  refreshSessions  RefreshSession[]
+  id                String           @id @default(uuid()) @db.Uuid
+  branchId          String           @map("branch_id") @db.Uuid
+  staffCode         String           @unique @map("staff_code") @db.VarChar(30)
+  name              String           @db.VarChar(120)
+  username          String           @unique @db.VarChar(80)
+  passwordHash      String           @map("password_hash")
+  role              StaffRole
+  status            StaffStatus      @default(ACTIVE)
+  failedLoginCount  Int              @default(0) @map("failed_login_count")
+  authVersion       Int              @default(1) @map("auth_version")
+  lockedUntil       DateTime?        @map("locked_until") @db.Timestamptz(6)
+  lastLoginAt       DateTime?        @map("last_login_at") @db.Timestamptz(6)
+  assignedCounterId String?          @unique @map("assigned_counter_id") @db.Uuid
+  createdAt         DateTime         @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt         DateTime         @updatedAt @map("updated_at") @db.Timestamptz(6)
+  branch            Branch           @relation(fields: [branchId], references: [id])
+  assignedCounter   Counter?         @relation("AssignedStaffCounter", fields: [assignedCounterId], references: [id])
+  sessions          CounterSession[]
+  tickets           Ticket[]
+  events            TicketEvent[]
+  refreshSessions   RefreshSession[]
 
   @@index([branchId, role, status])
   @@map("staff")

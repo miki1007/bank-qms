@@ -19,9 +19,11 @@ export const showcaseTickets = sqliteTable(
     priority: integer("priority", { mode: "boolean" })
       .notNull()
       .default(false),
+    priorityReason: text("priority_reason"),
     status: text("status").notNull().default("WAITING"),
     counter: text("counter"),
     createdAt: text("created_at").notNull(),
+    queueEnteredAt: text("queue_entered_at").notNull(),
     calledAt: text("called_at"),
     startedAt: text("started_at"),
     completedAt: text("completed_at"),
@@ -36,7 +38,7 @@ export const showcaseTickets = sqliteTable(
       table.status,
       table.serviceCode,
       table.priority,
-      table.createdAt,
+      table.queueEnteredAt,
     ),
     uniqueIndex("qms_demo_active_counter_idx")
       .on(table.counter)
@@ -68,6 +70,15 @@ export const showcaseSettings = sqliteTable("qms_demo_settings", {
   priorityLimit: integer("priority_limit").notNull().default(2),
 });
 
+export const showcasePriorityState = sqliteTable(
+  "qms_demo_priority_state",
+  {
+    serviceCode: text("service_code").primaryKey(),
+    priorityStreak: integer("priority_streak").notNull().default(0),
+  },
+  (table) => [index("qms_demo_priority_state_streak_idx").on(table.priorityStreak)],
+);
+
 export const showcaseStaff = sqliteTable(
   "qms_demo_staff",
   {
@@ -75,6 +86,7 @@ export const showcaseStaff = sqliteTable(
     username: text("username").notNull().unique(),
     displayName: text("display_name").notNull(),
     role: text("role").notNull(),
+    assignedCounter: text("assigned_counter"),
     passwordSalt: text("password_salt").notNull(),
     passwordHash: text("password_hash").notNull(),
     failedLoginCount: integer("failed_login_count").notNull().default(0),
@@ -82,7 +94,10 @@ export const showcaseStaff = sqliteTable(
     lastLoginAt: text("last_login_at"),
     active: integer("active", { mode: "boolean" }).notNull().default(true),
   },
-  (table) => [index("qms_demo_staff_role_idx").on(table.role, table.active)],
+  (table) => [
+    index("qms_demo_staff_role_idx").on(table.role, table.active),
+    uniqueIndex("qms_demo_staff_counter_unique").on(table.assignedCounter),
+  ],
 );
 
 export const showcaseSessions = sqliteTable(

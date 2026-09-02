@@ -55,7 +55,7 @@ pnpm db:seed
 pnpm dev
 ```
 
-The seed creates `MAIN` / `Main Branch`, four services, four counters, one development manager (`manager.dev`), three development tellers (`teller.one` through `teller.three`), device registrations, and a second-branch authorization fixture. Passwords and device secrets come only from your `.env` values.
+The seed creates `MAIN` / `Main Branch`, four services, four counters, one development manager (`manager.dev`), four development tellers (`teller.one` through `teller.four`), device registrations, and a second-branch authorization fixture. Each teller has a manager-controlled counter assignment and cannot switch counters from the teller app. Passwords and device secrets come only from your `.env` values.
 
 ## Mobile builds
 
@@ -68,6 +68,10 @@ gradle -p apps/android \
 ```
 
 Outputs are under `apps/android/customer-app/build/outputs/apk/` and `apps/android/staff-app/build/outputs/apk/`. The GitHub Actions workflow `.github/workflows/android-apks.yml` builds downloadable debug artifacts. Production signing keys must remain in an owner-controlled secret store.
+
+For a complete VS Code/Android phone walkthrough, including USB debugging,
+building both APKs, installing with ADB, and choosing a safe HTTPS backend, see
+[Android development](docs/operations/android-development.md).
 
 iOS simulator builds:
 

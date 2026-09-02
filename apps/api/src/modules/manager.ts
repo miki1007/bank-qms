@@ -407,7 +407,12 @@ export class ManagerService {
   counters(branchId: string) {
     return this.prisma.counter.findMany({
       where: { branchId },
-      include: { assignedService: true },
+      include: {
+        assignedService: true,
+        assignedStaff: {
+          select: { id: true, name: true, username: true, status: true },
+        },
+      },
       orderBy: { label: "asc" },
     });
   }
@@ -425,6 +430,9 @@ export class ManagerService {
         lockedUntil: true,
         lastLoginAt: true,
         createdAt: true,
+        assignedCounter: {
+          select: { id: true, label: true, assignedServiceId: true },
+        },
       },
       orderBy: { name: "asc" },
     });
@@ -618,6 +626,7 @@ export class ManagerService {
       username?: string;
       password?: string;
       role?: StaffRole;
+      assignedCounterId?: string;
     },
   ) {
     if (
@@ -633,6 +642,19 @@ export class ManagerService {
         "Complete valid staff details are required.",
         400,
       );
+    const assignedCounterId =
+      body.role === "TELLER" ? body.assignedCounterId : undefined;
+    if (body.role === "TELLER" && !assignedCounterId)
+      throw new DomainError(
+        "VALIDATION_ERROR",
+        "A teller must be assigned to a counter.",
+        400,
+      );
+    if (assignedCounterId)
+      await this.assertCounterAssignmentAvailable(
+        user.branchId,
+        assignedCounterId,
+      );
     const staff = await this.prisma.staff.create({
       data: {
         branchId: user.branchId,
@@ -643,6 +665,7 @@ export class ManagerService {
           type: argon2.argon2id,
         }),
         role: body.role,
+        assignedCounterId,
       },
       select: {
         id: true,
@@ -651,6 +674,7 @@ export class ManagerService {
         username: true,
         role: true,
         status: true,
+        assignedCounter: { select: { id: true, label: true } },
       },
     });
     await this.audit(user, "STAFF_CREATE", "STAFF", staff.id);
@@ -671,6 +695,40 @@ export class ManagerService {
         "Staff account not found.",
         404,
       );
+    const nextRole =
+      body.role === "TELLER" || body.role === "MANAGER"
+        ? body.role
+        : target.role;
+    const requestedCounterId =
+      typeof body.assignedCounterId === "string"
+        ? body.assignedCounterId
+        : body.assignedCounterId === null
+          ? null
+          : target.assignedCounterId;
+    const nextCounterId = nextRole === "MANAGER" ? null : requestedCounterId;
+    if (nextRole === "TELLER" && !nextCounterId)
+      throw new DomainError(
+        "VALIDATION_ERROR",
+        "A teller must be assigned to a counter.",
+        400,
+      );
+    if (nextCounterId && nextCounterId !== target.assignedCounterId) {
+      const activeSession = await this.prisma.counterSession.findFirst({
+        where: { staffId: id, status: { in: ["OPEN", "PAUSED"] } },
+        select: { id: true },
+      });
+      if (activeSession)
+        throw new DomainError(
+          "COUNTER_BUSY",
+          "Close the teller's active session before reassigning the counter.",
+          409,
+        );
+      await this.assertCounterAssignmentAvailable(
+        user.branchId,
+        nextCounterId,
+        id,
+      );
+    }
     const staff = await this.prisma.staff.update({
       where: { id },
       data: {
@@ -679,6 +737,7 @@ export class ManagerService {
           body.role === "TELLER" || body.role === "MANAGER"
             ? body.role
             : undefined,
+        assignedCounterId: nextCounterId,
         status:
           body.status === "ACTIVE" ||
           body.status === "INACTIVE" ||
@@ -697,6 +756,7 @@ export class ManagerService {
         username: true,
         role: true,
         status: true,
+        assignedCounter: { select: { id: true, label: true } },
       },
     });
     if (staff.status !== "ACTIVE")
@@ -706,6 +766,36 @@ export class ManagerService {
       });
     await this.audit(user, "STAFF_UPDATE", "STAFF", id);
     return staff;
+  }
+
+  private async assertCounterAssignmentAvailable(
+    branchId: string,
+    counterId: string,
+    excludeStaffId?: string,
+  ) {
+    const counter = await this.prisma.counter.findFirst({
+      where: { id: counterId, branchId, isActive: true },
+      select: { id: true, assignedServiceId: true },
+    });
+    if (!counter?.assignedServiceId)
+      throw new DomainError(
+        "VALIDATION_ERROR",
+        "Choose an active counter with an assigned service.",
+        400,
+      );
+    const assigned = await this.prisma.staff.findFirst({
+      where: {
+        assignedCounterId: counterId,
+        ...(excludeStaffId ? { id: { not: excludeStaffId } } : {}),
+      },
+      select: { id: true },
+    });
+    if (assigned)
+      throw new DomainError(
+        "COUNTER_BUSY",
+        "That counter is already assigned to another teller.",
+        409,
+      );
   }
 
   async resetPassword(user: RequestUser, id: string, password: string) {

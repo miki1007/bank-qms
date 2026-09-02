@@ -54,4 +54,27 @@ describe("priority fairness", () => {
         { priority: false },
       ]),
     ).toBe(2));
+
+  it("serves continuous priority arrivals without starving standard tickets", () => {
+    let streak = 0;
+    const selected: string[] = [];
+    for (let call = 0; call < 6; call += 1) {
+      const lane = selector.chooseLane({
+        priorityWaiting: 10,
+        standardWaiting: 10,
+        consecutivePriorityCalls: streak,
+        limit: 2,
+      });
+      selected.push(lane ?? "none");
+      streak = lane === "priority" ? streak + 1 : 0;
+    }
+    expect(selected).toEqual([
+      "priority",
+      "priority",
+      "standard",
+      "priority",
+      "priority",
+      "standard",
+    ]);
+  });
 });

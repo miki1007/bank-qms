@@ -145,6 +145,7 @@ type ManagerCounter = {
   label: string;
   status: string;
   assignedService?: { name: string } | null;
+  assignedStaff?: { id: string; name: string; username: string } | null;
 };
 type StaffListItem = {
   id: string;
@@ -153,6 +154,7 @@ type StaffListItem = {
   role: string;
   status: string;
   lastLoginAt: string | null;
+  assignedCounter?: { id: string; label: string } | null;
 };
 type DashboardResponse = {
   kpis: { issued: number; waiting: number; active: number; completed: number };
@@ -435,41 +437,52 @@ function TellerWorkspace() {
       <Shell mode="teller">
         <main className="workspace-page">
           <p className="eyebrow">Start shift</p>
-          <h1 className="section-title">Choose an available counter</h1>
+          <h1 className="section-title">Open your assigned counter</h1>
           <p className="muted">
-            One teller can hold one active counter session. The API resolves
-            simultaneous claims safely.
+            Counter ownership is assigned by your manager and cannot be changed
+            from the teller workspace.
           </p>
           {error && <div className="error">{error}</div>}
           <div className="grid">
-            {counters.data?.map((counter) => (
-              <article className="card" key={counter.id}>
-                <div className="row between">
-                  <Building2 />
-                  <span
-                    className={`status-pill ${counter.available ? "status-success" : ""}`}
+            {counters.data?.length ? (
+              counters.data.map((counter) => (
+                <article className="card" key={counter.id}>
+                  <div className="row between">
+                    <Building2 />
+                    <span
+                      className={`status-pill ${counter.available ? "status-success" : ""}`}
+                    >
+                      {counter.available ? "Available" : counter.status}
+                    </span>
+                  </div>
+                  <h2 style={{ marginTop: 22 }}>{counter.label}</h2>
+                  <p className="muted">
+                    {counter.service?.name ?? "No service assigned"}
+                  </p>
+                  <button
+                    className="primary"
+                    disabled={!counter.available || perform.isPending}
+                    onClick={() =>
+                      perform.mutate({
+                        path: "/teller/counter-sessions",
+                        body: { counterId: counter.id },
+                      })
+                    }
                   >
-                    {counter.available ? "Available" : counter.status}
-                  </span>
-                </div>
-                <h2 style={{ marginTop: 22 }}>{counter.label}</h2>
+                    Open session
+                  </button>
+                </article>
+              ))
+            ) : (
+              <article className="card">
+                <ShieldCheck />
+                <h2 style={{ marginTop: 18 }}>No counter assigned</h2>
                 <p className="muted">
-                  {counter.service?.name ?? "No service assigned"}
+                  Ask your manager to assign an active counter before starting
+                  your shift.
                 </p>
-                <button
-                  className="primary"
-                  disabled={!counter.available || perform.isPending}
-                  onClick={() =>
-                    perform.mutate({
-                      path: "/teller/counter-sessions",
-                      body: { counterId: counter.id },
-                    })
-                  }
-                >
-                  Open session
-                </button>
               </article>
-            ))}
+            )}
           </div>
         </main>
       </Shell>
@@ -924,6 +937,7 @@ function CountersPage() {
               <tr>
                 <th>Counter</th>
                 <th>Service</th>
+                <th>Assigned teller</th>
                 <th>State</th>
               </tr>
             </thead>
@@ -932,6 +946,7 @@ function CountersPage() {
                 <tr key={c.id}>
                   <td>{c.label}</td>
                   <td>{c.assignedService?.name ?? "Unassigned"}</td>
+                  <td>{c.assignedStaff?.name ?? "Unassigned"}</td>
                   <td>{c.status}</td>
                 </tr>
               ))}
@@ -977,26 +992,76 @@ function StaffPage() {
     queryKey: ["staff"],
     queryFn: () => api("/manager/staff"),
   });
+  const counters = useQuery<ManagerCounter[]>({
+    queryKey: ["counters"],
+    queryFn: () => api("/manager/counters"),
+  });
+  const [error, setError] = useState("");
   const [form, setForm] = useState({
     staffCode: "",
     name: "",
     username: "",
     password: "",
     role: "TELLER",
+    assignedCounterId: "",
   });
   const create = async () => {
-    await api("/manager/staff", { method: "POST", body: JSON.stringify(form) });
-    setForm({
-      staffCode: "",
-      name: "",
-      username: "",
-      password: "",
-      role: "TELLER",
-    });
-    void qc.invalidateQueries({ queryKey: ["staff"] });
+    setError("");
+    try {
+      await api("/manager/staff", {
+        method: "POST",
+        body: JSON.stringify({
+          ...form,
+          assignedCounterId:
+            form.role === "TELLER" ? form.assignedCounterId : undefined,
+        }),
+      });
+      setForm({
+        staffCode: "",
+        name: "",
+        username: "",
+        password: "",
+        role: "TELLER",
+        assignedCounterId: "",
+      });
+      void qc.invalidateQueries({ queryKey: ["staff"] });
+      void qc.invalidateQueries({ queryKey: ["counters"] });
+    } catch (caught) {
+      setError(
+        caught instanceof Error
+          ? caught.message
+          : "Could not create staff account.",
+      );
+    }
   };
+  const reassign = async (staffId: string, assignedCounterId: string) => {
+    setError("");
+    try {
+      await api(`/manager/staff/${staffId}`, {
+        method: "PATCH",
+        body: JSON.stringify({ assignedCounterId }),
+      });
+      void qc.invalidateQueries({ queryKey: ["staff"] });
+      void qc.invalidateQueries({ queryKey: ["counters"] });
+    } catch (caught) {
+      setError(
+        caught instanceof Error
+          ? caught.message
+          : "Could not reassign counter.",
+      );
+    }
+  };
+  const availableFor = (staffId: string) =>
+    counters.data?.filter(
+      (counter) =>
+        !counter.assignedStaff || counter.assignedStaff.id === staffId,
+    ) ?? [];
   return (
-    <ManagerPage title="Staff access">
+    <ManagerPage
+      title="Staff access"
+      subtitle="Every teller has an independent account and one manager-controlled counter assignment."
+    >
+      {error && <div className="error">{error}</div>}
       <div className="split">
         <div className="table-wrap">
           <table>
@@ -1004,6 +1069,7 @@ function StaffPage() {
               <tr>
                 <th>Staff</th>
                 <th>Role</th>
+                <th>Assigned counter</th>
                 <th>Status</th>
                 <th>Last login</th>
               </tr>
@@ -1016,6 +1082,29 @@ function StaffPage() {
                     <div className="small muted">{s.username}</div>
                   </td>
                   <td>{s.role}</td>
+                  <td>
+                    {s.role === "TELLER" ? (
+                      <select
+                        aria-label={`Assigned counter for ${s.name}`}
+                        value={s.assignedCounter?.id ?? ""}
+                        onChange={(event) =>
+                          void reassign(s.id, event.target.value)
+                        }
+                      >
+                        <option value="" disabled>
+                          Assign counter…
+                        </option>
+                        {availableFor(s.id).map((counter) => (
+                          <option key={counter.id} value={counter.id}>
+                            {counter.label} ·{" "}
+                            {counter.assignedService?.name ?? "No service"}
+                          </option>
+                        ))}
+                      </select>
+                    ) : (
+                      "Administration"
+                    )}
+                  </td>
                   <td>{s.status}</td>
                   <td>
                     {s.lastLoginAt
@@ -1051,13 +1140,43 @@ function StaffPage() {
             <span>Role</span>
             <select
               value={form.role}
-              onChange={(e) => setForm({ ...form, role: e.target.value })}
+              onChange={(e) =>
+                setForm({
+                  ...form,
+                  role: e.target.value,
+                  assignedCounterId:
+                    e.target.value === "MANAGER" ? "" : form.assignedCounterId,
+                })
+              }
             >
               <option>TELLER</option>
               <option>MANAGER</option>
             </select>
           </label>
-          <button className="primary" onClick={create}>
+          {form.role === "TELLER" && (
+            <label className="field">
+              <span>Assigned counter</span>
+              <select
+                value={form.assignedCounterId}
+                onChange={(event) =>
+                  setForm({ ...form, assignedCounterId: event.target.value })
+                }
+              >
+                <option value="">Select an available counter…</option>
+                {availableFor("").map((counter) => (
+                  <option key={counter.id} value={counter.id}>
+                    {counter.label} ·{" "}
+                    {counter.assignedService?.name ?? "No service"}
+                  </option>
+                ))}
+              </select>
+            </label>
+          )}
+          <button
+            className="primary"
+            onClick={create}
+            disabled={form.role === "TELLER" && !form.assignedCounterId}
+          >
             Create account
           </button>
         </div>

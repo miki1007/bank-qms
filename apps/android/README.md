@@ -15,3 +15,5 @@ gradle -PbankQmsBaseUrl=https://your-approved-domain.example \
 ```
 
 Only use an HTTPS deployment that serves `/customer-app` and `/staff-app`. Never place a preview bypass token, staff password, API key or signing key in this project. The default private showcase may ask the owner to authenticate. Production signing is intentionally not configured in source control.
+
+The staff application uses the authenticated teller account's manager-assigned counter. A teller cannot choose or forge a different counter from the Android application.

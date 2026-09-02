@@ -38,7 +38,13 @@ type Ticket = {
 };
 
 type Snapshot = {
-  actor?: { displayName: string; role: "TELLER" | "MANAGER" };
+  actor?: {
+    displayName: string;
+    username: string;
+    role: "TELLER" | "MANAGER";
+    assignedCounter: string | null;
+    assignedServiceCode: string | null;
+  };
   services: Array<{
     code: string;
     name: string;
@@ -65,7 +71,6 @@ const emptySnapshot: Snapshot = {
   tickets: [],
   metrics: { issued: 0, waiting: 0, serving: 0, completed: 0, noShow: 0 },
 };
-const counters = ["Counter 1", "Counter 2", "Counter 3", "Counter 4"];
 
 function elapsed(value: string | null, now: Date) {
   if (!value) return "00:00";
@@ -78,7 +83,6 @@ function elapsed(value: string | null, now: Date) {
 
 export function MobileStaffClient() {
   const [snapshot, setSnapshot] = useState<Snapshot>(emptySnapshot);
-  const [counter, setCounter] = useState(counters[0]);
   const [transferService, setTransferService] = useState("WDR");
   const [tab, setTab] = useState<"serve" | "queue" | "overview">("serve");
   const [busy, setBusy] = useState("");
@@ -137,21 +141,23 @@ export function MobileStaffClient() {
     };
   }, [refresh]);
 
+  const assignedCounter = snapshot.actor?.assignedCounter ?? null;
   const activeTicket = useMemo(
     () =>
       snapshot.tickets.find(
         (ticket) =>
-          ticket.counter === counter &&
+          ticket.counter === assignedCounter &&
           ["CALLED", "IN_SERVICE"].includes(ticket.status),
       ) ?? null,
-    [counter, snapshot.tickets],
+    [assignedCounter, snapshot.tickets],
   );
   const recentNoShow = useMemo(
     () =>
       snapshot.tickets.find(
-        (ticket) => ticket.counter === counter && ticket.status === "NO_SHOW",
+        (ticket) =>
+          ticket.counter === assignedCounter && ticket.status === "NO_SHOW",
       ) ?? null,
-    [counter, snapshot.tickets],
+    [assignedCounter, snapshot.tickets],
   );
   const transferOptions = activeTicket
     ? snapshot.services.filter(
@@ -163,6 +169,10 @@ export function MobileStaffClient() {
   )
     ? transferService
     : (transferOptions[0]?.code ?? "");
+  const assignedQueueWaiting =
+    snapshot.services.find(
+      (service) => service.code === snapshot.actor?.assignedServiceCode,
+    )?.waiting ?? 0;
 
   async function mutate(
     key: string,
@@ -257,17 +267,11 @@ export function MobileStaffClient() {
                   : "Branch pulse"}
             </h1>
           </div>
-          <label>
-            <span>Counter</span>
-            <select
-              value={counter}
-              onChange={(event) => setCounter(event.target.value)}
-            >
-              {counters.map((item) => (
-                <option key={item}>{item}</option>
-              ))}
-            </select>
-          </label>
+          <div className="mobile-counter-lock">
+            <span>Assigned counter</span>
+            <strong>{assignedCounter ?? "Not assigned"}</strong>
+            <small>{snapshot.actor?.username}</small>
+          </div>
         </div>
 
         {tab === "serve" && (
@@ -409,7 +413,11 @@ export function MobileStaffClient() {
                 <div className="mobile-empty-ticket">
                   <Tickets />
                   <strong>Counter ready</strong>
-                  <p>Call the next eligible customer when you are ready.</p>
+                  <p>
+                    {assignedQueueWaiting
+                      ? `${assignedQueueWaiting} waiting in your service queue.`
+                      : "Your service queue is currently clear."}
+                  </p>
                 </div>
               )}
             </article>
@@ -418,11 +426,16 @@ export function MobileStaffClient() {
               onClick={() =>
                 void mutate(
                   "call",
-                  { operation: "call_next", counter },
+                  { operation: "call_next" },
                   "Next customer called.",
                 )
               }
-              disabled={Boolean(busy) || Boolean(activeTicket)}
+              disabled={
+                Boolean(busy) ||
+                Boolean(activeTicket) ||
+                !assignedCounter ||
+                assignedQueueWaiting === 0
+              }
             >
               {busy === "call" ? (
                 <LoaderCircle className="spin" />

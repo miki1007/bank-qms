@@ -78,18 +78,24 @@ async function main() {
     );
   }
 
+  const counters = [];
   for (let index = 0; index < services.length; index += 1) {
-    await prisma.counter.upsert({
-      where: {
-        branchId_label: { branchId: branch.id, label: `Counter ${index + 1}` },
-      },
-      update: { assignedServiceId: services[index].id, isActive: true },
-      create: {
-        branchId: branch.id,
-        label: `Counter ${index + 1}`,
-        assignedServiceId: services[index].id,
-      },
-    });
+    counters.push(
+      await prisma.counter.upsert({
+        where: {
+          branchId_label: {
+            branchId: branch.id,
+            label: `Counter ${index + 1}`,
+          },
+        },
+        update: { assignedServiceId: services[index].id, isActive: true },
+        create: {
+          branchId: branch.id,
+          label: `Counter ${index + 1}`,
+          assignedServiceId: services[index].id,
+        },
+      }),
+    );
   }
 
   const users: Array<{
@@ -98,6 +104,7 @@ async function main() {
     username: string;
     role: StaffRole;
     password: string;
+    assignedCounterId?: string;
   }> = [
     {
       staffCode: "MGR-001",
@@ -112,6 +119,7 @@ async function main() {
       username: "teller.one",
       role: "TELLER",
       password: tellerPassword,
+      assignedCounterId: counters[0].id,
     },
     {
       staffCode: "TEL-002",
@@ -119,6 +127,7 @@ async function main() {
       username: "teller.two",
       role: "TELLER",
       password: tellerPassword,
+      assignedCounterId: counters[1].id,
     },
     {
       staffCode: "TEL-003",
@@ -126,12 +135,26 @@ async function main() {
       username: "teller.three",
       role: "TELLER",
       password: tellerPassword,
+      assignedCounterId: counters[2].id,
+    },
+    {
+      staffCode: "TEL-004",
+      name: "Selam Alemu",
+      username: "teller.four",
+      role: "TELLER",
+      password: tellerPassword,
+      assignedCounterId: counters[3].id,
     },
   ];
   for (const user of users) {
     await prisma.staff.upsert({
       where: { username: user.username },
-      update: { name: user.name, role: user.role, status: "ACTIVE" },
+      update: {
+        name: user.name,
+        role: user.role,
+        status: "ACTIVE",
+        assignedCounterId: user.assignedCounterId ?? null,
+      },
       create: {
         branchId: branch.id,
         staffCode: user.staffCode,
@@ -141,6 +164,7 @@ async function main() {
           type: argon2.argon2id,
         }),
         role: user.role,
+        assignedCounterId: user.assignedCounterId,
       },
     });
   }
@@ -206,7 +230,7 @@ async function main() {
   });
 
   console.log(
-    "Seeded MAIN with 4 services, 4 counters, 1 manager, 3 tellers, 2 devices, and a cross-branch test fixture.",
+    "Seeded MAIN with 4 services, 4 counters, 1 manager, 4 independently assigned tellers, 2 devices, and a cross-branch test fixture.",
   );
 }
 

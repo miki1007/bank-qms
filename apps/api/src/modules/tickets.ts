@@ -874,6 +874,14 @@ export class TicketWorkflowService {
             "COUNTER_BUSY",
             "Resolve the current ticket before calling another customer.",
           );
+        // Serialize the fairness decision for one branch/service queue. Ticket
+        // row locks prevent duplicate calls; this queue-scoped lock also keeps
+        // the consecutive-priority limit exact when several counters call at
+        // the same instant.
+        await this.acquireAdvisoryLock(
+          tx,
+          `${user.branchId}:PRIORITY_FAIRNESS:${session.service_type_id}`,
+        );
         const branch = await tx.branch.findUniqueOrThrow({
           where: { id: user.branchId },
         });

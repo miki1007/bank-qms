@@ -58,6 +58,7 @@ export function MobileCustomerClient() {
   const [services, setServices] = useState<Service[]>([]);
   const [selectedService, setSelectedService] = useState("DEP");
   const [priority, setPriority] = useState(false);
+  const [priorityReason, setPriorityReason] = useState("ELDERLY");
   const [ticket, setTicket] = useState<Ticket | null>(null);
   const [lookupToken, setLookupToken] = useState("");
   const [position, setPosition] = useState<number | null>(null);
@@ -193,6 +194,7 @@ export function MobileCustomerClient() {
           operation: "issue",
           serviceCode: selectedService,
           priority,
+          priorityReason: priority ? priorityReason : null,
         }),
       });
       const data = (await response.json()) as {
@@ -470,6 +472,21 @@ export function MobileCustomerClient() {
               </span>
               <Switch checked={priority} onCheckedChange={setPriority} />
             </label>
+            {priority && (
+              <label className="mobile-priority-reason">
+                <span>Eligibility reason</span>
+                <select
+                  value={priorityReason}
+                  onChange={(event) => setPriorityReason(event.target.value)}
+                >
+                  <option value="ELDERLY">Elderly customer</option>
+                  <option value="DISABILITY">Customer with disability</option>
+                  <option value="PREGNANCY">Pregnancy</option>
+                  <option value="OTHER">Other eligible need</option>
+                </select>
+                <small>Private—never shown on the public display.</small>
+              </label>
+            )}
 
             <Button
               className="mobile-primary-button"

@@ -63,7 +63,7 @@ export async function appendEvent(
 }
 
 export async function readSnapshot(db = getShowcaseDb()) {
-  const [ticketResult, eventResult, settings] = await Promise.all([
+  const [ticketResult, eventResult, settings, fairness] = await Promise.all([
     db
       .prepare(
         `SELECT id, public_number, service_code, service_name, priority, status,
@@ -77,10 +77,13 @@ export async function readSnapshot(db = getShowcaseDb()) {
       )
       .all<DemoEvent>(),
     db
+      .prepare("SELECT priority_limit FROM qms_demo_settings WHERE id=1")
+      .first<{ priority_limit: number }>(),
+    db
       .prepare(
-        "SELECT priority_streak, priority_limit FROM qms_demo_settings WHERE id=1",
+        "SELECT COALESCE(MAX(priority_streak), 0) AS priority_streak FROM qms_demo_priority_state",
       )
-      .first<{ priority_streak: number; priority_limit: number }>(),
+      .first<{ priority_streak: number }>(),
   ]);
   const tickets = ticketResult.results ?? [];
   const events = eventResult.results ?? [];
@@ -112,7 +115,7 @@ export async function readSnapshot(db = getShowcaseDb()) {
     events,
     activeCall,
     settings: {
-      priorityStreak: settings?.priority_streak ?? 0,
+      priorityStreak: fairness?.priority_streak ?? 0,
       priorityLimit: settings?.priority_limit ?? 2,
     },
     metrics: {

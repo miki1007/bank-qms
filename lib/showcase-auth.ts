@@ -7,6 +7,8 @@ export type ShowcaseActor = {
   username: string;
   displayName: string;
   role: ShowcaseRole;
+  assignedCounter: string | null;
+  assignedServiceCode: string | null;
 };
 
 const SESSION_COOKIE = "bank_qms_session";
@@ -20,6 +22,8 @@ const showcaseStaff = [
     username: "manager.dev",
     displayName: "Showcase Manager",
     role: "MANAGER" as const,
+    assignedCounter: null,
+    assignedServiceCode: null,
     salt: "42347debaf04f652d29a982200c05ba1",
     passwordHash:
       "356ccf97995de685fc013a028d680e0d0a2be0396026e1913e48532027d02af0",
@@ -27,8 +31,43 @@ const showcaseStaff = [
   {
     id: "showcase-teller",
     username: "teller.one",
-    displayName: "Showcase Teller",
+    displayName: "Meron Tesfaye",
     role: "TELLER" as const,
+    assignedCounter: "Counter 1",
+    assignedServiceCode: "DEP",
+    salt: "c6716fa6420014a4b1fb9a4f90d8fe8e",
+    passwordHash:
+      "083592b13334c36a10fc8880f9167cee0fcda8560469e4bf8ab841605314ca50",
+  },
+  {
+    id: "showcase-teller-two",
+    username: "teller.two",
+    displayName: "Dawit Bekele",
+    role: "TELLER" as const,
+    assignedCounter: "Counter 2",
+    assignedServiceCode: "WDR",
+    salt: "c6716fa6420014a4b1fb9a4f90d8fe8e",
+    passwordHash:
+      "083592b13334c36a10fc8880f9167cee0fcda8560469e4bf8ab841605314ca50",
+  },
+  {
+    id: "showcase-teller-three",
+    username: "teller.three",
+    displayName: "Hana Girma",
+    role: "TELLER" as const,
+    assignedCounter: "Counter 3",
+    assignedServiceCode: "LON",
+    salt: "c6716fa6420014a4b1fb9a4f90d8fe8e",
+    passwordHash:
+      "083592b13334c36a10fc8880f9167cee0fcda8560469e4bf8ab841605314ca50",
+  },
+  {
+    id: "showcase-teller-four",
+    username: "teller.four",
+    displayName: "Selam Alemu",
+    role: "TELLER" as const,
+    assignedCounter: "Counter 4",
+    assignedServiceCode: "NAC",
     salt: "c6716fa6420014a4b1fb9a4f90d8fe8e",
     passwordHash:
       "083592b13334c36a10fc8880f9167cee0fcda8560469e4bf8ab841605314ca50",
@@ -89,11 +128,12 @@ export async function ensureShowcaseStaff(db = getShowcaseDb()) {
     await db
       .prepare(
         `INSERT INTO qms_demo_staff
-         (id, username, display_name, role, password_salt, password_hash, failed_login_count, active)
-         VALUES (?, ?, ?, ?, ?, ?, 0, 1)
+         (id, username, display_name, role, assigned_counter, password_salt, password_hash, failed_login_count, active)
+         VALUES (?, ?, ?, ?, ?, ?, ?, 0, 1)
          ON CONFLICT(username) DO UPDATE SET
            display_name = excluded.display_name,
            role = excluded.role,
+           assigned_counter = excluded.assigned_counter,
            failed_login_count = CASE
              WHEN qms_demo_staff.password_salt <> excluded.password_salt
                OR qms_demo_staff.password_hash <> excluded.password_hash
@@ -111,6 +151,7 @@ export async function ensureShowcaseStaff(db = getShowcaseDb()) {
         staff.username,
         staff.displayName,
         staff.role,
+        staff.assignedCounter,
         staff.salt,
         staff.passwordHash,
       )
@@ -118,14 +159,21 @@ export async function ensureShowcaseStaff(db = getShowcaseDb()) {
   }
 }
 
-export async function getWorkspaceShowcaseActor(role: ShowcaseRole) {
+export async function getWorkspaceShowcaseActor(
+  role: ShowcaseRole,
+  requestedUsername?: string,
+) {
   const db = getShowcaseDb();
   await ensureShowcaseStaff(db);
-  const staff = showcaseStaff.find((candidate) => candidate.role === role);
+  const staff = showcaseStaff.find(
+    (candidate) =>
+      candidate.role === role &&
+      (!requestedUsername || candidate.username === requestedUsername),
+  );
   if (!staff) return null;
   const persisted = await db
     .prepare(
-      `SELECT id, username, display_name, role
+      `SELECT id, username, display_name, role, assigned_counter
        FROM qms_demo_staff WHERE username = ? AND active = 1 LIMIT 1`,
     )
     .bind(staff.username)
@@ -134,6 +182,7 @@ export async function getWorkspaceShowcaseActor(role: ShowcaseRole) {
       username: string;
       display_name: string;
       role: ShowcaseRole;
+      assigned_counter: string | null;
     }>();
   if (!persisted || persisted.role !== role) return null;
   return {
@@ -141,6 +190,8 @@ export async function getWorkspaceShowcaseActor(role: ShowcaseRole) {
     username: persisted.username,
     displayName: persisted.display_name,
     role: persisted.role,
+    assignedCounter: persisted.assigned_counter,
+    assignedServiceCode: staff.assignedServiceCode,
   } satisfies ShowcaseActor;
 }
 
@@ -150,7 +201,7 @@ export async function authenticate(username: string, password: string) {
   const normalized = username.trim().toLowerCase();
   const staff = await db
     .prepare(
-      `SELECT id, username, display_name, role, password_salt, password_hash,
+      `SELECT id, username, display_name, role, assigned_counter, password_salt, password_hash,
               failed_login_count, locked_until, active
        FROM qms_demo_staff WHERE username = ? LIMIT 1`,
     )
@@ -160,6 +211,7 @@ export async function authenticate(username: string, password: string) {
       username: string;
       display_name: string;
       role: ShowcaseRole;
+      assigned_counter: string | null;
       password_salt: string;
       password_hash: string;
       failed_login_count: number;
@@ -201,6 +253,10 @@ export async function authenticate(username: string, password: string) {
     username: staff.username,
     displayName: staff.display_name,
     role: staff.role,
+    assignedCounter: staff.assigned_counter,
+    assignedServiceCode:
+      showcaseStaff.find((candidate) => candidate.username === staff.username)
+        ?.assignedServiceCode ?? null,
   } satisfies ShowcaseActor;
 }
 
@@ -249,7 +305,7 @@ export async function getActor(
   const tokenHash = await sha256Hex(token);
   const row = await db
     .prepare(
-      `SELECT staff.id, staff.username, staff.display_name, staff.role
+      `SELECT staff.id, staff.username, staff.display_name, staff.role, staff.assigned_counter
        FROM qms_demo_sessions session
        JOIN qms_demo_staff staff ON staff.id = session.staff_id
        WHERE session.token_hash = ? AND session.revoked_at IS NULL
@@ -262,6 +318,7 @@ export async function getActor(
       username: string;
       display_name: string;
       role: ShowcaseRole;
+      assigned_counter: string | null;
     }>();
   return row
     ? {
@@ -269,6 +326,10 @@ export async function getActor(
         username: row.username,
         displayName: row.display_name,
         role: row.role,
+        assignedCounter: row.assigned_counter,
+        assignedServiceCode:
+          showcaseStaff.find((candidate) => candidate.username === row.username)
+            ?.assignedServiceCode ?? null,
       }
     : null;
 }
