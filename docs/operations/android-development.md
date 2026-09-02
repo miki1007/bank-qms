@@ -57,12 +57,12 @@ gradle -p apps/android \
   :customer-app:assembleDebug :staff-app:assembleDebug
 ```
 
-On Windows, use `gradlew.bat` from `apps/android` if a system Gradle command is
-not installed:
+On Windows, install Gradle 8.10.2 (or let Android Studio configure that Gradle
+version), then run the same build from PowerShell:
 
 ```powershell
 cd apps/android
-./gradlew.bat -PbankQmsBaseUrl=https://your-approved-bank-qms-host.example :customer-app:assembleDebug :staff-app:assembleDebug
+gradle -PbankQmsBaseUrl=https://your-approved-bank-qms-host.example :customer-app:assembleDebug :staff-app:assembleDebug
 ```
 
 ## 4. Install on a physical Android phone
