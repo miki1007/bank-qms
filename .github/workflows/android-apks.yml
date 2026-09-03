@@ -33,6 +33,11 @@ jobs:
           gradle-version: "8.10.2"
       - name: Test and build both apps
         run: gradle -p apps/android test :customer-app:assembleDebug :staff-app:assembleDebug --stacktrace
+      - name: Verify native feature payloads
+        run: |
+          ! grep -R "android.webkit.WebView\|START_URL" apps/android --include='*.kt' --include='*.java'
+          test "$(stat -c%s apps/android/customer-app/build/outputs/apk/debug/customer-app-debug.apk)" -gt 1000000
+          test "$(stat -c%s apps/android/staff-app/build/outputs/apk/debug/staff-app-debug.apk)" -gt 1000000
       - uses: actions/upload-artifact@v4
         with:
           name: bank-qms-customer-apk

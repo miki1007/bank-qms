@@ -10,25 +10,14 @@
         android:label="@string/app_name"
         android:supportsRtl="true"
         android:theme="@style/Theme.BankQms"
-        android:usesCleartextTraffic="false">
+        android:usesCleartextTraffic="${usesCleartext}">
         <activity
             android:name=".MainActivity"
-            android:configChanges="keyboard|keyboardHidden|orientation|screenLayout|screenSize|smallestScreenSize|uiMode"
             android:exported="true"
-            android:hardwareAccelerated="true"
-            android:launchMode="singleTask">
+            android:hardwareAccelerated="true">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
-            </intent-filter>
-            <intent-filter>
-                <action android:name="android.intent.action.VIEW" />
-                <category android:name="android.intent.category.DEFAULT" />
-                <category android:name="android.intent.category.BROWSABLE" />
-                <data
-                    android:host="bank-qms.malikket.chatgpt.site"
-                    android:pathPrefix="/customer-app"
-                    android:scheme="https" />
             </intent-filter>
         </activity>
     </application>

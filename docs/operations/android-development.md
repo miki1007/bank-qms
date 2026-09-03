@@ -5,9 +5,9 @@ The repository contains two Android applications:
 - `Bank QMS Customer` (`com.bankqms.customer`)
 - `Bank QMS Staff` (`com.bankqms.staff`)
 
-Both are secure native Android shells connected to the same Bank QMS backend.
-Queue rules remain server-side; the APKs do not contain a second copy of the
-business logic.
+Both are native Jetpack Compose Android applications connected to the same Bank
+QMS backend. Their screens and interaction logic are packaged in the APK; queue
+rules remain server-side so there is no competing copy of the domain workflow.
 
 ## 1. Install the development tools
 
@@ -41,19 +41,18 @@ teller accounts are `teller.one`, `teller.two`, `teller.three`, and
 `teller.four`; their password is the development value chosen in
 `DEV_TELLER_PASSWORD`. They are assigned to Counters 1–4 respectively.
 
-## 3. Choose the backend URL for the APKs
+## 3. Choose the API URL for the APKs
 
-Android builds intentionally accept only HTTPS. For a phone build, use an
-approved HTTPS deployment or an HTTPS development tunnel that forwards to the
-running web application. Do not weaken the WebView or enable clear-text HTTP
-for convenience.
+The value identifies the NestJS REST API. Including `/api/v1` is recommended;
+the mobile core appends it if omitted. Release builds intentionally accept only
+HTTPS. Debug builds also allow a private development address so a physical phone
+on the same trusted Wi-Fi can reach the computer running Docker and NestJS.
 
-Set the URL at build time; do not include `/customer-app` or `/staff-app` because
-the Gradle modules append the correct route:
+Build against an HTTPS deployment:
 
 ```bash
 gradle -p apps/android \
-  -PbankQmsBaseUrl=https://your-approved-bank-qms-host.example \
+  -PbankQmsApiUrl=https://qms-api.your-approved-host.example/api/v1 \
   :customer-app:assembleDebug :staff-app:assembleDebug
 ```
 
@@ -62,8 +61,22 @@ version), then run the same build from PowerShell:
 
 ```powershell
 cd apps/android
-gradle -PbankQmsBaseUrl=https://your-approved-bank-qms-host.example :customer-app:assembleDebug :staff-app:assembleDebug
+gradle -PbankQmsApiUrl=https://qms-api.your-approved-host.example/api/v1 :customer-app:assembleDebug :staff-app:assembleDebug
 ```
+
+For the Android Emulator, the default `http://10.0.2.2:3000/api/v1` reaches the
+host computer. For a physical phone, find the computer's LAN address and use it
+in a debug build, for example:
+
+```bash
+gradle -p apps/android \
+  -PbankQmsApiUrl=http://192.168.1.20:3000/api/v1 \
+  :customer-app:assembleDebug :staff-app:assembleDebug
+```
+
+Keep the phone and computer on the same private network and allow TCP port 3000
+through the development firewall. Never use clear-text HTTP for a distributed
+or production build.
 
 ## 4. Install on a physical Android phone
 
@@ -94,5 +107,7 @@ private testing only and must not be treated as Play Store releases.
 5. Tap Call Next, start service, and complete the ticket.
 6. Confirm the public display and manager dashboard update.
 
-If the phone shows a connection screen, confirm that the build-time URL is
-HTTPS, reachable from the phone, and serving the current Bank QMS version.
+If the phone reports a connection problem, confirm that the build-time API URL
+is reachable from the phone, the API health check responds, and PostgreSQL is
+running. A working website URL is not enough: the mobile apps connect directly
+to the `/api/v1` backend.

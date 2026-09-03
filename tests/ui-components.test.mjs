@@ -218,6 +218,7 @@ test("makes canonical Call Next retries idempotent inside PostgreSQL", async () 
 
 test("locks teller accounts to manager-controlled counters and scopes fairness per service", async () => {
   const prisma = await read("../apps/api/prisma/schema.prisma");
+  const seed = await read("../apps/api/prisma/seed.ts");
   const teller = await read("../apps/api/src/modules/teller.ts");
   const workflow = await read("../apps/api/src/modules/tickets.ts");
   const staffWeb = await read("../apps/staff-web/src/main.tsx");
@@ -237,4 +238,6 @@ test("locks teller accounts to manager-controlled counters and scopes fairness p
   assert.match(showcaseQueue, /qms_demo_priority_state/);
   assert.match(showcaseQueue, /service_code = \?/);
   assert.match(showcaseQueue, /priorityReason/);
+  assert.match(seed, /passwordHash,/);
+  assert.match(seed, /authVersion: \{ increment: 1 \}/);
 });

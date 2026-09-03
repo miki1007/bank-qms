@@ -6,6 +6,7 @@ import {
   ExecutionContext,
   ForbiddenException,
   Get,
+  Headers,
   Inject,
   Injectable,
   Post,
@@ -234,6 +235,24 @@ export class AuthService {
     };
   }
 
+  async profile(user: RequestUser) {
+    const branch = await this.prisma.branch.findUnique({
+      where: { id: user.branchId },
+      select: { code: true, name: true },
+    });
+    if (!branch)
+      throw new DomainError("RESOURCE_NOT_FOUND", "Branch not found.", 404);
+    return {
+      id: user.sub,
+      branchId: user.branchId,
+      branchCode: branch.code,
+      branchName: branch.name,
+      name: user.name,
+      username: user.username,
+      role: user.role,
+    };
+  }
+
   async refresh(refreshToken: string) {
     try {
       const claims = await this.jwt.verifyAsync<{
@@ -373,17 +392,24 @@ export class AuthController {
       path: "/api/v1/auth",
       maxAge: refreshTokenTtlDays() * 86_400_000,
     });
-    return { accessToken: result.accessToken, user: result.user };
+    return {
+      accessToken: result.accessToken,
+      user: result.user,
+      ...(request.headers["x-client-platform"] === "android"
+        ? { refreshToken: result.refreshToken }
+        : {}),
+    };
   }
 
   @PublicRoute()
   @Post("refresh")
   async refresh(
     @Req() request: Request,
+    @Headers("x-refresh-token") mobileRefreshToken: string | undefined,
     @Res({ passthrough: true }) response: Response,
   ) {
     const result = await this.auth.refresh(
-      String(request.cookies?.qms_refresh ?? ""),
+      String(mobileRefreshToken ?? request.cookies?.qms_refresh ?? ""),
     );
     response.cookie("qms_refresh", result.refreshToken, {
       httpOnly: true,
@@ -392,7 +418,13 @@ export class AuthController {
       path: "/api/v1/auth",
       maxAge: refreshTokenTtlDays() * 86_400_000,
     });
-    return { accessToken: result.accessToken, user: result.user };
+    return {
+      accessToken: result.accessToken,
+      user: result.user,
+      ...(request.headers["x-client-platform"] === "android"
+        ? { refreshToken: result.refreshToken }
+        : {}),
+    };
   }
 
   @UseGuards(JwtAuthGuard, RolesGuard)
@@ -400,10 +432,11 @@ export class AuthController {
   async logout(
     @CurrentUser() user: RequestUser,
     @Req() request: Request,
+    @Headers("x-refresh-token") mobileRefreshToken: string | undefined,
     @Res({ passthrough: true }) response: Response,
   ) {
     const result = await this.auth.logout(
-      request.cookies?.qms_refresh,
+      mobileRefreshToken ?? request.cookies?.qms_refresh,
       user,
       request,
     );
@@ -413,7 +446,7 @@ export class AuthController {
 
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Get("me")
-  me(@CurrentUser() user: RequestUser) {
-    return { user };
+  async me(@CurrentUser() user: RequestUser) {
+    return { user: await this.auth.profile(user) };
   }
 }

@@ -13,7 +13,7 @@ The product has six connected surfaces backed by the same domain rules:
 | Web kiosk         | Optional branch fallback for walk-in customers without the mobile app            | `http://localhost:5174`         |
 | API and Swagger   | REST, Socket.IO, health, and OpenAPI                                             | `http://localhost:3000/docs`    |
 
-The customer and staff products are also packaged as separate Android and iOS applications. Mobile shells reuse the secure responsive web clients; ticket state, permissions, queue selection, and reporting remain server-authoritative.
+The customer and staff products are also packaged as separate applications. The Android customer and teller experiences are native Jetpack Compose applications; ticket state, permissions, queue selection, and reporting remain server-authoritative. Manager administration and the public number display remain purpose-built web interfaces.
 
 ## Architecture
 
@@ -63,7 +63,7 @@ Android debug APKs:
 
 ```bash
 gradle -p apps/android \
-  -PbankQmsBaseUrl=https://your-approved-domain.example \
+  -PbankQmsApiUrl=https://qms-api.your-approved-domain.example/api/v1 \
   :customer-app:assembleDebug :staff-app:assembleDebug
 ```
 
@@ -130,4 +130,4 @@ The owner-only Sites URL is a constrained portfolio preview. That runtime cannot
 - Public display events contain public ticket number, counter, service, and call time only—never customer data, lookup proof, tokens, private notes, or priority reasons.
 - Logs and health responses must not include credentials or request authorization material.
 
-Troubleshooting: if the API fails at startup, check that all required variables are non-placeholder and `DATABASE_URL` uses PostgreSQL. A kiosk/display `403` means its device code/secret does not match the seeded registration. A staff `401` means the account is inactive/temporarily locked or the locally chosen password differs from the seeded value.
+Troubleshooting: if the API fails at startup, check that all required variables are non-placeholder and `DATABASE_URL` uses PostgreSQL. A kiosk/display `403` means its device code/secret does not match the seeded registration. A staff `401` means the account is inactive/temporarily locked or the locally chosen password differs from the seeded value. In development, correct `.env` and rerun `NODE_ENV=development pnpm db:seed`; reseeding safely refreshes the demo password hashes, clears temporary lockouts, and invalidates stale staff sessions.

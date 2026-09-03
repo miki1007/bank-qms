@@ -5,6 +5,7 @@ import {
   createParamDecorator,
   ExecutionContext,
   Get,
+  Headers,
   Inject,
   Injectable,
   Post,
@@ -346,7 +347,13 @@ export class CustomerAuthController {
       result.refreshToken,
       customerCookieOptions(),
     );
-    return { accessToken: result.accessToken, user: result.user };
+    return {
+      accessToken: result.accessToken,
+      user: result.user,
+      ...(request.headers["x-client-platform"] === "android"
+        ? { refreshToken: result.refreshToken }
+        : {}),
+    };
   }
 
   @PublicRoute()
@@ -363,24 +370,37 @@ export class CustomerAuthController {
       result.refreshToken,
       customerCookieOptions(),
     );
-    return { accessToken: result.accessToken, user: result.user };
+    return {
+      accessToken: result.accessToken,
+      user: result.user,
+      ...(request.headers["x-client-platform"] === "android"
+        ? { refreshToken: result.refreshToken }
+        : {}),
+    };
   }
 
   @PublicRoute()
   @Post("refresh")
   async refresh(
     @Req() request: Request,
+    @Headers("x-refresh-token") mobileRefreshToken: string | undefined,
     @Res({ passthrough: true }) response: Response,
   ) {
     const result = await this.auth.refresh(
-      String(request.cookies?.[customerCookie] ?? ""),
+      String(mobileRefreshToken ?? request.cookies?.[customerCookie] ?? ""),
     );
     response.cookie(
       customerCookie,
       result.refreshToken,
       customerCookieOptions(),
     );
-    return { accessToken: result.accessToken, user: result.user };
+    return {
+      accessToken: result.accessToken,
+      user: result.user,
+      ...(request.headers["x-client-platform"] === "android"
+        ? { refreshToken: result.refreshToken }
+        : {}),
+    };
   }
 
   @UseGuards(CustomerJwtAuthGuard)
@@ -388,10 +408,11 @@ export class CustomerAuthController {
   async logout(
     @CurrentCustomer() user: CustomerRequestUser,
     @Req() request: Request,
+    @Headers("x-refresh-token") mobileRefreshToken: string | undefined,
     @Res({ passthrough: true }) response: Response,
   ) {
     const result = await this.auth.logout(
-      request.cookies?.[customerCookie],
+      mobileRefreshToken ?? request.cookies?.[customerCookie],
       user,
       request,
     );

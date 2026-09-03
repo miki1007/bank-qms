@@ -15,4 +15,4 @@ dependencyResolutionManagement {
 }
 
 rootProject.name = "BankQmsAndroid"
-include(":shell", ":customer-app", ":staff-app")
+include(":mobile-core", ":customer-app", ":staff-app")

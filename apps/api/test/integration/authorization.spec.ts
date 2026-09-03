@@ -56,6 +56,28 @@ describe.skipIf(!run)("authorization integration with PostgreSQL", () => {
     }
   });
 
+  it("rotates an Android staff refresh token without exposing it to browsers", async () => {
+    const browser = await login("teller.three", tellerPassword);
+    expect(browser.status).toBe(201);
+    expect(browser.body.refreshToken).toBeUndefined();
+
+    const mobile = await request(app.getHttpServer())
+      .post("/api/v1/auth/login")
+      .set("X-Client-Platform", "android")
+      .send({ username: "teller.three", password: tellerPassword });
+    expect(mobile.status).toBe(201);
+    expect(mobile.body.refreshToken).toEqual(expect.any(String));
+
+    const rotated = await request(app.getHttpServer())
+      .post("/api/v1/auth/refresh")
+      .set("X-Client-Platform", "android")
+      .set("X-Refresh-Token", mobile.body.refreshToken);
+    expect(rotated.status).toBe(201);
+    expect(rotated.body.refreshToken).toEqual(expect.any(String));
+    expect(rotated.body.refreshToken).not.toBe(mobile.body.refreshToken);
+    expect(rotated.body.user.role).toBe("TELLER");
+  });
+
   it("locks a teller session to the counter assigned by the manager", async () => {
     const teller = await login("teller.one", tellerPassword);
     expect(teller.status).toBe(201);
@@ -186,5 +208,26 @@ describe.skipIf(!run)("authorization integration with PostgreSQL", () => {
       .get("/api/v1/customer-auth/me")
       .set("Authorization", `Bearer ${customerToken}`);
     expect(revoked.status).toBe(401);
+  });
+
+  it("supports encrypted-at-rest Android customer refresh rotation", async () => {
+    const registered = await request(app.getHttpServer())
+      .post("/api/v1/customer-auth/register")
+      .set("X-Client-Platform", "android")
+      .send({
+        name: "Mobile Customer",
+        email: `mobile-${randomUUID()}@example.com`,
+        password: "MobileCustomer7",
+      });
+    expect(registered.status).toBe(201);
+    expect(registered.body.refreshToken).toEqual(expect.any(String));
+
+    const rotated = await request(app.getHttpServer())
+      .post("/api/v1/customer-auth/refresh")
+      .set("X-Client-Platform", "android")
+      .set("X-Refresh-Token", registered.body.refreshToken);
+    expect(rotated.status).toBe(201);
+    expect(rotated.body.refreshToken).toEqual(expect.any(String));
+    expect(rotated.body.refreshToken).not.toBe(registered.body.refreshToken);
   });
 });

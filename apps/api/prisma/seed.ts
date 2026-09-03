@@ -147,6 +147,9 @@ async function main() {
     },
   ];
   for (const user of users) {
+    const passwordHash = await argon2.hash(user.password, {
+      type: argon2.argon2id,
+    });
     await prisma.staff.upsert({
       where: { username: user.username },
       update: {
@@ -154,15 +157,17 @@ async function main() {
         role: user.role,
         status: "ACTIVE",
         assignedCounterId: user.assignedCounterId ?? null,
+        passwordHash,
+        failedLoginCount: 0,
+        lockedUntil: null,
+        authVersion: { increment: 1 },
       },
       create: {
         branchId: branch.id,
         staffCode: user.staffCode,
         name: user.name,
         username: user.username,
-        passwordHash: await argon2.hash(user.password, {
-          type: argon2.argon2id,
-        }),
+        passwordHash,
         role: user.role,
         assignedCounterId: user.assignedCounterId,
       },
@@ -214,17 +219,24 @@ async function main() {
       },
     },
   });
+  const branchTwoManagerHash = await argon2.hash(managerPassword, {
+    type: argon2.argon2id,
+  });
   await prisma.staff.upsert({
     where: { username: "manager.branch2" },
-    update: {},
+    update: {
+      status: "ACTIVE",
+      passwordHash: branchTwoManagerHash,
+      failedLoginCount: 0,
+      lockedUntil: null,
+      authVersion: { increment: 1 },
+    },
     create: {
       branchId: second.id,
       staffCode: "MGR-B2-001",
       name: "Branch Two Manager",
       username: "manager.branch2",
-      passwordHash: await argon2.hash(managerPassword, {
-        type: argon2.argon2id,
-      }),
+      passwordHash: branchTwoManagerHash,
       role: "MANAGER",
     },
   });
