@@ -16,6 +16,8 @@ const managerPassword = process.env.DEV_MANAGER_PASSWORD ?? "";
 describe.skipIf(!run)("authorization integration with PostgreSQL", () => {
   let app: INestApplication;
   let prisma: PrismaService;
+  let tellerOneAccessToken = "";
+  let browserTellerBody: Record<string, unknown> = {};
 
   beforeAll(async () => {
     const moduleRef = await Test.createTestingModule({
@@ -28,6 +30,13 @@ describe.skipIf(!run)("authorization integration with PostgreSQL", () => {
     app.useGlobalFilters(new DomainExceptionFilter());
     await app.init();
     prisma = app.get(PrismaService);
+
+    const teller = await login("teller.one", tellerPassword);
+    if (teller.status !== 201) {
+      throw new Error("Unable to establish the shared teller test session.");
+    }
+    tellerOneAccessToken = teller.body.accessToken as string;
+    browserTellerBody = teller.body as Record<string, unknown>;
   });
 
   afterAll(async () => app?.close());
@@ -40,8 +49,6 @@ describe.skipIf(!run)("authorization integration with PostgreSQL", () => {
   }
 
   it("returns 403 for teller privilege escalation", async () => {
-    const teller = await login("teller.one", tellerPassword);
-    expect(teller.status).toBe(201);
     for (const path of [
       "/api/v1/manager/staff",
       "/api/v1/manager/services",
@@ -50,16 +57,14 @@ describe.skipIf(!run)("authorization integration with PostgreSQL", () => {
     ]) {
       const response = await request(app.getHttpServer())
         .get(path)
-        .set("Authorization", `Bearer ${teller.body.accessToken}`);
+        .set("Authorization", `Bearer ${tellerOneAccessToken}`);
       expect(response.status).toBe(403);
       expect(response.body.error.code).toBe("FORBIDDEN");
     }
   });
 
   it("rotates an Android staff refresh token without exposing it to browsers", async () => {
-    const browser = await login("teller.three", tellerPassword);
-    expect(browser.status).toBe(201);
-    expect(browser.body.refreshToken).toBeUndefined();
+    expect(browserTellerBody.refreshToken).toBeUndefined();
 
     const mobile = await request(app.getHttpServer())
       .post("/api/v1/auth/login")
@@ -79,8 +84,6 @@ describe.skipIf(!run)("authorization integration with PostgreSQL", () => {
   });
 
   it("locks a teller session to the counter assigned by the manager", async () => {
-    const teller = await login("teller.one", tellerPassword);
-    expect(teller.status).toBe(201);
     const account = await prisma.staff.findUniqueOrThrow({
       where: { username: "teller.one" },
       include: { assignedCounter: true },
@@ -95,28 +98,28 @@ describe.skipIf(!run)("authorization integration with PostgreSQL", () => {
 
     const available = await request(app.getHttpServer())
       .get("/api/v1/teller/counters/available")
-      .set("Authorization", `Bearer ${teller.body.accessToken}`);
+      .set("Authorization", `Bearer ${tellerOneAccessToken}`);
     expect(available.status).toBe(200);
     expect(available.body).toHaveLength(1);
     expect(available.body[0].id).toBe(account.assignedCounterId);
 
     const forgedOpen = await request(app.getHttpServer())
       .post("/api/v1/teller/counter-sessions")
-      .set("Authorization", `Bearer ${teller.body.accessToken}`)
+      .set("Authorization", `Bearer ${tellerOneAccessToken}`)
       .send({ counterId: otherCounter.id });
     expect(forgedOpen.status).toBe(403);
     expect(forgedOpen.body.error.code).toBe("FORBIDDEN");
 
     const assignedOpen = await request(app.getHttpServer())
       .post("/api/v1/teller/counter-sessions")
-      .set("Authorization", `Bearer ${teller.body.accessToken}`)
+      .set("Authorization", `Bearer ${tellerOneAccessToken}`)
       .send({ counterId: account.assignedCounterId });
     expect(assignedOpen.status).toBe(201);
     expect(assignedOpen.body.session.counterId).toBe(account.assignedCounterId);
 
     const close = await request(app.getHttpServer())
       .post("/api/v1/teller/counter-session/close")
-      .set("Authorization", `Bearer ${teller.body.accessToken}`);
+      .set("Authorization", `Bearer ${tellerOneAccessToken}`);
     expect(close.status).toBe(201);
   });
 
