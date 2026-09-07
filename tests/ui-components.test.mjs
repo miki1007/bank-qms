@@ -145,37 +145,60 @@ test("launches every product surface and exposes audited manager controls", asyn
   assert.match(route, /Content-Disposition/);
 });
 
-test("ships separate hardened Android customer and staff applications", async () => {
+test("ships full native Android customer and teller applications", async () => {
   const settings = await read("../apps/android/settings.gradle");
-  const shell = await read(
-    "../apps/android/shell/src/main/java/com/bankqms/shell/BaseWebActivity.java",
+  const core = await read(
+    "../apps/android/mobile-core/src/main/java/com/bankqms/mobilecore/QmsApiClient.kt",
   );
-  const policy = await read(
-    "../apps/android/shell/src/main/java/com/bankqms/shell/TrustedNavigationPolicy.java",
+  const secureStore = await read(
+    "../apps/android/mobile-core/src/main/java/com/bankqms/mobilecore/SecureSessionStore.kt",
+  );
+  const realtime = await read(
+    "../apps/android/mobile-core/src/main/java/com/bankqms/mobilecore/RealtimeConnection.kt",
+  );
+  const customer = await read(
+    "../apps/android/customer-app/src/main/java/com/bankqms/customer/CustomerApplication.kt",
+  );
+  const customerApi = await read(
+    "../apps/android/customer-app/src/main/java/com/bankqms/customer/CustomerRepository.kt",
+  );
+  const staff = await read(
+    "../apps/android/staff-app/src/main/java/com/bankqms/staff/StaffApplication.kt",
+  );
+  const staffApi = await read(
+    "../apps/android/staff-app/src/main/java/com/bankqms/staff/StaffRepository.kt",
   );
   const customerBuild = await read("../apps/android/customer-app/build.gradle");
   const staffBuild = await read("../apps/android/staff-app/build.gradle");
-  const customerManifest = await read(
-    "../apps/android/customer-app/src/main/AndroidManifest.xml",
-  );
-  const staffManifest = await read(
-    "../apps/android/staff-app/src/main/AndroidManifest.xml",
-  );
   const workflow = await read("../.github/workflows/android-apks.yml");
 
+  assert.match(settings, /mobile-core/);
   assert.match(settings, /customer-app/);
   assert.match(settings, /staff-app/);
   assert.match(customerBuild, /com\.bankqms\.customer/);
   assert.match(staffBuild, /com\.bankqms\.staff/);
-  assert.match(customerManifest, /android:usesCleartextTraffic="false"/);
-  assert.match(staffManifest, /android:usesCleartextTraffic="false"/);
+  assert.match(customerBuild, /compose true/);
+  assert.match(staffBuild, /compose true/);
   assert.match(
-    shell,
-    /setMixedContentMode\(WebSettings\.MIXED_CONTENT_NEVER_ALLOW\)/,
+    customerBuild,
+    /manifestPlaceholders = \[usesCleartext: "false"\]/,
   );
-  assert.match(shell, /handler\.cancel\(\)/);
-  assert.match(policy, /"https"\.equalsIgnoreCase/);
+  assert.match(staffBuild, /manifestPlaceholders = \[usesCleartext: "false"\]/);
+  assert.match(secureStore, /AndroidKeyStore/);
+  assert.match(secureStore, /AES\/GCM\/NoPadding/);
+  assert.match(core, /X-Refresh-Token/);
+  assert.match(core, /Idempotency-Key/);
+  assert.match(realtime, /eventId/);
+  assert.match(realtime, /seenIds/);
+  assert.match(customer, /Join a bank queue/);
+  assert.match(customerApi, /customer-auth\/register/);
+  assert.match(customerApi, /customers\/tickets\/\$id\/cancel/);
+  assert.match(staff, /Call next customer/);
+  assert.match(staffApi, /teller\/tickets\/call-next/);
+  assert.match(staffApi, /teller\/tickets\/\$id\/transfer/);
+  assert.doesNotMatch(customer + staff + core, /android\.webkit\.WebView/);
   assert.match(workflow, /assembleDebug/);
+  assert.match(workflow, /stat -c%s/);
 });
 
 test("ships separate secure iOS customer and staff targets", async () => {

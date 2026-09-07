@@ -39,7 +39,9 @@ class RealtimeConnection(
         }
     }
 
-    fun connect() = socket.connect()
+    fun connect() {
+        socket.connect()
+    }
 
     fun close() {
         socket.off()
