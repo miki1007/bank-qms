@@ -126,7 +126,7 @@ The owner-only Sites URL is a constrained portfolio preview. That runtime cannot
 
 - Never commit `.env`, database credentials, JWT keys, device secrets, signing keys, access tokens, refresh tokens, or lookup codes.
 - Teller and manager authorization is enforced by backend role, branch, and counter-session ownership checks; hidden navigation is not a security boundary.
-- Customer and staff access tokens stay in memory. Refresh tokens are rotated, hashed in storage, and delivered only through HTTP-only cookies.
+- Customer and staff access tokens stay in memory. Refresh tokens are rotated and hashed server-side; browsers receive them only through HTTP-only cookies, while native Android clients receive them over TLS and encrypt them at rest with Android Keystore AES-GCM.
 - Public display events contain public ticket number, counter, service, and call time only—never customer data, lookup proof, tokens, private notes, or priority reasons.
 - Logs and health responses must not include credentials or request authorization material.
 
