@@ -156,6 +156,15 @@ test("ships full native Android customer and teller applications", async () => {
   const realtime = await read(
     "../apps/android/mobile-core/src/main/java/com/bankqms/mobilecore/RealtimeConnection.kt",
   );
+  const serverSetup = await read(
+    "../apps/android/mobile-core/src/main/java/com/bankqms/mobilecore/ServerConfiguration.kt",
+  );
+  const customerMain = await read(
+    "../apps/android/customer-app/src/main/java/com/bankqms/customer/MainActivity.kt",
+  );
+  const staffMain = await read(
+    "../apps/android/staff-app/src/main/java/com/bankqms/staff/MainActivity.kt",
+  );
   const customer = await read(
     "../apps/android/customer-app/src/main/java/com/bankqms/customer/CustomerApplication.kt",
   );
@@ -190,6 +199,12 @@ test("ships full native Android customer and teller applications", async () => {
   assert.match(core, /Idempotency-Key/);
   assert.match(realtime, /eventId/);
   assert.match(realtime, /seenIds/);
+  assert.match(serverSetup, /Connect this phone/);
+  assert.match(serverSetup, /health\/ready/);
+  assert.match(serverSetup, /confirmedUrl/);
+  assert.match(serverSetup, /Release builds accept HTTPS only/);
+  assert.match(customerMain, /ServerSetupScreen/);
+  assert.match(staffMain, /ServerSetupScreen/);
   assert.match(customer, /Join a bank queue/);
   assert.match(customerApi, /customer-auth\/register/);
   assert.match(customerApi, /customers\/tickets\/\$id\/cancel/);

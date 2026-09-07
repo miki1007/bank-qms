@@ -69,6 +69,12 @@ gradle -p apps/android \
 
 Outputs are under `apps/android/customer-app/build/outputs/apk/` and `apps/android/staff-app/build/outputs/apk/`. The GitHub Actions workflow `.github/workflows/android-apks.yml` builds downloadable debug artifacts. Production signing keys must remain in an owner-controlled secret store.
 
+On first launch, each APK asks for and verifies the Bank QMS server. A physical
+phone can use the computer's private IPv4 address, such as
+`192.168.1.20:3000`, without rebuilding the APK. The phone and computer must be
+on the same trusted Wi-Fi, the development firewall must allow port 3000, and
+the API/PostgreSQL readiness check must pass. Release builds accept HTTPS only.
+
 For a complete VS Code/Android phone walkthrough, including USB debugging,
 building both APKs, installing with ADB, and choosing a safe HTTPS backend, see
 [Android development](docs/operations/android-development.md).

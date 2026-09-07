@@ -44,6 +44,7 @@ import androidx.compose.material.icons.rounded.Bolt
 import androidx.compose.material.icons.rounded.Call
 import androidx.compose.material.icons.rounded.CheckCircle
 import androidx.compose.material.icons.rounded.Close
+import androidx.compose.material.icons.rounded.Dns
 import androidx.compose.material.icons.rounded.Forward
 import androidx.compose.material.icons.rounded.Lock
 import androidx.compose.material.icons.rounded.Logout
@@ -108,7 +109,11 @@ import java.time.Duration
 import java.time.Instant
 
 @Composable
-fun StaffApplication(viewModel: StaffViewModel) {
+fun StaffApplication(
+    viewModel: StaffViewModel,
+    serverAddress: String,
+    onServerSettings: () -> Unit,
+) {
     val state by viewModel.state.collectAsStateWithLifecycle()
     val snackbar = remember { SnackbarHostState() }
     LaunchedEffect(state.error, state.notice) {
@@ -133,7 +138,12 @@ fun StaffApplication(viewModel: StaffViewModel) {
                 ) { screen ->
                     when (screen) {
                         "loading" -> StaffLoader()
-                        "auth" -> StaffLogin(state.busy, viewModel::login)
+                        "auth" -> StaffLogin(
+                            busy = state.busy,
+                            serverAddress = serverAddress,
+                            login = viewModel::login,
+                            onServerSettings = onServerSettings,
+                        )
                         "open" -> OpenCounterScreen(state, viewModel)
                         else -> WorkspaceScreen(state, viewModel)
                     }
@@ -175,7 +185,12 @@ private fun StaffLoader() {
 }
 
 @Composable
-private fun StaffLogin(busy: Boolean, login: (String, String) -> Unit) {
+private fun StaffLogin(
+    busy: Boolean,
+    serverAddress: String,
+    login: (String, String) -> Unit,
+    onServerSettings: () -> Unit,
+) {
     var username by remember { mutableStateOf("") }
     var password by remember { mutableStateOf("") }
     var visible by remember { mutableStateOf(false) }
@@ -244,6 +259,14 @@ private fun StaffLogin(busy: Boolean, login: (String, String) -> Unit) {
         Row(Modifier.padding(top = 22.dp), verticalAlignment = Alignment.CenterVertically) {
             Icon(Icons.Rounded.Security, null, tint = QmsStaff, modifier = Modifier.size(18.dp))
             Text("Your manager assigns the counter. It cannot be changed here.", color = QmsMuted, fontSize = 12.sp, modifier = Modifier.padding(start = 8.dp))
+        }
+        TextButton(
+            onClick = onServerSettings,
+            enabled = !busy,
+            modifier = Modifier.padding(top = 8.dp),
+        ) {
+            Icon(Icons.Rounded.Dns, null, modifier = Modifier.size(18.dp))
+            Text("Server: $serverAddress", modifier = Modifier.padding(start = 8.dp))
         }
     }
 }

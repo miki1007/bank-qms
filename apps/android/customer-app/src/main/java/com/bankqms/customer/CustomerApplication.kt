@@ -38,6 +38,7 @@ import androidx.compose.material.icons.rounded.Add
 import androidx.compose.material.icons.rounded.Apartment
 import androidx.compose.material.icons.rounded.CheckCircle
 import androidx.compose.material.icons.rounded.ConfirmationNumber
+import androidx.compose.material.icons.rounded.Dns
 import androidx.compose.material.icons.rounded.Email
 import androidx.compose.material.icons.rounded.History
 import androidx.compose.material.icons.rounded.HourglassTop
@@ -103,7 +104,11 @@ import com.bankqms.mobilecore.QmsSurfaceHigh
 import com.bankqms.mobilecore.QmsWarning
 
 @Composable
-fun CustomerApplication(viewModel: CustomerViewModel) {
+fun CustomerApplication(
+    viewModel: CustomerViewModel,
+    serverAddress: String,
+    onServerSettings: () -> Unit,
+) {
     val state by viewModel.state.collectAsStateWithLifecycle()
     val snackbar = remember { SnackbarHostState() }
     LaunchedEffect(state.error, state.notice) {
@@ -133,8 +138,10 @@ fun CustomerApplication(viewModel: CustomerViewModel) {
                         when (screen) {
                             CustomerScreen.AUTH -> AuthScreen(
                                 busy = state.busy,
+                                serverAddress = serverAddress,
                                 onLogin = viewModel::login,
                                 onRegister = viewModel::register,
+                                onServerSettings = onServerSettings,
                             )
                             CustomerScreen.HOME -> HomeScreen(state, viewModel)
                             CustomerScreen.JOIN -> JoinScreen(state, viewModel)
@@ -188,8 +195,10 @@ private fun BrandMark() {
 @Composable
 private fun AuthScreen(
     busy: Boolean,
+    serverAddress: String,
     onLogin: (String, String) -> Unit,
     onRegister: (String, String, String) -> Unit,
+    onServerSettings: () -> Unit,
 ) {
     var register by remember { mutableStateOf(false) }
     var name by remember { mutableStateOf("") }
@@ -290,6 +299,14 @@ private fun AuthScreen(
             Icon(Icons.Rounded.Security, null, tint = QmsCustomer, modifier = Modifier.size(18.dp))
             Spacer(Modifier.width(8.dp))
             Text("Encrypted session · Private ticket history", color = QmsMuted, fontSize = 13.sp)
+        }
+        TextButton(
+            onClick = onServerSettings,
+            enabled = !busy,
+            modifier = Modifier.padding(top = 8.dp),
+        ) {
+            Icon(Icons.Rounded.Dns, null, modifier = Modifier.size(18.dp))
+            Text("Server: $serverAddress", modifier = Modifier.padding(start = 8.dp))
         }
     }
 }

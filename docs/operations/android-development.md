@@ -8,6 +8,7 @@ The repository contains two Android applications:
 Both are native Jetpack Compose Android applications connected to the same Bank
 QMS backend. Their screens and interaction logic are packaged in the APK; queue
 rules remain server-side so there is no competing copy of the domain workflow.
+Both require Android 8.0 or newer.
 
 ## 1. Install the development tools
 
@@ -41,12 +42,31 @@ teller accounts are `teller.one`, `teller.two`, `teller.three`, and
 `teller.four`; their password is the development value chosen in
 `DEV_TELLER_PASSWORD`. They are assigned to Counters 1–4 respectively.
 
-## 3. Choose the API URL for the APKs
+## 3. Connect an installed APK to the API
 
-The value identifies the NestJS REST API. Including `/api/v1` is recommended;
-the mobile core appends it if omitted. Release builds intentionally accept only
-HTTPS. Debug builds also allow a private development address so a physical phone
-on the same trusted Wi-Fi can reach the computer running Docker and NestJS.
+On first launch, select the Bank QMS server inside the app. For a physical
+phone, run `ipconfig` on Windows, locate the computer's IPv4 address, and enter
+it in this form:
+
+```text
+192.168.1.20:3000
+```
+
+The debug app normalizes this to
+`http://192.168.1.20:3000/api/v1`, calls `/health/ready`, and continues only
+when the real NestJS/PostgreSQL system is ready. Keep the phone and computer on
+the same private Wi-Fi and allow inbound TCP port 3000 through the development
+firewall.
+
+The selected server is remembered. A **Server** action appears on the customer
+and teller login screens when it needs to be changed. Changing it clears the
+locally held session before connecting to another deployment.
+
+## 4. Optional build-time API suggestion
+
+The setup screen initially suggests the build-time URL. Including `/api/v1`
+is optional because the mobile core appends it when omitted. Release builds
+accept only HTTPS. Debug builds also allow a private development address.
 
 Build against an HTTPS deployment:
 
@@ -65,8 +85,8 @@ gradle -PbankQmsApiUrl=https://qms-api.your-approved-host.example/api/v1 :custom
 ```
 
 For the Android Emulator, the default `http://10.0.2.2:3000/api/v1` reaches the
-host computer. For a physical phone, find the computer's LAN address and use it
-in a debug build, for example:
+host computer. A physical-phone address can be supplied as the initial
+suggestion:
 
 ```bash
 gradle -p apps/android \
@@ -74,11 +94,10 @@ gradle -p apps/android \
   :customer-app:assembleDebug :staff-app:assembleDebug
 ```
 
-Keep the phone and computer on the same private network and allow TCP port 3000
-through the development firewall. Never use clear-text HTTP for a distributed
-or production build.
+Never use clear-text HTTP for a distributed or production build. Release builds
+reject HTTP addresses even if one was previously saved by a debug build.
 
-## 4. Install on a physical Android phone
+## 5. Install on a physical Android phone
 
 On the phone, enable Developer options and USB debugging, connect the USB cable,
 approve the computer, then confirm the device:
@@ -95,19 +114,23 @@ adb install -r apps/android/staff-app/build/outputs/apk/debug/staff-app-debug.ap
 ```
 
 You can also copy each APK to the phone and open it manually. Android may ask
-for permission to install an app from the Files application. Debug APKs are for
-private testing only and must not be treated as Play Store releases.
+for permission to install an app from the Files application. If Android reports
+**App not installed** after an earlier CI build was installed, uninstall the
+old Bank QMS app first; separate CI debug builds can use different debug signing
+certificates. Debug APKs are for private testing only and must not be treated as
+Play Store releases.
 
-## 5. Verify the phone flow
+## 6. Verify the phone flow
 
-1. Open Bank QMS Customer and create a standard ticket.
-2. Create priority tickets only after choosing a private eligibility reason.
-3. Open Bank QMS Staff and sign in as the teller assigned to that service.
-4. Confirm the app shows only that teller's assigned counter.
-5. Tap Call Next, start service, and complete the ticket.
-6. Confirm the public display and manager dashboard update.
+1. Open Bank QMS Customer and complete **Connect this phone**.
+2. Register a customer account and create a standard ticket.
+3. Create priority tickets only after choosing a private eligibility reason.
+4. Open Bank QMS Staff, connect to the same server, and sign in as the teller
+   assigned to that service.
+5. Confirm the app shows only that teller's assigned counter.
+6. Tap Call Next, start service, and complete the ticket.
+7. Confirm the public display and manager dashboard update.
 
-If the phone reports a connection problem, confirm that the build-time API URL
-is reachable from the phone, the API health check responds, and PostgreSQL is
-running. A working website URL is not enough: the mobile apps connect directly
-to the `/api/v1` backend.
+If the phone reports a connection problem, use the explanation on the setup
+screen to check Wi-Fi, firewall, API and PostgreSQL readiness. A working website
+URL is not enough: the mobile apps connect directly to the `/api/v1` backend.
