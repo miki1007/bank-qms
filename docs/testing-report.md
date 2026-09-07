@@ -1,5 +1,16 @@
 # Testing report
 
+## 2026-09-07 native Android v2.0 checkpoint
+
+- The customer and teller WebView shells were replaced by native Jetpack Compose applications with a shared Kotlin mobile core. The Android workflow passed Gradle tests and built both apps in [run 34148075178](https://github.com/miki1007/bank-qms/actions/runs/34148075178).
+- The workflow's native-payload guard found no `WebView` or `START_URL` implementation and required each APK to exceed 1 MB before upload.
+- `Bank-QMS-Customer-v2.0-debug.apk` is 17,065,572 bytes with SHA-256 `e68439f0a4a760432720362d023238862400a5011ec6070e42b8b78d49ccf196`.
+- `Bank-QMS-Staff-v2.0-debug.apk` is 17,049,176 bytes with SHA-256 `ec4256d8bf9e2663a274e8ee6d118b9a1527fb2bb335eaeec9d380f418de5c88`.
+- Both downloaded workflow ZIP archives passed `unzip -t`, and both extracted files were identified as Android packages containing Gradle application metadata.
+- Clean PostgreSQL CI passed in [run 34148593927](https://github.com/miki1007/bank-qms/actions/runs/34148593927): dependency installation, Prisma generation, migrations, seed, formatting, lint, type checks, unit tests, authorization/integration tests, production builds, five readiness probes, Playwright end-to-end tests, and the repeated concurrency suite all completed successfully.
+- Local API verification passed TypeScript compilation, 17 unit tests, 15 repository/security contract tests, formatting checks, and `git diff --check`.
+- Physical-device installation remains an explicit operational verification item; the APKs are debug-signed demonstration builds, not owner-signed release or Play Store packages.
+
 ## 2026-09-02 independent-teller and priority-fairness checkpoint
 
 - Prettier, hosted and API ESLint, all TypeScript project checks, and `git diff --check` passed locally.
