@@ -1,5 +1,17 @@
 # Testing report
 
+## 2026-09-07 physical-phone Android v2.1 checkpoint
+
+- Both native Android apps now require a verified server selection on first launch, accept a computer IPv4 address without an APK rebuild, persist the normalized endpoint, expose server settings from login, and clear the old local session before changing deployments.
+- Debug builds permit private-LAN HTTP for local testing. Release builds reject HTTP, credential-bearing URLs, query strings and fragments; they continue to require HTTPS.
+- The setup flow verifies the authoritative NestJS/PostgreSQL readiness endpoint before opening authentication. Invalid or unreachable servers are not confirmed.
+- Gradle tests, both APK builds, the anti-WebView guard and the APK payload-size gate passed in [Android workflow run 34151593666](https://github.com/miki1007/bank-qms/actions/runs/34151593666).
+- `Bank-QMS-Customer-v2.1-debug.apk` is 17,098,344 bytes with SHA-256 `1c6d938ae2c278e75da176efbbd3a382306531751651a30b296238102af50903`.
+- `Bank-QMS-Staff-v2.1-debug.apk` is 17,081,948 bytes with SHA-256 `f3b1217fcd6c364faed7cad892f507e9732221e97317398dd33da64a6d8dba44`.
+- Both downloaded workflow ZIP archives passed `unzip -t`, and both extracted files were identified as Android packages containing Gradle application metadata.
+- Clean PostgreSQL, authorization, concurrency, lint, type-check, production-build and Playwright gates passed in [qms-ci run 34151593663](https://github.com/miki1007/bank-qms/actions/runs/34151593663).
+- A physical Android installation remains an owner-side acceptance step because this build environment does not expose an Android device. If an earlier CI debug build is installed, it must first be uninstalled when Android reports a signing-certificate mismatch.
+
 ## 2026-09-07 native Android v2.0 checkpoint
 
 - The customer and teller WebView shells were replaced by native Jetpack Compose applications with a shared Kotlin mobile core. The Android workflow passed Gradle tests and built both apps in [run 34148075178](https://github.com/miki1007/bank-qms/actions/runs/34148075178).
