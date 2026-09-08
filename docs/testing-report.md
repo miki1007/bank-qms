@@ -1,5 +1,12 @@
 # Testing report
 
+## 2026-09-08 WorldLink multi-branch web checkpoint
+
+- Hosted workflow integration suite: 11/11 passed against real SQLite after applying all seven D1 migrations. Coverage includes branch/day numbering, ticket and teller idempotency, preserved remote-booking order after arrival, expiry, remote limits/cooldown, priority verification/fairness, session ownership, transfer/no-show behavior, public-data privacy, branch authorization, CSV auditing, and five rounds of 20-ticket simultaneous Call Next simulation.
+- Site TypeScript check and site ESLint passed. The production build passed for NestJS, all four Vite clients, and every hosted route.
+- Browser acceptance executed on the working preview: supplied emblem rendered; Summit remote ticket `DEP-001` was created; arrival code check-in preserved its original position; independently authenticated Teller 1 opened only Counter 1; Call Next selected that checked-in ticket; the public display showed `DEP-001` at Counter 1; Start Service and Complete updated the customer ticket to completed; Manager quick access routed to the full manager dashboard and displayed the persisted ticket/event data.
+- The preview-only HTTP cookie/customer identity fallbacks are strictly hostname-gated. Production Sites remains HTTPS owner-authenticated; the canonical deployment remains NestJS/PostgreSQL/Socket.IO.
+
 ## 2026-09-07 physical-phone Android v2.1 checkpoint
 
 - Both native Android apps now require a verified server selection on first launch, accept a computer IPv4 address without an APK rebuild, persist the normalized endpoint, expose server settings from login, and clear the old local session before changing deployments.

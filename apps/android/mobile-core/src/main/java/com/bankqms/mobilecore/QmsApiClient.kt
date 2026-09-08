@@ -186,3 +186,4 @@ fun Any?.asObject(): JSONObject = this as? JSONObject
 
 fun Any?.asArray(): JSONArray = this as? JSONArray
     ?: throw ApiException(500, "INVALID_RESPONSE", "The server returned an invalid response.")
+

@@ -79,3 +79,4 @@ internal fun JSONObject.toTicket(): CustomerTicket {
         version = optInt("version"),
     )
 }
+

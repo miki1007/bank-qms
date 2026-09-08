@@ -1,6 +1,6 @@
 # Bank QMS
 
-Bank QMS is a queue-management platform for a bank-branch showcase. It is not branded for, commissioned by, or affiliated with any real bank.
+Bank QMS is the academic queue-management showcase branded as **WorldLink Bank**. The supplied WorldLink emblem is used with the project owner's direction; this repository is a demonstration and does not provide banking transactions or account access.
 
 The product has six connected surfaces backed by the same domain rules:
 
@@ -55,7 +55,9 @@ pnpm db:seed
 pnpm dev
 ```
 
-The seed creates `MAIN` / `Main Branch`, four services, four counters, one development manager (`manager.dev`), four development tellers (`teller.one` through `teller.four`), device registrations, and a second-branch authorization fixture. Each teller has a manager-controlled counter assignment and cannot switch counters from the teller app. Passwords and device secrets come only from your `.env` values.
+The hosted showcase exposes independent queues for Summit, CMC, Ayat, Piyassa, 4 Killo, Stadium, Megenagna, Mexico, Bole, Shola, and Lideta. Summit demo staff use `manager.dev` and `teller.one` through `teller.four`; other hosted branch usernames append the branch code (for example, `manager.dev.cmc`). Each teller has a manager-controlled counter assignment and cannot switch identities or counters from the teller console. Passwords and device secrets for the canonical PostgreSQL deployment come only from your `.env` values.
+
+The customer web/PWA uses a virtual-queue reservation model: one active remote ticket per customer per branch, three remote reservations per day, a ten-minute cancellation cooldown, expiry/no-show abuse controls, and branch arrival-code check-in. A customer who checks in on time keeps the original booking timestamp; unconfirmed reservations cannot be called. Priority is only requested remotely and becomes active after staff verification. While standard customers wait, the configured fairness rule calls at most two priority tickets consecutively by default.
 
 ## Mobile builds
 
@@ -126,7 +128,7 @@ Deploy PostgreSQL and the NestJS API behind HTTPS, serve the four Vite web clien
 
 ## Private hosted showcase
 
-The owner-only Sites URL is a constrained portfolio preview. That runtime cannot open PostgreSQL TCP connections or host the canonical Socket.IO process, so it uses a persistent D1 compatibility adapter and authoritative polling. This adapter is not the production backend and is explained in `docs/implementation-decisions.md`; local and deployable builds use NestJS/PostgreSQL.
+The owner-only Sites URL is a constrained portfolio preview. It contains `/customer`, `/kiosk`, `/teller`, `/manager`, and `/display`, all connected to one persistent queue adapter. That runtime cannot open PostgreSQL TCP connections or host the canonical Socket.IO process, so it uses D1 and authoritative polling. This adapter is not the production backend and is explained in `docs/implementation-decisions.md`; the production target remains NestJS/PostgreSQL/Socket.IO.
 
 ## Security notes
 

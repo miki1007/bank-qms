@@ -1,0 +1,2 @@
+DROP INDEX `qms_customer_active_ticket_unique`;--> statement-breakpoint
+CREATE UNIQUE INDEX `qms_customer_active_ticket_unique` ON `qms_demo_tickets` (`branch_code`,`customer_subject`) WHERE "qms_demo_tickets"."customer_subject" IS NOT NULL AND "qms_demo_tickets"."channel" = 'REMOTE' AND "qms_demo_tickets"."status" IN ('RESERVED', 'WAITING', 'CALLED', 'IN_SERVICE', 'NO_SHOW');

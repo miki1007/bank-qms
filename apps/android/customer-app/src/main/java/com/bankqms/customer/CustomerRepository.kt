@@ -77,3 +77,4 @@ class CustomerRepository(private val api: QmsApiClient) {
     suspend fun logout() = api.logout()
     fun clearSession() = api.clearSession()
 }
+

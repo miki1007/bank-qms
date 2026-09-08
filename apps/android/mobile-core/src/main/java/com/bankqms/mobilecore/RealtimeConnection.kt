@@ -49,3 +49,4 @@ class RealtimeConnection(
         onConnectionChanged(false)
     }
 }
+

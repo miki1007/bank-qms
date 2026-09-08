@@ -1,13 +1,15 @@
 import type { Metadata } from "next";
 import "./globals.css";
+import "./worldlink.css";
 
 export const metadata: Metadata = {
-  title: "Bank QMS",
+  title: "WorldLink Bank | Queue Management",
   description:
-    "Connected Bank QMS customer and staff mobile apps, kiosk, public display, teller console, and manager dashboard.",
+    "WorldLink Bank customer queue portal, teller console, manager dashboard, branch kiosk and public number display. Academic demonstration.",
   icons: {
-    icon: "/favicon.svg",
-    shortcut: "/favicon.svg",
+    icon: "/worldlink-bank-logo.jpeg",
+    shortcut: "/worldlink-bank-logo.jpeg",
+    apple: "/worldlink-bank-logo.jpeg",
   },
 };
 

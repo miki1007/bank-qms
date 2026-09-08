@@ -93,3 +93,4 @@ fun AnimatedBackdrop(accent: Color, modifier: Modifier = Modifier) {
 }
 
 val QmsCardShape = RoundedCornerShape(26.dp)
+

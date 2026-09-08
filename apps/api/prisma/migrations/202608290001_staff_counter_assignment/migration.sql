@@ -23,3 +23,4 @@ WHERE s."branch_id" = b."id"
     (s."username" = 'teller.three' AND c."label" = 'Counter 3') OR
     (s."username" = 'teller.four' AND c."label" = 'Counter 4')
   );
+

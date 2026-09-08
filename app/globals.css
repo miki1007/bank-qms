@@ -2,13 +2,13 @@
 @import "tw-animate-css";
 
 :root {
-  --background: #f3f7f6;
-  --foreground: #102821;
+  --background: #f3f6fb;
+  --foreground: #1e3048;
   --card: #ffffff;
   --card-foreground: #102821;
   --popover: #ffffff;
   --popover-foreground: #102821;
-  --primary: #08634d;
+  --primary: #1e3048;
   --primary-foreground: #ffffff;
   --secondary: #e7f3ee;
   --secondary-foreground: #164b3d;
@@ -21,10 +21,10 @@
   --input: #ccd9d4;
   --ring: #0b8062;
   --radius: 0.75rem;
-  --ink: #102821;
-  --green: #08634d;
-  --green-dark: #064d3c;
-  --green-soft: #e5f3ee;
+  --ink: #1e3048;
+  --green: #1e3048;
+  --green-dark: #142339;
+  --green-soft: #e8edf5;
   --cream: #f8faf8;
   --line: #dce6e2;
   --muted-ink: #64736e;

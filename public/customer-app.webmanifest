@@ -1,13 +1,12 @@
 {
-  "name": "Bank QMS Customer",
-  "short_name": "QMS Customer",
-  "description": "Join and follow your bank queue from your phone.",
-  "start_url": "/customer-app",
+  "name": "WorldLink Bank Customer",
+  "short_name": "WorldLink",
+  "description": "Reserve, check in and follow your branch queue.",
+  "id": "/customer",
+  "start_url": "/customer",
   "scope": "/",
   "display": "standalone",
-  "background_color": "#f3f7f6",
-  "theme_color": "#08634d",
-  "icons": [
-    { "src": "/favicon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any maskable" }
-  ]
+  "theme_color": "#1e3048",
+  "background_color": "#f3f6fb",
+  "icons": [{ "src": "/worldlink-bank-logo.jpeg", "sizes": "447x447", "type": "image/jpeg", "purpose": "any" }]
 }

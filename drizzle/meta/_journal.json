@@ -29,6 +29,34 @@
       "when": 1788336845707,
       "tag": "0003_independent_teller_priority",
       "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "6",
+      "when": 1788850949050,
+      "tag": "0004_worldlink_branch_reservations",
+      "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "6",
+      "when": 1788851034041,
+      "tag": "0005_arrival_challenges",
+      "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "6",
+      "when": 1788851131503,
+      "tag": "0006_remote_ticket_limit_scope",
+      "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "6",
+      "when": 1788851455758,
+      "tag": "0007_atomic_workflow_operations",
+      "breakpoints": true
     }
   ]
 }

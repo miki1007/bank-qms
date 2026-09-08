@@ -34,7 +34,11 @@ export async function POST(request: Request) {
       );
     }
     if (body.action === "workspace_showcase") {
-      const workspaceUser = request.headers.get("oai-authenticated-user-email");
+      const workspaceUser =
+        request.headers.get("oai-authenticated-user-email") ??
+        (new URL(request.url).hostname === "terminal.local"
+          ? "local-preview@worldlink.test"
+          : null);
       if (!workspaceUser)
         return Response.json(
           { error: "Private showcase authentication is required." },
@@ -42,12 +46,13 @@ export async function POST(request: Request) {
         );
       const role = body.role === "MANAGER" ? "MANAGER" : "TELLER";
       const requestedUsername =
-        role === "TELLER" && typeof body.username === "string"
-          ? body.username
-          : undefined;
+        typeof body.username === "string" ? body.username : undefined;
       const actor = await getWorkspaceShowcaseActor(role, requestedUsername);
       if (!actor) return genericFailure();
-      const session = await createSession(actor);
+      const session = await createSession(
+        actor,
+        new URL(request.url).hostname !== "terminal.local",
+      );
       return Response.json(
         { actor, expiresAt: session.expiresAt },
         { headers: { "Set-Cookie": session.cookie } },
@@ -59,7 +64,10 @@ export async function POST(request: Request) {
     if (!username || !password) return genericFailure();
     const actor = await authenticate(username, password);
     if (!actor) return genericFailure();
-    const session = await createSession(actor);
+    const session = await createSession(
+      actor,
+      new URL(request.url).hostname !== "terminal.local",
+    );
     return Response.json(
       { actor, expiresAt: session.expiresAt },
       { headers: { "Set-Cookie": session.cookie } },

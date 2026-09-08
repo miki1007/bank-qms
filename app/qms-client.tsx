@@ -7,7 +7,6 @@ import {
   BanknoteArrowUp,
   BellRing,
   BriefcaseBusiness,
-  Building2,
   Check,
   CircleDollarSign,
   Clock3,
@@ -17,7 +16,6 @@ import {
   Play,
   RefreshCw,
   RotateCcw,
-  Settings2,
   ShieldCheck,
   TicketCheck,
   Tickets,
@@ -26,19 +24,17 @@ import {
   Volume2,
   X,
 } from "lucide-react";
-import { useCallback, useEffect, useMemo, useState } from "react";
-
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import Link from "next/link";
+import { BankLogo } from "./bank-logo";
 import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-  AlertDialogTrigger,
-} from "@/components/ui/alert-dialog";
+  BANK_BRANCHES,
+  BANK_NAME,
+  DEFAULT_BRANCH_CODE,
+  bankBranch,
+} from "@/lib/bank-brand";
+import { clientUuid } from "@/lib/client-id";
+
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
 
@@ -50,6 +46,7 @@ type Ticket = {
   service_code: string;
   service_name: string;
   priority: number;
+  priority_requested?: number;
   status: string;
   counter: string | null;
   created_at: string;
@@ -82,6 +79,7 @@ type Snapshot = {
   events: QueueEvent[];
   activeCall: Ticket | null;
   settings: { priorityStreak: number; priorityLimit: number };
+  counters?: Array<{ counter: string; status: string; service_code: string }>;
   actor?: {
     id: string;
     username: string;
@@ -102,8 +100,8 @@ type Snapshot = {
 const emptySnapshot: Snapshot = {
   generatedAt: new Date(0).toISOString(),
   branch: {
-    code: "MAIN",
-    name: "Main Branch",
+    code: "SUMMIT",
+    name: "Summit Branch",
     timezone: "Africa/Addis_Ababa",
   },
   services: [],
@@ -170,13 +168,38 @@ export function QmsClient({ surface }: { surface: QmsSurface }) {
   const [lookupToken, setLookupToken] = useState("");
   const [transferService, setTransferService] = useState("WDR");
   const [now, setNow] = useState(new Date());
+  const [branchCode, setBranchCode] = useState<string>(() => {
+    if (typeof window === "undefined") return DEFAULT_BRANCH_CODE;
+    const code = new URLSearchParams(window.location.search).get("branch");
+    return bankBranch(code)?.code ?? DEFAULT_BRANCH_CODE;
+  });
+  const [arrival, setArrival] = useState<{
+    code: string;
+    expiresAt: string;
+  } | null>(null);
+  const [auditEntries, setAuditEntries] = useState<Array<{
+    id: string;
+    action: string;
+    detail: string;
+    created_at: string;
+  }> | null>(null);
+  const [reportFrom, setReportFrom] = useState(
+    new Date().toLocaleDateString("en-CA", { timeZone: "Africa/Addis_Ababa" }),
+  );
+  const [reportTo, setReportTo] = useState(reportFrom);
+  const requestIntents = useRef(
+    new Map<string, { key: string; proof: string }>(),
+  );
 
   const refresh = useCallback(
     async (quiet = false) => {
       try {
-        const response = await fetch(`/api/showcase?surface=${surface}`, {
-          cache: "no-store",
-        });
+        const response = await fetch(
+          `/api/showcase?surface=${surface}${surface === "kiosk" || surface === "display" ? `&branch=${branchCode}` : ""}`,
+          {
+            cache: "no-store",
+          },
+        );
         const data = (await response.json()) as Snapshot & { error?: string };
         if (response.status === 401 || response.status === 403) {
           window.location.assign(
@@ -206,7 +229,7 @@ export function QmsClient({ surface }: { surface: QmsSurface }) {
         setLoading(false);
       }
     },
-    [surface],
+    [surface, branchCode],
   );
 
   useEffect(() => {
@@ -228,17 +251,38 @@ export function QmsClient({ surface }: { surface: QmsSurface }) {
     setBusy(key);
     setError("");
     setNotice("");
+    const intentKey = JSON.stringify(payload);
+    if (!requestIntents.current.has(intentKey))
+      requestIntents.current.set(intentKey, {
+        key: clientUuid(),
+        proof: clientUuid() + clientUuid(),
+      });
+    const intent = requestIntents.current.get(intentKey)!;
     try {
       const response = await fetch("/api/showcase", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload),
+        body: JSON.stringify({
+          ...payload,
+          idempotencyKey: intent.key,
+          ...(payload.operation === "issue"
+            ? { lookupToken: intent.proof, branchCode, channel: "KIOSK" }
+            : {}),
+        }),
       });
       const data = (await response.json()) as {
         ticket?: Ticket;
         lookupToken?: string;
         snapshot?: Snapshot;
         error?: string;
+        code?: string;
+        expiresAt?: string;
+        entries?: Array<{
+          id: string;
+          action: string;
+          detail: string;
+          created_at: string;
+        }>;
       };
       if (
         (response.status === 401 || response.status === 403) &&
@@ -250,6 +294,10 @@ export function QmsClient({ surface }: { surface: QmsSurface }) {
         return null;
       }
       if (!response.ok) throw new Error(data.error || "The operation failed.");
+      requestIntents.current.delete(intentKey);
+      if (data.code && data.expiresAt)
+        setArrival({ code: data.code, expiresAt: data.expiresAt });
+      if (data.entries) setAuditEntries(data.entries);
       if (data.snapshot) setSnapshot(data.snapshot);
       setConnected(true);
       setNotice(successMessage);
@@ -265,6 +313,9 @@ export function QmsClient({ surface }: { surface: QmsSurface }) {
   }
 
   const assignedCounter = snapshot.actor?.assignedCounter ?? null;
+  const counterState =
+    snapshot.counters?.find((counter) => counter.counter === assignedCounter)
+      ?.status ?? "CLOSED";
   const activeTicket = useMemo(
     () =>
       snapshot.tickets.find(
@@ -376,7 +427,11 @@ export function QmsClient({ surface }: { surface: QmsSurface }) {
       const response = await fetch("/api/showcase", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ operation: "export_csv" }),
+        body: JSON.stringify({
+          operation: "export_csv",
+          from: reportFrom,
+          to: reportTo,
+        }),
       });
       if (response.status === 401 || response.status === 403) {
         window.location.assign("/staff/login?next=%2Fmanager");
@@ -409,18 +464,35 @@ export function QmsClient({ surface }: { surface: QmsSurface }) {
     <main className={`qms-shell surface-${surface}`}>
       {surface !== "display" && (
         <header className="qms-header">
-          <a className="qms-brand" aria-label="Bank QMS" href="/kiosk">
-            <span className="brand-mark">
-              <Building2 />
-            </span>
+          <Link className="qms-brand" aria-label={BANK_NAME} href="/">
+            <BankLogo />
             <span>
-              <strong>Bank</strong> QMS
+              <strong>{BANK_NAME}</strong>
             </span>
-          </a>
+          </Link>
           {surface === "kiosk" ? (
-            <a className="staff-entry" href="/staff/login">
-              Staff sign in
-            </a>
+            <div className="wl-inline">
+              <label className="wl-branch-select">
+                Branch
+                <select
+                  value={branchCode}
+                  onChange={(event) => {
+                    setBranchCode(event.target.value);
+                    setIssuedTicket(null);
+                    setLookupToken("");
+                  }}
+                >
+                  {BANK_BRANCHES.map((branch) => (
+                    <option key={branch.code} value={branch.code}>
+                      {branch.name}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <a className="staff-entry" href="/staff/login">
+                Staff sign in
+              </a>
+            </div>
           ) : (
             <nav className="staff-navigation" aria-label="Staff navigation">
               <a
@@ -484,6 +556,50 @@ export function QmsClient({ surface }: { surface: QmsSurface }) {
       )}
 
       <div className="route-stage" key={surface}>
+        {(surface === "teller" || surface === "manager") &&
+          snapshot.tickets.some(
+            (ticket) =>
+              ticket.priority_requested &&
+              !ticket.priority &&
+              ["WAITING", "RESERVED"].includes(ticket.status),
+          ) && (
+            <section className="wl-priority-approvals">
+              <h2>Priority requests awaiting verification</h2>
+              <p>
+                Confirm the customer’s eligibility before approving. Reasons
+                stay private.
+              </p>
+              {snapshot.tickets
+                .filter(
+                  (ticket) =>
+                    ticket.priority_requested &&
+                    !ticket.priority &&
+                    ["WAITING", "RESERVED"].includes(ticket.status),
+                )
+                .map((ticket) => (
+                  <div key={ticket.id}>
+                    <strong>{ticket.public_number}</strong>
+                    <span>{ticket.service_name}</span>
+                    <Button
+                      variant="outline"
+                      disabled={!!busy}
+                      onClick={() =>
+                        void mutate(
+                          `priority:${ticket.id}`,
+                          {
+                            operation: "approve_priority",
+                            ticketId: ticket.id,
+                          },
+                          "Priority approved and audited.",
+                        )
+                      }
+                    >
+                      Verify & approve
+                    </Button>
+                  </div>
+                ))}
+            </section>
+          )}
         {surface === "kiosk" && (
           <section className="kiosk-view">
             <div className="view-heading centered-heading">
@@ -618,9 +734,78 @@ export function QmsClient({ surface }: { surface: QmsSurface }) {
                 <span>Manager-assigned counter</span>
                 <strong>{assignedCounter ?? "Not assigned"}</strong>
                 <small>{snapshot.actor?.username}</small>
+                <small>
+                  {snapshot.branch.name} · {counterState.toLowerCase()}
+                </small>
               </div>
             </div>
 
+            <div className="wl-counter-toolbar">
+              <Button
+                disabled={!!busy || !!activeTicket}
+                onClick={() =>
+                  void mutate(
+                    "counter",
+                    {
+                      operation: "counter",
+                      action:
+                        counterState === "CLOSED"
+                          ? "open"
+                          : counterState === "PAUSED"
+                            ? "resume"
+                            : "pause",
+                    },
+                    "Counter updated.",
+                  )
+                }
+              >
+                {counterState === "CLOSED"
+                  ? "Open counter session"
+                  : counterState === "PAUSED"
+                    ? "Resume counter"
+                    : "Pause counter"}
+              </Button>
+              {counterState !== "CLOSED" && (
+                <Button
+                  variant="outline"
+                  disabled={!!busy || !!activeTicket}
+                  onClick={() =>
+                    void mutate(
+                      "counter-close",
+                      { operation: "counter", action: "close" },
+                      "Counter session closed.",
+                    )
+                  }
+                >
+                  Close session
+                </Button>
+              )}
+              <Button
+                variant="outline"
+                onClick={() =>
+                  void mutate(
+                    "arrival",
+                    { operation: "arrival_code" },
+                    "Arrival code is ready for customers at this branch.",
+                  )
+                }
+              >
+                Show arrival code
+              </Button>
+            </div>
+            {arrival && new Date(arrival.expiresAt) > now && (
+              <div className="wl-arrival-code">
+                <span>{snapshot.branch.name} arrival code</span>
+                <strong>{arrival.code}</strong>
+                <small>
+                  Give this code to customers who have arrived. Valid until{" "}
+                  {new Date(arrival.expiresAt).toLocaleTimeString("en-GB", {
+                    timeZone: "Africa/Addis_Ababa",
+                  })}
+                  .
+                </small>
+              </div>
+            )}
             <div className="teller-grid">
               <div className="current-ticket-panel">
                 <div className="panel-label">
@@ -773,6 +958,7 @@ export function QmsClient({ surface }: { surface: QmsSurface }) {
                       disabled={
                         Boolean(busy) ||
                         !assignedCounter ||
+                        counterState !== "OPEN" ||
                         assignedQueueWaiting === 0
                       }
                     >
@@ -836,13 +1022,24 @@ export function QmsClient({ surface }: { surface: QmsSurface }) {
           <section className="display-view">
             <div className="display-header">
               <div>
-                <span className="display-logo">
-                  <Building2 />
-                </span>
-                <strong>Bank QMS</strong>
+                <BankLogo />
+                <strong>{BANK_NAME}</strong>
               </div>
               <div>
-                <span>{snapshot.branch.name}</span>
+                <label className="wl-display-branch">
+                  Branch
+                  <select
+                    aria-label="Display branch"
+                    value={branchCode}
+                    onChange={(event) => setBranchCode(event.target.value)}
+                  >
+                    {BANK_BRANCHES.map((branch) => (
+                      <option value={branch.code} key={branch.code}>
+                        {branch.name}
+                      </option>
+                    ))}
+                  </select>
+                </label>
                 <strong>{formatClock(now)}</strong>
               </div>
             </div>
@@ -931,43 +1128,102 @@ export function QmsClient({ surface }: { surface: QmsSurface }) {
                 <Button variant="outline" onClick={() => void refresh()}>
                   <RefreshCw /> Refresh
                 </Button>
-                <AlertDialog>
-                  <AlertDialogTrigger asChild>
-                    <Button variant="outline">
-                      <Settings2 /> Reset queue
-                    </Button>
-                  </AlertDialogTrigger>
-                  <AlertDialogContent>
-                    <AlertDialogHeader>
-                      <AlertDialogTitle>
-                        Reset all showcase queue data?
-                      </AlertDialogTitle>
-                      <AlertDialogDescription>
-                        This clears tickets, events, and daily showcase
-                        sequences. This action cannot be undone.
-                      </AlertDialogDescription>
-                    </AlertDialogHeader>
-                    <AlertDialogFooter>
-                      <AlertDialogCancel>Keep data</AlertDialogCancel>
-                      <AlertDialogAction
-                        variant="destructive"
-                        onClick={() => {
-                          setIssuedTicket(null);
-                          void mutate(
-                            "reset",
-                            { operation: "reset" },
-                            "Showcase queue reset.",
-                          );
-                        }}
-                      >
-                        Reset queue
-                      </AlertDialogAction>
-                    </AlertDialogFooter>
-                  </AlertDialogContent>
-                </AlertDialog>
+                <Button
+                  variant="outline"
+                  onClick={() =>
+                    void mutate(
+                      "arrival",
+                      { operation: "arrival_code" },
+                      "Arrival code is ready.",
+                    )
+                  }
+                >
+                  Show arrival code
+                </Button>
+                <Button
+                  variant="outline"
+                  onClick={() =>
+                    void mutate(
+                      "audit",
+                      { operation: "audit" },
+                      "Audit log loaded.",
+                    )
+                  }
+                >
+                  View audit log
+                </Button>
               </div>
             </div>
 
+            <div className="wl-report-filters">
+              <label>
+                Report from
+                <input
+                  type="date"
+                  value={reportFrom}
+                  onChange={(event) => setReportFrom(event.target.value)}
+                />
+              </label>
+              <label>
+                Report to
+                <input
+                  type="date"
+                  value={reportTo}
+                  onChange={(event) => setReportTo(event.target.value)}
+                />
+              </label>
+              <span>CSV exports use this range and your assigned branch.</span>
+            </div>
+            {arrival && new Date(arrival.expiresAt) > now && (
+              <div className="wl-arrival-code">
+                <span>{snapshot.branch.name} arrival code</span>
+                <strong>{arrival.code}</strong>
+                <small>
+                  Valid for two minutes. Give it only to customers who have
+                  arrived at this branch.
+                </small>
+              </div>
+            )}
+            {auditEntries && (
+              <div className="wl-audit">
+                <div className="wl-inline">
+                  <h2>Audit log</h2>
+                  <Button
+                    variant="outline"
+                    onClick={() => setAuditEntries(null)}
+                  >
+                    Close
+                  </Button>
+                </div>
+                {auditEntries.length ? (
+                  <table>
+                    <thead>
+                      <tr>
+                        <th>Time</th>
+                        <th>Action</th>
+                        <th>Details</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {auditEntries.map((entry) => (
+                        <tr key={entry.id}>
+                          <td>
+                            {new Date(entry.created_at).toLocaleString(
+                              "en-GB",
+                              { timeZone: "Africa/Addis_Ababa" },
+                            )}
+                          </td>
+                          <td>{entry.action}</td>
+                          <td>{entry.detail}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                ) : (
+                  <p>No audit entries yet.</p>
+                )}
+              </div>
+            )}
             <div className="metric-grid">
               <article>
                 <span className="metric-icon mint">
@@ -1066,13 +1322,21 @@ export function QmsClient({ surface }: { surface: QmsSurface }) {
                         <p>
                           <strong>{counter}</strong>
                           <small>
-                            {ticket ? ticket.public_number : "Available"}
+                            {ticket
+                              ? ticket.public_number
+                              : (snapshot.counters
+                                  ?.find((item) => item.counter === counter)
+                                  ?.status?.toLowerCase() ?? "closed")}
                           </small>
                         </p>
                         <span
                           className={`status-pill ${ticket ? ticket.status.toLowerCase() : "available"}`}
                         >
-                          {ticket ? statusLabel(ticket.status) : "open"}
+                          {ticket
+                            ? statusLabel(ticket.status)
+                            : (snapshot.counters
+                                ?.find((item) => item.counter === counter)
+                                ?.status?.toLowerCase() ?? "closed")}
                         </span>
                       </div>
                     );

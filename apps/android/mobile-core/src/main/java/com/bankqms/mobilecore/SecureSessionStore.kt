@@ -67,3 +67,4 @@ class SecureSessionStore(context: Context, namespace: String) {
         return generator.generateKey()
     }
 }
+

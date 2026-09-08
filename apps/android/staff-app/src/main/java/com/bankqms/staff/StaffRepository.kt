@@ -67,3 +67,4 @@ class StaffRepository(private val api: QmsApiClient) {
     suspend fun logout() = api.logout()
     fun clearSession() = api.clearSession()
 }
+

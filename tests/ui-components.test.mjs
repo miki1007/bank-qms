@@ -29,13 +29,15 @@ test("separates operational surfaces into dedicated routes", async () => {
 test("connects interface actions to the persisted queue API", async () => {
   const client = await read("../app/qms-client.tsx");
   const route = await read("../app/api/showcase/route.ts");
+  const workflow = await read("../lib/showcase-ticket-workflow.ts");
 
   assert.match(client, /fetch\("\/api\/showcase"/);
   for (const operation of ["issue", "call_next", "transition", "transfer"]) {
     assert.match(route, new RegExp(`case ["']${operation}["']`));
   }
-  assert.match(route, /status IN \('CALLED','IN_SERVICE'\)/);
-  assert.match(route, /priority_streak/);
+  assert.match(workflow, /status IN \('CALLED','IN_SERVICE'\)/);
+  assert.match(workflow, /qms_branch_fairness/);
+  assert.match(workflow, /last_operation_id/);
 });
 
 test("reinforces active-counter and queue ordering rules in storage", async () => {
@@ -52,35 +54,41 @@ test("enforces staff sessions, manager roles, and private cancellation proof", a
   const auth = await read("../lib/showcase-auth.ts");
   const authRoute = await read("../app/api/showcase/auth/route.ts");
   const queueRoute = await read("../app/api/showcase/route.ts");
+  const workflow = await read("../lib/showcase-ticket-workflow.ts");
 
   assert.match(auth, /HttpOnly; Secure; SameSite=Strict/);
   assert.match(auth, /PBKDF2_ITERATIONS = 100_000/);
   assert.match(auth, /locked_until/);
-  assert.match(auth, /ON CONFLICT\(username\) DO UPDATE SET/);
+  assert.match(auth, /ON CONFLICT\(username\) DO NOTHING/);
   assert.match(authRoute, /Unable to sign in with those credentials/);
   assert.match(authRoute, /oai-authenticated-user-email/);
   assert.match(authRoute, /workspace_showcase/);
   assert.match(authRoute, /sign-in service is temporarily unavailable/i);
   assert.match(auth, /FROM qms_demo_staff WHERE username = \?/);
   assert.match(queueRoute, /Manager permission required/);
-  assert.match(queueRoute, /lookup_token_hash/);
+  assert.match(workflow, /lookup_token_hash/);
 });
 
 test("routes managers to the full dashboard and keeps daily ticket identities", async () => {
   const login = await read("../app/staff-login-client.tsx");
   const staffApp = await read("../app/mobile-staff-client.tsx");
   const schema = await read("../db/schema.ts");
-  const migration = await read("../drizzle/0002_daily_ticket_identity.sql");
-  const queueRoute = await read("../app/api/showcase/route.ts");
+  const migration = await read(
+    "../drizzle/0004_worldlink_branch_reservations.sql",
+  );
+  const workflow = await read("../lib/showcase-ticket-workflow.ts");
 
   assert.match(login, /actor\.role === "MANAGER"/);
   assert.match(login, /window\.location\.replace\("\/manager"\)/);
   assert.match(staffApp, /data\.actor\?\.role === "MANAGER"/);
-  assert.match(schema, /qms_demo_ticket_number_per_day_unique/);
-  assert.match(migration, /DROP INDEX `qms_demo_tickets_public_number_unique`/);
-  assert.match(migration, /datetime\(`created_at`, '\+3 hours'\)/);
-  assert.match(queueRoute, /business_date, service_code/);
-  assert.match(queueRoute, /WHERE service_code = \? AND business_date = \?/);
+  assert.match(schema, /qms_demo_ticket_number_per_branch_day_unique/);
+  assert.match(migration, /qms_demo_ticket_number_per_branch_day_unique/);
+  assert.match(migration, /qms_branch_sequences/);
+  assert.match(workflow, /businessDate\(now\)/);
+  assert.match(
+    workflow,
+    /branch_code=\? AND service_code=\? AND business_date=\?/,
+  );
 });
 
 test("keeps reconnect and reduced-motion safety states visible", async () => {
@@ -98,6 +106,7 @@ test("provides two installable mobile apps on the shared queue backend", async (
   const customer = await read("../app/mobile-customer-client.tsx");
   const staff = await read("../app/mobile-staff-client.tsx");
   const queueRoute = await read("../app/api/showcase/route.ts");
+  const workflow = await read("../lib/showcase-ticket-workflow.ts");
   const customerManifest = JSON.parse(
     await read("../public/customer-app.webmanifest"),
   );
@@ -116,10 +125,11 @@ test("provides two installable mobile apps on the shared queue backend", async (
   assert.match(staff, /operation: "transfer"/);
   assert.match(staff, /action: "requeue"/);
   assert.match(staff, /role === "MANAGER"/);
-  assert.match(queueRoute, /customerTicketLookup/);
-  assert.match(queueRoute, /priority_streak/);
+  assert.match(workflow, /async lookup\(/);
+  assert.match(queueRoute, /case "check_in"/);
+  assert.match(workflow, /qms_branch_fairness/);
   assert.equal(customerManifest.display, "standalone");
-  assert.equal(customerManifest.start_url, "/customer-app");
+  assert.equal(customerManifest.start_url, "/customer");
   assert.equal(staffManifest.display, "standalone");
   assert.equal(staffManifest.start_url, "/staff-app");
 });
@@ -261,7 +271,7 @@ test("locks teller accounts to manager-controlled counters and scopes fairness p
   const workflow = await read("../apps/api/src/modules/tickets.ts");
   const staffWeb = await read("../apps/staff-web/src/main.tsx");
   const showcaseAuth = await read("../lib/showcase-auth.ts");
-  const showcaseQueue = await read("../app/api/showcase/route.ts");
+  const showcaseWorkflow = await read("../lib/showcase-ticket-workflow.ts");
   const showcaseStaff = await read("../app/mobile-staff-client.tsx");
 
   assert.match(prisma, /assignedCounterId\s+String\?\s+@unique/);
@@ -273,9 +283,9 @@ test("locks teller accounts to manager-controlled counters and scopes fairness p
   assert.doesNotMatch(showcaseStaff, /setCounter\(/);
   assert.match(showcaseAuth, /assignedCounter: "Counter 4"/);
   assert.match(workflow, /PRIORITY_FAIRNESS/);
-  assert.match(showcaseQueue, /qms_demo_priority_state/);
-  assert.match(showcaseQueue, /service_code = \?/);
-  assert.match(showcaseQueue, /priorityReason/);
+  assert.match(showcaseWorkflow, /qms_branch_fairness/);
+  assert.match(showcaseWorkflow, /service_code=\?/);
+  assert.match(showcaseWorkflow, /priorityReason/);
   assert.match(seed, /passwordHash,/);
   assert.match(seed, /authVersion: \{ increment: 1 \}/);
 });

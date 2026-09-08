@@ -1,97 +1,79 @@
 import {
   ArrowUpRight,
-  Building2,
   LayoutDashboard,
+  MapPin,
   MonitorUp,
   Smartphone,
-  Sparkles,
   Store,
   UsersRound,
 } from "lucide-react";
+import { BankLogo } from "./bank-logo";
+import { BANK_BRANCHES, BANK_NAME } from "@/lib/bank-brand";
 import Link from "next/link";
 
 const products = [
   {
-    href: "/customer-app",
+    href: "/customer",
     icon: Smartphone,
-    eyebrow: "Android customer app",
-    title: "Bank QMS Customer",
-    description:
-      "Join the queue, track your position and keep your private ticket on your phone.",
+    title: "Customer portal",
+    description: "Reserve a ticket, confirm arrival and follow your place.",
     accent: "mint",
   },
   {
-    href: "/staff-app",
+    href: "/teller",
     icon: UsersRound,
-    eyebrow: "Android staff app",
-    title: "Bank QMS Staff",
-    description:
-      "Fast teller operations in a secure, role-aware mobile workspace.",
+    title: "Teller console",
+    description: "Sign in to your assigned counter and call the next customer.",
     accent: "blue",
-  },
-  {
-    href: "/display",
-    icon: MonitorUp,
-    eyebrow: "TV and monitor",
-    title: "Public Display",
-    description:
-      "A privacy-safe, full-screen now-serving display with live calls and sound.",
-    accent: "violet",
   },
   {
     href: "/manager",
     icon: LayoutDashboard,
-    eyebrow: "Desktop operations",
-    title: "Manager Dashboard",
-    description:
-      "Live KPIs, queue control, fairness settings, reports and audit visibility.",
+    title: "Manager dashboard",
+    description: "Monitor your branch, approve priority and review reports.",
     accent: "green",
   },
+  {
+    href: "/display",
+    icon: MonitorUp,
+    title: "Public number display",
+    description: "Open the full-screen ticket and counter monitor.",
+    accent: "violet",
+  },
 ];
-
 export default function Home() {
   return (
-    <main className="product-hub">
+    <main className="product-hub wl-hub">
       <header className="hub-header">
-        <Link className="hub-brand" href="/">
+        <Link className="wl-brand" href="/">
+          <BankLogo size={56} />
           <span>
-            <Building2 />
+            <strong>{BANK_NAME}</strong>
+            <small>Queue management</small>
           </span>
-          <strong>Bank QMS</strong>
         </Link>
-        <span className="hub-badge">
-          <i /> Connected system
-        </span>
+        <span className="wl-demo-badge">Academic demonstration</span>
       </header>
-      <section className="hub-hero">
-        <div className="hub-copy">
-          <span className="hub-kicker">
-            <Sparkles /> One queue. Every screen.
-          </span>
-          <h1>
-            A complete branch experience, <em>perfectly connected.</em>
-          </h1>
-          <p>
-            Two Android apps and two focused web screens. Every surface reads
-            and updates the same authoritative queue in real time.
-          </p>
-        </div>
-        <div className="hub-visual" aria-hidden="true">
-          <span className="hub-core">
-            <Building2 />
-          </span>
-          <i />
-          <i />
-          <i />
-          <i />
-          <b>Live</b>
-        </div>
+      <section className="wl-hub-intro">
+        <span className="wl-eyebrow">Welcome to WorldLink</span>
+        <h1>
+          Banking starts with
+          <br />
+          <em>a better wait.</em>
+        </h1>
+        <p>
+          Choose your branch, save your place and let the queue come to you.
+        </p>
+        <Link className="wl-hub-cta" href="/customer">
+          Reserve a ticket
+          <ArrowUpRight />
+        </Link>
       </section>
-      <section className="hub-grid" aria-label="Bank QMS interfaces">
+      <section className="hub-grid" aria-label="WorldLink Bank interfaces">
         {products.map((product, index) => {
           const Icon = product.icon;
           return (
-            <a
+            <Link
               className={`hub-card hub-${product.accent}`}
               href={product.href}
               key={product.href}
@@ -101,43 +83,51 @@ export default function Home() {
                 <Icon />
               </span>
               <span className="hub-card-copy">
-                <small>{product.eyebrow}</small>
+                <small>Web application</small>
                 <strong>{product.title}</strong>
                 <p>{product.description}</p>
               </span>
               <span className="hub-open">
-                Open <ArrowUpRight />
+                Open
+                <ArrowUpRight />
               </span>
-            </a>
+            </Link>
           );
         })}
+      </section>
+      <section className="wl-branch-directory">
+        <div>
+          <span className="wl-eyebrow">Addis Ababa</span>
+          <h2>Find your branch</h2>
+        </div>
+        <div>
+          {BANK_BRANCHES.map((branch) => (
+            <Link key={branch.code} href={`/customer?branch=${branch.code}`}>
+              <MapPin />
+              {branch.name}
+              <ArrowUpRight />
+            </Link>
+          ))}
+        </div>
       </section>
       <aside className="hub-kiosk-note">
         <span className="hub-card-icon">
           <Store />
         </span>
         <span>
-          <small>Optional branch fallback</small>
-          <strong>Customer Kiosk</strong>
-          <p>
-            Keep a shared touch screen for visitors without a smartphone,
-            connectivity or battery.
-          </p>
+          <strong>Visiting without a smartphone?</strong>
+          <p>Use the branch kiosk to get a walk-in ticket.</p>
         </span>
-        <a href="/kiosk">
-          Open kiosk <ArrowUpRight />
-        </a>
+        <Link href="/kiosk">
+          Open kiosk
+          <ArrowUpRight />
+        </Link>
       </aside>
-      <footer className="hub-footer">
-        <span>
-          <i /> Database authoritative
-        </span>
-        <span>
-          <i /> Role protected
-        </span>
-        <span>
-          <i /> Privacy-safe display
-        </span>
+      <footer className="wl-footer">
+        WorldLink Bank · Academic queue-management demonstration. No banking
+        transactions or account access.
+        <Link href="/customer-app">Customer PWA</Link>
+        <Link href="/staff-app">Staff companion</Link>
       </footer>
     </main>
   );

@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { access, readFile } from "node:fs/promises";
 import test from "node:test";
 
-const productTitle = /title:\s*["']Bank QMS["']/i;
+const productTitle = /title:\s*["']WorldLink Bank \| Queue Management["']/i;
 const developmentPreviewMeta = /codex-preview/i;
 
 test("builds the Bank QMS product without the starter preview marker", async () => {

@@ -215,3 +215,4 @@ class CustomerViewModel(private val repository: CustomerRepository) : ViewModel(
         pollJob?.cancel()
     }
 }
+

@@ -1,0 +1,1 @@
+ALTER TABLE `qms_demo_tickets` ADD `last_operation_id` text;

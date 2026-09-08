@@ -2,7 +2,6 @@
 
 import {
   ArrowRight,
-  Building2,
   CheckCircle2,
   Eye,
   EyeOff,
@@ -13,6 +12,8 @@ import {
   Sparkles,
 } from "lucide-react";
 import { useState } from "react";
+import { BankLogo } from "./bank-logo";
+import { BANK_NAME } from "@/lib/bank-brand";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -27,7 +28,6 @@ export function StaffLoginClient() {
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
-  const [showcaseTeller, setShowcaseTeller] = useState("teller.one");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
 
@@ -53,7 +53,7 @@ export function StaffLoginClient() {
         body: JSON.stringify({
           action: "workspace_showcase",
           role,
-          ...(role === "TELLER" ? { username: showcaseTeller } : {}),
+          username: role === "TELLER" ? "teller.one" : "manager.dev",
         }),
       });
       const result = (await response.json()) as {
@@ -101,10 +101,8 @@ export function StaffLoginClient() {
       <div className="login-orb orb-two" />
       <section className="login-story">
         <a className="login-brand" href="/kiosk">
-          <span>
-            <Building2 />
-          </span>
-          <strong>Bank QMS</strong>
+          <BankLogo size={56} />
+          <strong>{BANK_NAME}</strong>
         </a>
         <div className="story-copy">
           <span className="story-kicker">
@@ -176,18 +174,11 @@ export function StaffLoginClient() {
                 Teller view
               </Button>
             </div>
-            <label className="showcase-teller-picker">
-              <span>Independent teller account</span>
-              <select
-                value={showcaseTeller}
-                onChange={(event) => setShowcaseTeller(event.target.value)}
-              >
-                <option value="teller.one">Teller 1 · Counter 1</option>
-                <option value="teller.two">Teller 2 · Counter 2</option>
-                <option value="teller.three">Teller 3 · Counter 3</option>
-                <option value="teller.four">Teller 4 · Counter 4</option>
-              </select>
-            </label>
+            <p className="showcase-note">
+              Quick teller access opens only Teller 1 at Counter 1. Every other
+              teller must sign in with their own provisioned username and
+              password.
+            </p>
           </div>
 
           <div className="login-divider">

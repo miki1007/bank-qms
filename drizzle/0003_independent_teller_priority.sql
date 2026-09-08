@@ -22,3 +22,4 @@ SET `assigned_counter` = CASE `username`
 END
 WHERE `role` = 'TELLER';--> statement-breakpoint
 CREATE UNIQUE INDEX `qms_demo_staff_counter_unique` ON `qms_demo_staff` (`assigned_counter`);
+

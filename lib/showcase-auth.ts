@@ -1,4 +1,5 @@
 import { getShowcaseDb } from "@/lib/showcase-adapter";
+import { BANK_BRANCHES, DEFAULT_BRANCH_CODE } from "@/lib/bank-brand";
 
 export type ShowcaseRole = "TELLER" | "MANAGER";
 
@@ -9,6 +10,7 @@ export type ShowcaseActor = {
   role: ShowcaseRole;
   assignedCounter: string | null;
   assignedServiceCode: string | null;
+  branchCode: string;
 };
 
 const SESSION_COOKIE = "bank_qms_session";
@@ -16,7 +18,7 @@ const SESSION_SECONDS = 60 * 60 * 4;
 // Cloudflare Workers WebCrypto currently rejects PBKDF2 counts above 100,000.
 const PBKDF2_ITERATIONS = 100_000;
 
-const showcaseStaff = [
+const baseShowcaseStaff = [
   {
     id: "showcase-manager",
     username: "manager.dev",
@@ -74,6 +76,21 @@ const showcaseStaff = [
   },
 ];
 
+const showcaseStaff = BANK_BRANCHES.flatMap((branch) =>
+  baseShowcaseStaff.map((staff) => ({
+    ...staff,
+    id:
+      branch.code === DEFAULT_BRANCH_CODE
+        ? staff.id
+        : `${staff.id}-${branch.code.toLowerCase()}`,
+    username:
+      branch.code === DEFAULT_BRANCH_CODE
+        ? staff.username
+        : `${staff.username}.${branch.code.toLowerCase()}`,
+    branchCode: branch.code,
+  })),
+);
+
 function fromHex(value: string) {
   return Uint8Array.from(value.match(/.{2}/g) ?? [], (byte) =>
     Number.parseInt(byte, 16),
@@ -124,39 +141,27 @@ function timingSafeEqual(left: string, right: string) {
 }
 
 export async function ensureShowcaseStaff(db = getShowcaseDb()) {
-  for (const staff of showcaseStaff) {
-    await db
-      .prepare(
-        `INSERT INTO qms_demo_staff
-         (id, username, display_name, role, assigned_counter, password_salt, password_hash, failed_login_count, active)
-         VALUES (?, ?, ?, ?, ?, ?, ?, 0, 1)
-         ON CONFLICT(username) DO UPDATE SET
-           display_name = excluded.display_name,
-           role = excluded.role,
-           assigned_counter = excluded.assigned_counter,
-           failed_login_count = CASE
-             WHEN qms_demo_staff.password_salt <> excluded.password_salt
-               OR qms_demo_staff.password_hash <> excluded.password_hash
-             THEN 0 ELSE qms_demo_staff.failed_login_count END,
-           locked_until = CASE
-             WHEN qms_demo_staff.password_salt <> excluded.password_salt
-               OR qms_demo_staff.password_hash <> excluded.password_hash
-             THEN NULL ELSE qms_demo_staff.locked_until END,
-           password_salt = excluded.password_salt,
-           password_hash = excluded.password_hash,
-           active = 1`,
-      )
-      .bind(
-        staff.id,
-        staff.username,
-        staff.displayName,
-        staff.role,
-        staff.assignedCounter,
-        staff.salt,
-        staff.passwordHash,
-      )
-      .run();
-  }
+  await db.batch(
+    showcaseStaff.map((staff) =>
+      db
+        .prepare(
+          `INSERT INTO qms_demo_staff
+         (id, username, display_name, role, assigned_counter, password_salt, password_hash, branch_code, failed_login_count, active)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, 0, 1)
+         ON CONFLICT(username) DO NOTHING`,
+        )
+        .bind(
+          staff.id,
+          staff.username,
+          staff.displayName,
+          staff.role,
+          staff.assignedCounter,
+          staff.salt,
+          staff.passwordHash,
+          staff.branchCode,
+        ),
+    ),
+  );
 }
 
 export async function getWorkspaceShowcaseActor(
@@ -173,7 +178,7 @@ export async function getWorkspaceShowcaseActor(
   if (!staff) return null;
   const persisted = await db
     .prepare(
-      `SELECT id, username, display_name, role, assigned_counter
+      `SELECT id, username, display_name, role, assigned_counter, branch_code
        FROM qms_demo_staff WHERE username = ? AND active = 1 LIMIT 1`,
     )
     .bind(staff.username)
@@ -183,6 +188,7 @@ export async function getWorkspaceShowcaseActor(
       display_name: string;
       role: ShowcaseRole;
       assigned_counter: string | null;
+      branch_code: string;
     }>();
   if (!persisted || persisted.role !== role) return null;
   return {
@@ -192,6 +198,7 @@ export async function getWorkspaceShowcaseActor(
     role: persisted.role,
     assignedCounter: persisted.assigned_counter,
     assignedServiceCode: staff.assignedServiceCode,
+    branchCode: persisted.branch_code,
   } satisfies ShowcaseActor;
 }
 
@@ -201,7 +208,7 @@ export async function authenticate(username: string, password: string) {
   const normalized = username.trim().toLowerCase();
   const staff = await db
     .prepare(
-      `SELECT id, username, display_name, role, assigned_counter, password_salt, password_hash,
+      `SELECT id, username, display_name, role, assigned_counter, branch_code, password_salt, password_hash,
               failed_login_count, locked_until, active
        FROM qms_demo_staff WHERE username = ? LIMIT 1`,
     )
@@ -212,6 +219,7 @@ export async function authenticate(username: string, password: string) {
       display_name: string;
       role: ShowcaseRole;
       assigned_counter: string | null;
+      branch_code: string;
       password_salt: string;
       password_hash: string;
       failed_login_count: number;
@@ -254,13 +262,14 @@ export async function authenticate(username: string, password: string) {
     displayName: staff.display_name,
     role: staff.role,
     assignedCounter: staff.assigned_counter,
+    branchCode: staff.branch_code,
     assignedServiceCode:
       showcaseStaff.find((candidate) => candidate.username === staff.username)
         ?.assignedServiceCode ?? null,
   } satisfies ShowcaseActor;
 }
 
-export async function createSession(actor: ShowcaseActor) {
+export async function createSession(actor: ShowcaseActor, secure = true) {
   const db = getShowcaseDb();
   const token = `${crypto.randomUUID()}${crypto.randomUUID()}`;
   const tokenHash = await sha256Hex(token);
@@ -282,7 +291,7 @@ export async function createSession(actor: ShowcaseActor) {
     .run();
   await appendAudit(actor, "auth.login", "Staff session opened");
   return {
-    cookie: `${SESSION_COOKIE}=${token}; HttpOnly; Secure; SameSite=Strict; Path=/; Max-Age=${SESSION_SECONDS}`,
+    cookie: `${SESSION_COOKIE}=${token}; HttpOnly; ${secure ? "Secure; " : ""}SameSite=Strict; Path=/; Max-Age=${SESSION_SECONDS}`,
     expiresAt: expiresAt.toISOString(),
   };
 }
@@ -305,7 +314,7 @@ export async function getActor(
   const tokenHash = await sha256Hex(token);
   const row = await db
     .prepare(
-      `SELECT staff.id, staff.username, staff.display_name, staff.role, staff.assigned_counter
+      `SELECT staff.id, staff.username, staff.display_name, staff.role, staff.assigned_counter, staff.branch_code
        FROM qms_demo_sessions session
        JOIN qms_demo_staff staff ON staff.id = session.staff_id
        WHERE session.token_hash = ? AND session.revoked_at IS NULL
@@ -319,6 +328,7 @@ export async function getActor(
       display_name: string;
       role: ShowcaseRole;
       assigned_counter: string | null;
+      branch_code: string;
     }>();
   return row
     ? {
@@ -327,6 +337,7 @@ export async function getActor(
         displayName: row.display_name,
         role: row.role,
         assignedCounter: row.assigned_counter,
+        branchCode: row.branch_code,
         assignedServiceCode:
           showcaseStaff.find((candidate) => candidate.username === row.username)
             ?.assignedServiceCode ?? null,
@@ -360,7 +371,7 @@ export async function appendAudit(
   const db = getShowcaseDb();
   await db
     .prepare(
-      "INSERT INTO qms_demo_audit (id, staff_id, action, detail, created_at) VALUES (?, ?, ?, ?, ?)",
+      "INSERT INTO qms_demo_audit (id, staff_id, action, detail, created_at, branch_code) VALUES (?, ?, ?, ?, ?, ?)",
     )
     .bind(
       crypto.randomUUID(),
@@ -368,6 +379,7 @@ export async function appendAudit(
       action,
       detail,
       new Date().toISOString(),
+      actor.branchCode,
     )
     .run();
 }

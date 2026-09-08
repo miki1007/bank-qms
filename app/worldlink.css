@@ -1,0 +1,1141 @@
+.worldlink-logo {
+  display: block;
+  object-fit: contain;
+  border-radius: 50%;
+  background: #fff;
+  flex-shrink: 0;
+  box-shadow: 0 0 0 1px #dce3ed;
+}
+.wl-brand {
+  display: inline-flex;
+  align-items: center;
+  gap: 12px;
+  color: #1e3048;
+  text-decoration: none;
+}
+.wl-brand > span {
+  display: grid;
+  gap: 3px;
+}
+.wl-brand strong {
+  font-size: 21px;
+  letter-spacing: -0.035em;
+}
+.wl-brand small {
+  font-size: 13px;
+  color: #64758a;
+  letter-spacing: 0.025em;
+}
+.wl-topbar {
+  padding: 20px max(5vw, 20px);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  border-bottom: 1px solid #dce3ed;
+  background: #ffffffed;
+}
+.wl-connection {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  color: #306852;
+  font-size: 14px;
+}
+.wl-connection i {
+  width: 7px;
+  height: 7px;
+  background: #27815b;
+  border-radius: 50%;
+}
+.wl-connection.is-offline {
+  color: #906015;
+}
+.wl-connection.is-offline i {
+  background: #b67b25;
+}
+.wl-customer {
+  min-height: 100dvh;
+  background: #f3f6fb;
+  color: #1e3048;
+  font-size: 16px;
+}
+.wl-customer-layout {
+  display: grid;
+  grid-template-columns: minmax(260px, 0.78fr) minmax(0, 1.22fr);
+  max-width: 1250px;
+  margin: 0 auto;
+  min-height: calc(100dvh - 91px);
+  padding: 50px 30px;
+  gap: 65px;
+}
+.wl-guide {
+  padding: 36px 0;
+  align-self: start;
+  position: sticky;
+  top: 35px;
+}
+.wl-eyebrow {
+  display: block;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.15em;
+  text-transform: uppercase;
+  color: #61748e;
+  margin-bottom: 14px;
+}
+.wl-guide h1 {
+  font-size: clamp(42px, 4.9vw, 65px);
+  line-height: 1.05;
+  font-weight: 650;
+  letter-spacing: -0.055em;
+  margin: 0 0 25px;
+}
+.wl-guide h1 em {
+  font-style: normal;
+  color: #67829f;
+}
+.wl-guide > p {
+  font-size: 17px;
+  line-height: 1.8;
+  max-width: 360px;
+  color: #56687e;
+}
+.wl-guide-steps {
+  display: grid;
+  gap: 24px;
+  margin: 36px 0;
+}
+.wl-guide-steps span {
+  display: flex;
+  align-items: center;
+  gap: 18px;
+  font-weight: 600;
+  font-size: 15px;
+}
+.wl-guide-steps b {
+  color: #7f94ad;
+  font-size: 12px;
+  letter-spacing: 0.1em;
+  border: 1px solid #d1dce9;
+  border-radius: 50%;
+  width: 35px;
+  height: 35px;
+  display: grid;
+  place-items: center;
+}
+.wl-policy-note {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 18px;
+  border: 1px solid #d7e2ef;
+  border-radius: 12px;
+  background: #eaf0f8;
+  font-size: 14px;
+  color: #3c5572;
+  line-height: 1.65;
+  margin: 18px 0;
+}
+.wl-policy-note svg {
+  width: 19px;
+  min-width: 19px;
+  margin-top: 2px;
+}
+.wl-policy-note p {
+  margin: 0;
+}
+.wl-demo-note {
+  display: block;
+  font-size: 12px;
+  line-height: 1.8;
+  color: #697b91;
+  margin-top: 24px;
+}
+.wl-booking {
+  align-self: start;
+  border-radius: 22px;
+  border: 1px solid #dce4ee;
+  box-shadow: 0 14px 40px #1e304809;
+  background: white;
+  overflow: hidden;
+}
+.wl-tabs {
+  display: flex;
+  border-bottom: 1px solid #e5eaf1;
+  padding: 0 24px;
+  gap: 20px;
+}
+.wl-tabs button {
+  padding: 23px 5px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  border: 0;
+  border-bottom: 3px solid transparent;
+  color: #65768c;
+  background: transparent;
+  font-size: 14px;
+  cursor: pointer;
+  font-weight: 600;
+}
+.wl-tabs button[aria-current="page"] {
+  color: #1e3048;
+  border-bottom-color: #1e3048;
+}
+.wl-tabs svg {
+  width: 17px;
+}
+.wl-booking-flow,
+.wl-ticket-view,
+.wl-history {
+  padding: 32px;
+}
+.wl-progress {
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: 35px;
+}
+.wl-progress span {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  font-size: 13px;
+  color: #77879b;
+}
+.wl-progress b {
+  display: grid;
+  place-items: center;
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  background: #edf1f7;
+  color: #677b95;
+  font-size: 12px;
+}
+.wl-progress b svg {
+  width: 14px;
+}
+.wl-progress .is-active {
+  color: #1e3048;
+  font-weight: 600;
+}
+.wl-progress .is-active b {
+  background: #1e3048;
+  color: #fff;
+}
+.wl-step {
+  animation: wl-enter 0.32s cubic-bezier(0.2, 0.8, 0.2, 1) both;
+}
+.wl-step h2,
+.wl-history h2 {
+  margin: 0 0 10px;
+  font-size: 28px;
+  letter-spacing: -0.035em;
+  font-weight: 650;
+}
+.wl-step > p {
+  font-size: 15px;
+  color: #687b92;
+  line-height: 1.6;
+  margin: 0 0 22px;
+}
+.wl-branch-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+  margin-top: 24px;
+}
+.wl-branch-grid button {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  position: relative;
+  gap: 12px;
+  padding: 18px 14px;
+  border-radius: 12px;
+  background: #fff;
+  border: 1px solid #dce4ee;
+  min-height: 97px;
+  color: #465e7a;
+  cursor: pointer;
+  transition:
+    background 0.2s,
+    border 0.2s,
+    transform 0.2s;
+}
+.wl-branch-grid button > svg:first-child {
+  width: 19px;
+  color: #8396af;
+}
+.wl-branch-grid strong {
+  font-size: 14px;
+  font-weight: 600;
+}
+.wl-branch-grid button > svg:last-child:not(:first-child) {
+  position: absolute;
+  top: 15px;
+  right: 12px;
+  width: 16px;
+}
+.wl-branch-grid .is-selected {
+  border-color: #1e3048;
+  background: #edf2f8;
+  color: #1e3048;
+}
+.wl-branch-grid button:hover {
+  transform: translateY(-2px);
+  background: #f4f7fc;
+}
+.wl-primary {
+  width: 100%;
+  margin-top: 28px;
+  min-height: 52px !important;
+  background: #1e3048 !important;
+  color: white !important;
+  border-radius: 10px !important;
+  font-size: 15px !important;
+  transition:
+    background 0.2s,
+    transform 0.2s !important;
+}
+.wl-primary:hover:not(:disabled) {
+  background: #304c6e !important;
+  transform: translateY(-1px);
+}
+.wl-primary svg {
+  width: 19px;
+}
+.wl-services {
+  display: grid;
+  gap: 12px;
+  margin-top: 25px;
+}
+.wl-services > button {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  border: 1px solid #dce4ee;
+  border-radius: 13px;
+  background: white;
+  padding: 17px;
+  cursor: pointer;
+  text-align: left;
+  color: #1e3048;
+  transition:
+    border 0.2s,
+    background 0.2s,
+    transform 0.2s;
+}
+.wl-services > button > span:nth-child(2) {
+  display: grid;
+  gap: 6px;
+  flex: 1;
+}
+.wl-services strong {
+  font-size: 15px;
+}
+.wl-services small {
+  font-size: 13px;
+  color: #667d97;
+}
+.wl-service-icon {
+  width: 45px;
+  height: 45px;
+  background: #edf2f8;
+  display: grid;
+  place-items: center;
+  border-radius: 11px;
+  color: #516f90;
+}
+.wl-service-icon svg {
+  width: 23px;
+}
+.wl-services > button > svg {
+  width: 18px;
+}
+.wl-services .is-selected {
+  border-color: #1e3048;
+  background: #f5f8fc;
+}
+.wl-services > button:hover {
+  transform: translateX(3px);
+}
+.wl-priority {
+  display: flex;
+  gap: 15px;
+  align-items: center;
+  justify-content: space-between;
+  padding: 22px 0;
+  border-top: 1px solid #e2e8f0;
+  margin-top: 25px;
+}
+.wl-priority > span {
+  display: grid;
+  gap: 6px;
+}
+.wl-priority strong {
+  font-size: 14px;
+}
+.wl-priority small {
+  font-size: 13px;
+  color: #6b7a8f;
+}
+.wl-field {
+  display: grid;
+  gap: 9px;
+  font-size: 14px;
+  font-weight: 500;
+}
+.wl-field select,
+.wl-branch-select select {
+  border: 1px solid #bdcbdc;
+  border-radius: 8px;
+  min-height: 46px;
+  padding: 10px 12px;
+  color: #1e3048;
+  background: #fff;
+}
+.wl-field small {
+  font-size: 12px;
+  color: #6c7f97;
+  font-weight: 400;
+  line-height: 1.6;
+}
+.wl-text-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 12px 0;
+  background: transparent;
+  border: 0;
+  font-size: 14px;
+  color: #516f8f;
+  cursor: pointer;
+  min-height: 44px;
+  margin-bottom: 12px;
+}
+.wl-text-button svg {
+  width: 16px;
+}
+.wl-confirm-summary {
+  display: grid;
+  justify-items: center;
+  gap: 12px;
+  padding: 28px;
+  margin-top: 25px;
+  border-radius: 15px;
+  background: #f5f7fb;
+  border: 1px solid #dce5f0;
+}
+.wl-confirm-summary strong {
+  font-size: 23px;
+  margin-top: 7px;
+  letter-spacing: -0.035em;
+}
+.wl-confirm-summary > span {
+  font-size: 15px;
+  color: #5d718b;
+}
+.wl-caption {
+  margin: 12px 0 0 !important;
+  color: #7b8ca2 !important;
+  text-align: center;
+  font-size: 12px !important;
+}
+.wl-alert,
+.wl-notice {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 14px 17px;
+  margin: 18px 24px 0;
+  border-radius: 10px;
+  font-size: 14px;
+  line-height: 1.6;
+}
+.wl-alert {
+  background: #fff1ef;
+  color: #98372d;
+  border: 1px solid #f5d4d0;
+}
+.wl-notice {
+  background: #edf6f1;
+  color: #286747;
+  border: 1px solid #d5e9dc;
+}
+.wl-alert > svg,
+.wl-notice > svg {
+  width: 19px;
+  min-width: 19px;
+}
+.wl-alert > button {
+  margin-left: auto;
+  border: 0;
+  background: transparent;
+  cursor: pointer;
+  display: grid;
+  place-items: center;
+  min-width: 30px;
+  min-height: 35px;
+}
+.wl-alert > button svg {
+  width: 17px;
+}
+.wl-ticket-card {
+  padding: 34px 20px;
+  text-align: center;
+  background: #1e3048;
+  border-radius: 18px;
+  color: white;
+  display: grid;
+  gap: 10px;
+  position: relative;
+  animation: wl-enter 0.4s ease both;
+}
+.wl-ticket-card > span {
+  font-size: 14px;
+  color: #bbccdf;
+}
+.wl-ticket-card > strong {
+  font-size: clamp(44px, 6vw, 70px);
+  line-height: 1.2;
+  font-weight: 650;
+  letter-spacing: -0.05em;
+  font-variant-numeric: tabular-nums;
+}
+.wl-ticket-card > b {
+  font-size: 14px;
+  font-weight: 500;
+  color: #d1e1f2;
+  margin-top: 8px;
+}
+.wl-ticket-card.status-called {
+  background: #175f4c;
+  animation: wl-arrival 1s ease 2;
+}
+.wl-ticket-facts {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  padding: 24px 0;
+  border-bottom: 1px solid #e1e8f0;
+  gap: 20px;
+}
+.wl-ticket-facts > div {
+  display: grid;
+  gap: 8px;
+}
+.wl-ticket-facts > div + div {
+  border-left: 1px solid #e1e8f0;
+  padding-left: 25px;
+}
+.wl-ticket-facts small {
+  font-size: 13px;
+  color: #73839a;
+}
+.wl-ticket-facts strong {
+  font-size: 26px;
+  letter-spacing: -0.04em;
+}
+.wl-arrival {
+  padding: 22px 0;
+}
+.wl-arrival h3 {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 18px;
+  font-weight: 650;
+  letter-spacing: -0.02em;
+  margin-bottom: 10px;
+}
+.wl-arrival h3 svg {
+  width: 20px;
+}
+.wl-arrival p {
+  font-size: 14px;
+  line-height: 1.7;
+  color: #5e7188;
+  margin-bottom: 16px;
+}
+.wl-arrival label {
+  display: block;
+  font-size: 13px;
+  font-weight: 600;
+  margin-bottom: 8px;
+}
+.wl-arrival input {
+  height: 47px;
+  font-size: 19px;
+  letter-spacing: 0.18em;
+  min-width: 0;
+}
+.wl-arrival small {
+  font-size: 12px;
+  color: #71839b;
+  line-height: 1.6;
+  display: block;
+  margin-top: 12px;
+}
+.wl-inline {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.wl-inline > input {
+  flex: 1;
+  min-width: 0;
+}
+.wl-inline > button {
+  min-height: 47px;
+}
+.wl-ticket-actions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin: 18px 0;
+}
+.wl-ticket-actions > button {
+  flex: 1;
+  min-height: 46px;
+}
+.wl-priority-status {
+  padding: 13px 15px;
+  background: #fff7e7;
+  color: #85622c;
+  font-size: 13px;
+  border-radius: 9px;
+  line-height: 1.6;
+}
+.wl-confirm {
+  background: #fff1ef;
+  padding: 18px;
+  border-radius: 12px;
+  margin-top: 15px;
+}
+.wl-confirm p {
+  margin-bottom: 15px;
+  font-size: 15px;
+}
+.wl-confirm button {
+  margin-right: 8px;
+}
+.wl-history > button {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  text-align: left;
+  width: 100%;
+  background: transparent;
+  border: 0;
+  border-bottom: 1px solid #e0e7f0;
+  padding: 22px 0;
+  cursor: pointer;
+}
+.wl-history > button > span:first-child {
+  display: grid;
+  gap: 7px;
+  flex: 1;
+}
+.wl-history strong {
+  font-size: 20px;
+}
+.wl-history small {
+  font-size: 13px;
+  color: #6c819a;
+}
+.wl-status {
+  padding: 5px 9px;
+  background: #edf2f8;
+  border-radius: 5px;
+  font-size: 11px;
+  letter-spacing: 0.04em;
+  color: #476384;
+}
+.wl-history > button > svg {
+  width: 18px;
+}
+.wl-empty {
+  text-align: center;
+  color: #697f9a;
+  padding: 48px 12px;
+}
+.wl-empty > svg {
+  margin: 0 auto 20px;
+  width: 40px;
+  height: 40px;
+  stroke-width: 1.3;
+}
+.wl-empty h3 {
+  font-size: 20px;
+  font-weight: 600;
+  color: #1e3048;
+  margin-bottom: 12px;
+}
+.wl-empty p {
+  font-size: 14px;
+  line-height: 1.7;
+}
+.wl-install {
+  position: fixed;
+  bottom: 18px;
+  right: 22px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 48px;
+  padding: 12px 20px;
+  background: #1e3048;
+  border: 1px solid #4d6581;
+  border-radius: 50px;
+  box-shadow: 0 6px 25px #1e304840;
+  color: white;
+  font-size: 14px;
+  cursor: pointer;
+}
+.wl-hub {
+  max-width: 1280px !important;
+}
+.wl-hub-intro {
+  padding: 30px 0 35px;
+  position: relative;
+}
+.wl-hub-intro h1 {
+  font-size: clamp(36px, 4.5vw, 58px);
+  line-height: 1.08;
+  font-weight: 650;
+  letter-spacing: -0.045em;
+  margin: 0 0 18px;
+}
+.wl-hub-intro em {
+  font-style: normal;
+  color: #637f9f;
+}
+.wl-hub-intro > p {
+  font-size: 17px;
+  color: #667c96;
+  line-height: 1.7;
+  margin-bottom: 22px;
+}
+.wl-hub-cta {
+  display: inline-flex;
+  align-items: center;
+  gap: 20px;
+  background: #1e3048;
+  color: white;
+  padding: 16px 22px;
+  border-radius: 10px;
+  font-size: 15px;
+  font-weight: 600;
+  text-decoration: none;
+}
+.wl-hub-cta svg {
+  width: 20px;
+}
+.wl-demo-badge {
+  padding: 8px 12px;
+  color: #657a94;
+  background: #e9eef5;
+  border: 1px solid #dbe2ed;
+  border-radius: 30px;
+  font-size: 12px;
+}
+.wl-hub .hub-grid {
+  gap: 16px;
+}
+.wl-hub .hub-card {
+  min-height: 190px;
+}
+.wl-hub .hub-card-copy strong {
+  font-size: 21px;
+}
+.wl-branch-directory {
+  margin: 35px 0;
+}
+.wl-branch-directory h2 {
+  font-size: 25px;
+  letter-spacing: -0.03em;
+  font-weight: 600;
+  margin-bottom: 22px;
+}
+.wl-branch-directory > div:last-child {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+.wl-branch-directory a {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  color: #425e7c;
+  background: white;
+  border: 1px solid #d7e1ee;
+  padding: 11px 14px;
+  border-radius: 8px;
+  text-decoration: none;
+  font-size: 14px;
+  transition:
+    transform 0.2s,
+    background 0.2s;
+}
+.wl-branch-directory a:hover {
+  background: #e8eff8;
+  transform: translateY(-2px);
+}
+.wl-branch-directory svg {
+  width: 15px;
+}
+.wl-footer {
+  padding: 28px 0;
+  color: #6d7f96;
+  font-size: 12px;
+  line-height: 1.7;
+  display: flex;
+  gap: 20px;
+  flex-wrap: wrap;
+}
+.wl-footer a {
+  color: #476889;
+}
+.wl-counter-toolbar {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin: 20px 0;
+}
+.wl-arrival-code {
+  display: grid;
+  gap: 10px;
+  background: #edf2f9;
+  border: 1px solid #ccd9ea;
+  padding: 22px 28px;
+  border-radius: 14px;
+  margin: 20px 0;
+  color: #1e3048;
+}
+.wl-arrival-code > strong {
+  font-size: 38px;
+  letter-spacing: 0.2em;
+  font-variant-numeric: tabular-nums;
+}
+.wl-arrival-code small {
+  font-size: 13px;
+  color: #617894;
+}
+.wl-branch-select {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 13px;
+  color: #677a94;
+}
+.wl-priority-approvals {
+  padding: 25px;
+  background: #fff9ec;
+  border: 1px solid #ecd8b4;
+  border-radius: 14px;
+  margin: 20px auto;
+  max-width: 1300px;
+}
+.wl-priority-approvals h2 {
+  font-size: 20px;
+  font-weight: 650;
+}
+.wl-priority-approvals p {
+  font-size: 14px;
+  color: #82663a;
+  margin: 10px 0 17px;
+}
+.wl-priority-approvals > div {
+  display: flex;
+  gap: 18px;
+  align-items: center;
+  padding: 10px 0;
+  border-top: 1px solid #ecd8b4;
+}
+.wl-priority-approvals > div > button {
+  margin-left: auto;
+}
+.wl-report-filters {
+  display: flex;
+  align-items: end;
+  flex-wrap: wrap;
+  gap: 15px;
+  margin: 0 0 25px;
+}
+.wl-report-filters label {
+  display: grid;
+  gap: 8px;
+  font-size: 13px;
+  font-weight: 600;
+}
+.wl-report-filters input {
+  border: 1px solid #ccd8e6;
+  border-radius: 7px;
+  padding: 9px 12px;
+  background: #fff;
+  color: #1e3048;
+}
+.wl-report-filters span {
+  font-size: 13px;
+  color: #6a8099;
+  padding-bottom: 10px;
+}
+.wl-audit {
+  background: #fff;
+  border: 1px solid #dce4ee;
+  border-radius: 14px;
+  padding: 24px;
+  margin: 20px 0;
+  overflow-x: auto;
+}
+.wl-audit .wl-inline {
+  justify-content: space-between;
+  margin-bottom: 12px;
+}
+.wl-audit h2 {
+  font-size: 22px;
+  font-weight: 600;
+}
+.wl-audit td,
+.wl-audit th {
+  padding: 14px;
+  text-align: left;
+  border-bottom: 1px solid #e1e8f0;
+  font-size: 13px;
+}
+.wl-display-branch {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  font-size: 14px !important;
+}
+.wl-display-branch select {
+  background: transparent;
+  color: inherit;
+  border: 1px solid #8d9dad;
+  padding: 8px 15px;
+  border-radius: 8px;
+}
+.wl-display-branch option {
+  color: #1e3048;
+  background: white;
+}
+.qms-header .qms-brand {
+  gap: 12px;
+}
+.display-header > div:first-child {
+  gap: 15px;
+}
+.login-brand .worldlink-logo {
+  background: #fff;
+}
+.login-story {
+  background: linear-gradient(150deg, #1c2d44, #2e4a6c) !important;
+}
+.login-brand {
+  color: #fff !important;
+}
+.login-brand > strong {
+  color: #fff;
+}
+.login-page .story-kicker {
+  color: #d3e2f1;
+}
+.display-view {
+  background: linear-gradient(125deg, #17283e, #294567) !important;
+}
+.display-view .worldlink-logo {
+  width: 66px;
+  height: 66px;
+}
+.status-pill.reserved {
+  background: #e8edf8;
+  color: #476792;
+}
+.status-pill.expired {
+  background: #f0f0f0;
+  color: #666;
+}
+@keyframes wl-enter {
+  from {
+    opacity: 0;
+    transform: translateY(12px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+@keyframes wl-arrival {
+  50% {
+    box-shadow: 0 0 0 8px #b9dfd1;
+  }
+}
+@media (min-width: 1050px) {
+  .wl-hub .hub-grid {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+  .wl-hub .hub-card {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+  .wl-hub .hub-open {
+    margin-top: auto;
+  }
+}
+@media (max-width: 1000px) {
+  .wl-customer-layout {
+    gap: 30px;
+    padding: 35px 24px;
+    grid-template-columns: minmax(220px, 0.7fr) minmax(0, 1.3fr);
+  }
+  .wl-guide h1 {
+    font-size: 43px;
+  }
+  .wl-branch-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .wl-booking-flow,
+  .wl-ticket-view,
+  .wl-history {
+    padding: 25px;
+  }
+}
+@media (max-width: 700px) {
+  .wl-topbar {
+    padding: 15px 18px;
+  }
+  .wl-brand strong {
+    font-size: 19px;
+  }
+  .wl-brand small {
+    font-size: 12px;
+  }
+  .wl-customer-layout {
+    display: block;
+    padding: 15px;
+  }
+  .wl-guide {
+    position: static;
+    padding: 12px 9px 20px;
+  }
+  .wl-guide > .wl-eyebrow,
+  .wl-guide-steps,
+  .wl-guide > .wl-policy-note {
+    display: none;
+  }
+  .wl-guide h1 {
+    font-size: 32px;
+    line-height: 1.15;
+    margin: 0 0 10px;
+  }
+  .wl-guide h1 br {
+    display: none;
+  }
+  .wl-guide h1 em:before {
+    content: " ";
+  }
+  .wl-guide > p {
+    font-size: 14px;
+    line-height: 1.7;
+    max-width: none;
+    margin: 0;
+  }
+  .wl-demo-note {
+    margin-top: 10px;
+    font-size: 11px;
+  }
+  .wl-booking {
+    border-radius: 16px;
+  }
+  .wl-tabs {
+    padding: 0 20px;
+    gap: 24px;
+  }
+  .wl-tabs button {
+    padding: 18px 0;
+    font-size: 13px;
+  }
+  .wl-booking-flow,
+  .wl-ticket-view,
+  .wl-history {
+    padding: 23px 20px;
+  }
+  .wl-progress {
+    margin-bottom: 27px;
+  }
+  .wl-branch-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 8px;
+  }
+  .wl-branch-grid button {
+    padding: 14px 10px;
+    min-height: 88px;
+  }
+  .wl-branch-grid strong {
+    font-size: 13px;
+  }
+  .wl-step h2 {
+    font-size: 26px;
+  }
+  .wl-connection {
+    font-size: 12px;
+  }
+  .wl-step > p {
+    font-size: 14px;
+  }
+  .wl-ticket-facts strong {
+    font-size: 23px;
+  }
+  .wl-hub .hub-card {
+    min-height: 150px;
+  }
+  .wl-demo-badge {
+    display: none;
+  }
+  .wl-hub-intro {
+    padding: 20px 0 28px;
+  }
+  .wl-hub-intro h1 {
+    font-size: 38px;
+  }
+  .wl-hub-intro > p {
+    font-size: 15px;
+  }
+  .wl-alert,
+  .wl-notice {
+    margin: 14px 15px 0;
+    font-size: 13px;
+  }
+  .wl-branch-select {
+    flex-direction: column;
+    gap: 0;
+    align-items: start;
+  }
+  .wl-branch-select select {
+    min-height: 38px;
+    width: 115px;
+  }
+  .wl-priority-approvals > div {
+    flex-wrap: wrap;
+    gap: 10px;
+  }
+  .wl-priority-approvals > div > button {
+    margin-left: 0;
+  }
+  .wl-audit {
+    padding: 14px;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .wl-step,
+  .wl-ticket-card,
+  .wl-branch-grid button,
+  .wl-services > button,
+  .wl-primary,
+  .wl-branch-directory a {
+    animation: none !important;
+    transition: none !important;
+    transform: none !important;
+  }
+}
