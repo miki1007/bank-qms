@@ -106,6 +106,7 @@ export const showcaseStaff = sqliteTable(
     displayName: text("display_name").notNull(),
     role: text("role").notNull(),
     assignedCounter: text("assigned_counter"),
+    assignedServiceCode: text("assigned_service_code"),
     passwordSalt: text("password_salt").notNull(),
     passwordHash: text("password_hash").notNull(),
     failedLoginCount: integer("failed_login_count").notNull().default(0),
@@ -195,3 +196,73 @@ export const arrivalChallenges = sqliteTable("qms_arrival_challenges", {
   codeHash: text("code_hash").notNull(),
   expiresAt: text("expires_at").notNull(),
 });
+
+export const serviceConfiguration = sqliteTable(
+  "qms_service_configuration",
+  {
+    branchCode: text("branch_code").notNull(),
+    code: text("code").notNull(),
+    name: text("name").notNull(),
+    targetMinutes: integer("target_minutes").notNull(),
+    priorityEnabled: integer("priority_enabled", { mode: "boolean" })
+      .notNull()
+      .default(true),
+    active: integer("active", { mode: "boolean" }).notNull().default(true),
+  },
+  (table) => [
+    primaryKey({ columns: [table.branchCode, table.code] }),
+    index("qms_service_configuration_active_idx").on(
+      table.branchCode,
+      table.active,
+    ),
+  ],
+);
+
+export const customerAccounts = sqliteTable(
+  "qms_customer_accounts",
+  {
+    id: text("id").primaryKey(),
+    customerSubject: text("customer_subject").notNull(),
+    accountType: text("account_type").notNull(),
+    accountName: text("account_name").notNull(),
+    maskedNumber: text("masked_number").notNull(),
+    currency: text("currency").notNull().default("ETB"),
+    ledgerBalanceMinor: integer("ledger_balance_minor").notNull(),
+    availableBalanceMinor: integer("available_balance_minor").notNull(),
+    status: text("status").notNull().default("ACTIVE"),
+    createdAt: text("created_at").notNull(),
+  },
+  (table) => [
+    uniqueIndex("qms_customer_account_type_unique").on(
+      table.customerSubject,
+      table.accountType,
+    ),
+    index("qms_customer_accounts_subject_idx").on(table.customerSubject),
+  ],
+);
+
+export const customerTransactions = sqliteTable(
+  "qms_customer_transactions",
+  {
+    id: text("id").primaryKey(),
+    accountId: text("account_id")
+      .notNull()
+      .references(() => customerAccounts.id),
+    postedAt: text("posted_at").notNull(),
+    description: text("description").notNull(),
+    category: text("category").notNull(),
+    amountMinor: integer("amount_minor").notNull(),
+    balanceMinor: integer("balance_minor").notNull(),
+    status: text("status").notNull().default("POSTED"),
+    reference: text("reference").notNull(),
+  },
+  (table) => [
+    uniqueIndex("qms_customer_transaction_reference_unique").on(
+      table.reference,
+    ),
+    index("qms_customer_transactions_account_posted_idx").on(
+      table.accountId,
+      table.postedAt,
+    ),
+  ],
+);

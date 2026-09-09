@@ -49,6 +49,9 @@ export async function POST(request: Request) {
         typeof body.username === "string" ? body.username : undefined;
       const actor = await getWorkspaceShowcaseActor(role, requestedUsername);
       if (!actor) return genericFailure();
+      const currentActor = await getActor(request);
+      if (currentActor && currentActor.id !== actor.id)
+        await revokeSession(request, currentActor);
       const session = await createSession(
         actor,
         new URL(request.url).hostname !== "terminal.local",
@@ -64,6 +67,9 @@ export async function POST(request: Request) {
     if (!username || !password) return genericFailure();
     const actor = await authenticate(username, password);
     if (!actor) return genericFailure();
+    const currentActor = await getActor(request);
+    if (currentActor && currentActor.id !== actor.id)
+      await revokeSession(request, currentActor);
     const session = await createSession(
       actor,
       new URL(request.url).hostname !== "terminal.local",

@@ -1,8 +1,11 @@
 import {
+  actorPerformance,
   businessDate,
   getShowcaseDb,
   publicSnapshot,
+  readCustomerPortfolio,
   readSnapshot,
+  readStaffDirectory,
 } from "@/lib/showcase-adapter";
 import { BANK_NAME, DEFAULT_BRANCH_CODE, bankBranch } from "@/lib/bank-brand";
 import {
@@ -33,6 +36,19 @@ async function requireActor(request: Request, managerOnly = false) {
   if (managerOnly && actor.role !== "MANAGER")
     throw new QueueError("Manager permission required.", 403, "FORBIDDEN");
   return actor;
+}
+
+async function protectedSnapshot(actor: ShowcaseActor) {
+  const snapshot = await readSnapshot(getShowcaseDb(), actor.branchCode);
+  return {
+    ...snapshot,
+    actor,
+    actorMetrics: actorPerformance(snapshot, actor.assignedCounter),
+    staff:
+      actor.role === "MANAGER"
+        ? await readStaffDirectory(getShowcaseDb(), actor.branchCode)
+        : undefined,
+  };
 }
 async function customerSubject(request: Request) {
   // Only the owner-private Sites dispatcher supplies this identity. This is a
@@ -83,6 +99,8 @@ export async function GET(request: Request) {
     const url = new URL(request.url),
       surface = url.searchParams.get("surface");
     const requested = url.searchParams.get("branch");
+    if (surface === "customer-banking")
+      return json(await readCustomerPortfolio(await customerSubject(request)));
     if (surface === "customer-history")
       return json(
         await new TicketWorkflowService().history(
@@ -97,17 +115,17 @@ export async function GET(request: Request) {
         publicSnapshot(await readSnapshot(getShowcaseDb(), branch), surface),
       );
     }
-    const actor = await requireActor(request, surface === "manager");
+    const actor = await requireActor(
+      request,
+      surface === "manager" || surface === "admin",
+    );
     if (requested && requested !== actor.branchCode)
       throw new QueueError(
         "This branch is outside your staff assignment.",
         403,
         "FORBIDDEN",
       );
-    return json({
-      ...(await readSnapshot(getShowcaseDb(), actor.branchCode)),
-      actor,
-    });
+    return json(await protectedSnapshot(actor));
   } catch (caught) {
     return handleError(caught);
   }
@@ -182,6 +200,227 @@ async function exportDailyCsv(
   });
 }
 
+async function exportCustomerStatement(
+  payload: Record<string, unknown>,
+  subject: string,
+) {
+  const portfolio = await readCustomerPortfolio(subject);
+  const requestedAccount =
+    typeof payload.accountId === "string" ? payload.accountId : null;
+  if (
+    requestedAccount &&
+    !portfolio.accounts.some((account) => account.id === requestedAccount)
+  )
+    throw new QueueError("Account not found.", 404, "RESOURCE_NOT_FOUND");
+  const rows = portfolio.transactions.filter(
+    (transaction) =>
+      !requestedAccount || transaction.account_id === requestedAccount,
+  );
+  const accountName = requestedAccount
+    ? portfolio.accounts.find((account) => account.id === requestedAccount)
+        ?.account_name
+    : "All demonstration accounts";
+  const lines = [
+    `# ${BANK_NAME} customer statement`,
+    `# Account: ${accountName}`,
+    `# Generated at UTC: ${new Date().toISOString()}`,
+    "# Demonstration data only; no real funds or banking operations",
+    [
+      "posted_at",
+      "description",
+      "category",
+      "amount_etb",
+      "balance_etb",
+      "status",
+      "reference",
+    ]
+      .map(csvCell)
+      .join(","),
+    ...rows.map((row) =>
+      [
+        row.posted_at,
+        row.description,
+        row.category,
+        (row.amount_minor / 100).toFixed(2),
+        (row.balance_minor / 100).toFixed(2),
+        row.status,
+        row.reference,
+      ]
+        .map(csvCell)
+        .join(","),
+    ),
+  ];
+  return new Response(lines.join("\n"), {
+    headers: {
+      "Content-Type": "text/csv; charset=utf-8",
+      "Content-Disposition": `attachment; filename="worldlink-statement-${businessDate()}.csv"`,
+      "Cache-Control": "no-store, private",
+    },
+  });
+}
+
+const allowedCounters = new Set([
+  "Counter 1",
+  "Counter 2",
+  "Counter 3",
+  "Counter 4",
+]);
+
+async function updateStaffAssignment(
+  payload: Record<string, unknown>,
+  actor: ShowcaseActor,
+) {
+  const db = getShowcaseDb();
+  await readSnapshot(db, actor.branchCode);
+  const staffId = typeof payload.staffId === "string" ? payload.staffId : "";
+  const assignedCounter =
+    typeof payload.assignedCounter === "string" ? payload.assignedCounter : "";
+  const assignedServiceCode =
+    typeof payload.assignedServiceCode === "string"
+      ? payload.assignedServiceCode
+      : "";
+  const active = payload.active !== false;
+  if (!staffId || !allowedCounters.has(assignedCounter))
+    throw new QueueError("Choose a valid teller and counter.", 400);
+  const teller = await db
+    .prepare(
+      `SELECT id, display_name, assigned_counter, assigned_service_code, active
+       FROM qms_demo_staff WHERE id=? AND branch_code=? AND role='TELLER' LIMIT 1`,
+    )
+    .bind(staffId, actor.branchCode)
+    .first<{
+      id: string;
+      display_name: string;
+      assigned_counter: string | null;
+      assigned_service_code: string | null;
+      active: number;
+    }>();
+  if (!teller) throw new QueueError("Teller not found in your branch.", 404);
+  const service = await db
+    .prepare(
+      "SELECT code FROM qms_service_configuration WHERE branch_code=? AND code=? AND active=1",
+    )
+    .bind(actor.branchCode, assignedServiceCode)
+    .first<{ code: string }>();
+  if (!service) throw new QueueError("Choose an active service.", 400);
+  const assignmentChanged =
+    teller.assigned_counter !== assignedCounter ||
+    teller.assigned_service_code !== assignedServiceCode ||
+    Boolean(teller.active) !== active;
+  if (!assignmentChanged) return protectedSnapshot(actor);
+  const activeCounter = await db
+    .prepare(
+      `SELECT counter FROM qms_counter_operations
+       WHERE branch_code=? AND staff_id=? AND status!='CLOSED' LIMIT 1`,
+    )
+    .bind(actor.branchCode, staffId)
+    .first<{ counter: string }>();
+  if (activeCounter)
+    throw new QueueError(
+      "Close this teller's active counter session before changing the assignment.",
+      409,
+      "COUNTER_BUSY",
+    );
+  const occupied = await db
+    .prepare(
+      `SELECT id FROM qms_demo_staff
+       WHERE branch_code=? AND assigned_counter=? AND id!=? AND active=1 LIMIT 1`,
+    )
+    .bind(actor.branchCode, assignedCounter, staffId)
+    .first();
+  if (occupied)
+    throw new QueueError(
+      "That counter is already assigned to another active teller.",
+      409,
+      "COUNTER_BUSY",
+    );
+  await db
+    .prepare(
+      `UPDATE qms_demo_staff
+       SET assigned_counter=?, assigned_service_code=?, active=?
+       WHERE id=? AND branch_code=? AND role='TELLER'`,
+    )
+    .bind(
+      assignedCounter,
+      assignedServiceCode,
+      active ? 1 : 0,
+      staffId,
+      actor.branchCode,
+    )
+    .run();
+  await appendAudit(
+    actor,
+    "admin.staff_assignment",
+    `${teller.display_name}: ${assignedCounter}, ${assignedServiceCode}, ${active ? "active" : "inactive"}`,
+  );
+  return protectedSnapshot(actor);
+}
+
+async function updateServiceConfiguration(
+  payload: Record<string, unknown>,
+  actor: ShowcaseActor,
+) {
+  const db = getShowcaseDb();
+  await readSnapshot(db, actor.branchCode);
+  const code =
+    typeof payload.serviceCode === "string" ? payload.serviceCode : "";
+  const targetMinutes = Number(payload.targetMinutes);
+  const priorityEnabled = payload.priorityEnabled !== false;
+  const active = payload.active !== false;
+  if (
+    !code ||
+    !Number.isInteger(targetMinutes) ||
+    targetMinutes < 1 ||
+    targetMinutes > 60
+  )
+    throw new QueueError(
+      "Service target must be between 1 and 60 minutes.",
+      400,
+    );
+  const current = await db
+    .prepare(
+      "SELECT name FROM qms_service_configuration WHERE branch_code=? AND code=?",
+    )
+    .bind(actor.branchCode, code)
+    .first<{ name: string }>();
+  if (!current) throw new QueueError("Service not found.", 404);
+  if (!active) {
+    const inUse = await db
+      .prepare(
+        `SELECT id FROM qms_demo_tickets WHERE branch_code=? AND service_code=?
+         AND status IN ('RESERVED','WAITING','CALLED','IN_SERVICE') LIMIT 1`,
+      )
+      .bind(actor.branchCode, code)
+      .first();
+    if (inUse)
+      throw new QueueError(
+        "Resolve this service's active queue before deactivating it.",
+        409,
+        "QUEUE_CONFLICT",
+      );
+  }
+  await db
+    .prepare(
+      `UPDATE qms_service_configuration
+       SET target_minutes=?, priority_enabled=?, active=?
+       WHERE branch_code=? AND code=?`,
+    )
+    .bind(
+      targetMinutes,
+      priorityEnabled ? 1 : 0,
+      active ? 1 : 0,
+      actor.branchCode,
+      code,
+    )
+    .run();
+  await appendAudit(
+    actor,
+    "admin.service_configuration",
+    `${code}: target ${targetMinutes} minutes, priority ${priorityEnabled ? "enabled" : "disabled"}, ${active ? "active" : "inactive"}`,
+  );
+  return protectedSnapshot(actor);
+}
+
 export async function POST(request: Request) {
   try {
     const origin = request.headers.get("origin");
@@ -200,6 +439,11 @@ export async function POST(request: Request) {
     const ip = request.headers.get("cf-connecting-ip");
     if (ip) await workflow.throttle(await sha256Hex(ip), "network", 240);
     switch (payload.operation) {
+      case "customer_statement":
+        return await exportCustomerStatement(
+          payload,
+          await customerSubject(request),
+        );
       case "issue": {
         const subject = await customerSubject(request);
         const result = await workflow.issue(payload, subject);
@@ -275,12 +519,34 @@ export async function POST(request: Request) {
           "settings.priority_limit",
           `Priority limit set to ${limit}`,
         );
+        return json({ snapshot: await protectedSnapshot(actor) });
+      }
+      case "admin_staff_update": {
+        const actor = await requireActor(request, true);
+        return json({ snapshot: await updateStaffAssignment(payload, actor) });
+      }
+      case "admin_service_update": {
+        const actor = await requireActor(request, true);
         return json({
-          snapshot: {
-            ...(await readSnapshot(getShowcaseDb(), actor.branchCode)),
-            actor,
-          },
+          snapshot: await updateServiceConfiguration(payload, actor),
         });
+      }
+      case "admin_revoke_teller_sessions": {
+        const actor = await requireActor(request, true);
+        const now = new Date().toISOString();
+        await getShowcaseDb()
+          .prepare(
+            `UPDATE qms_demo_sessions SET revoked_at=? WHERE revoked_at IS NULL
+             AND staff_id IN (SELECT id FROM qms_demo_staff WHERE branch_code=? AND role='TELLER')`,
+          )
+          .bind(now, actor.branchCode)
+          .run();
+        await appendAudit(
+          actor,
+          "admin.sessions_revoked",
+          "All active teller authentication sessions revoked",
+        );
+        return json({ snapshot: await protectedSnapshot(actor) });
       }
       case "export_csv":
         return await exportDailyCsv(payload, await requireActor(request, true));

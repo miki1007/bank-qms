@@ -1139,3 +1139,980 @@
     transform: none !important;
   }
 }
+
+/* Customer banking overview */
+.wl-customer-nav {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px;
+  border: 1px solid #dbe4ef;
+  border-radius: 12px;
+  background: #f3f6fa;
+}
+.wl-customer-nav button {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  min-height: 38px;
+  padding: 0 14px;
+  border: 0;
+  border-radius: 9px;
+  color: #63758b;
+  background: transparent;
+  font-size: 14px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: 180ms ease;
+}
+.wl-customer-nav button:hover,
+.wl-customer-nav button[aria-current="page"] {
+  color: #1e3048;
+  background: white;
+  box-shadow: 0 3px 12px #20354e12;
+}
+.wl-customer-nav svg {
+  width: 17px;
+}
+.account-guide-features b svg {
+  width: 16px;
+}
+.wl-banking-dashboard {
+  align-self: start;
+  display: grid;
+  gap: 24px;
+  min-width: 0;
+  animation: wl-enter 0.42s cubic-bezier(0.2, 0.8, 0.2, 1) both;
+}
+.banking-hero {
+  position: relative;
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  min-height: 205px;
+  padding: 31px;
+  overflow: hidden;
+  border-radius: 24px;
+  color: white;
+  background:
+    radial-gradient(circle at 82% 18%, #6b8caf55 0 10%, transparent 35%),
+    linear-gradient(135deg, #14263d, #29486b 70%, #365c7c);
+  box-shadow: 0 24px 55px #1228402b;
+}
+.banking-hero::after {
+  content: "";
+  position: absolute;
+  right: -55px;
+  bottom: -115px;
+  width: 280px;
+  height: 280px;
+  border: 1px solid #ffffff1f;
+  border-radius: 50%;
+  box-shadow:
+    0 0 0 38px #ffffff09,
+    0 0 0 78px #ffffff07;
+  animation: banking-orbit 8s ease-in-out infinite alternate;
+}
+.banking-hero > div {
+  position: relative;
+  z-index: 1;
+  display: grid;
+  gap: 9px;
+}
+.banking-hero .wl-eyebrow {
+  margin: 0;
+  color: #c9d8e8;
+}
+.banking-hero div > strong {
+  font-size: clamp(34px, 4vw, 51px);
+  letter-spacing: -0.055em;
+  line-height: 1.05;
+}
+.banking-hero div > small {
+  color: #c8d5e4;
+  font-size: 14px;
+}
+.banking-hero > button {
+  position: relative;
+  z-index: 2;
+  display: grid;
+  width: 44px;
+  height: 44px;
+  place-items: center;
+  border: 1px solid #ffffff2b;
+  border-radius: 13px;
+  color: white;
+  background: #ffffff12;
+  cursor: pointer;
+}
+.banking-hero > button svg {
+  width: 19px;
+}
+.banking-demo-badge {
+  position: absolute;
+  z-index: 2;
+  right: 28px;
+  bottom: 25px;
+  padding: 7px 11px;
+  border: 1px solid #d8e5f12e;
+  border-radius: 999px;
+  color: #dce8f4;
+  background: #0d1d2f42;
+  font-size: 12px;
+  font-weight: 750;
+  letter-spacing: 0.04em;
+}
+.banking-quick-actions {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 11px;
+}
+.banking-quick-actions button {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  align-items: center;
+  gap: 12px;
+  min-height: 78px;
+  padding: 15px;
+  border: 1px solid #dce4ee;
+  border-radius: 16px;
+  color: #20364f;
+  background: white;
+  text-align: left;
+  cursor: pointer;
+  box-shadow: 0 8px 25px #1b355009;
+  transition: 180ms ease;
+}
+.banking-quick-actions button:hover {
+  transform: translateY(-2px);
+  border-color: #b9cadc;
+  box-shadow: 0 13px 30px #1b355014;
+}
+.banking-quick-actions button > svg:first-child {
+  width: 41px;
+  height: 41px;
+  padding: 10px;
+  border-radius: 12px;
+  color: #315a76;
+  background: #edf4f9;
+}
+.banking-quick-actions button > svg:last-child {
+  width: 17px;
+  color: #8a9aae;
+}
+.banking-quick-actions span {
+  display: grid;
+  gap: 4px;
+}
+.banking-quick-actions small {
+  color: #78899c;
+  font-size: 12px;
+}
+.banking-section-heading {
+  display: flex;
+  align-items: end;
+  justify-content: space-between;
+  gap: 15px;
+}
+.banking-section-heading .wl-eyebrow {
+  margin-bottom: 5px;
+}
+.banking-section-heading h2 {
+  margin: 0;
+  font-size: 25px;
+  letter-spacing: -0.035em;
+}
+.banking-section-heading > button {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  border: 0;
+  color: #516b86;
+  background: transparent;
+  font-weight: 700;
+  cursor: pointer;
+}
+.banking-section-heading > button svg {
+  width: 16px;
+}
+.account-card-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+}
+.account-card-grid article {
+  position: relative;
+  display: grid;
+  min-height: 205px;
+  padding: 23px;
+  overflow: hidden;
+  border: 1px solid #d7e1ec;
+  border-radius: 20px;
+  color: #20364f;
+  background: linear-gradient(145deg, white, #f5f8fc);
+  box-shadow: 0 14px 35px #17334f0c;
+}
+.account-card-grid article::after {
+  content: "";
+  position: absolute;
+  right: -28px;
+  bottom: -32px;
+  width: 115px;
+  height: 115px;
+  border: 18px solid #dce8f31c;
+  border-radius: 50%;
+}
+.account-card-grid article.savings {
+  color: #173e36;
+  border-color: #cfe1da;
+  background: linear-gradient(145deg, #f8fffc, #edf7f3);
+}
+.account-card-grid article > div {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.account-icon {
+  display: grid;
+  width: 41px;
+  height: 41px;
+  place-items: center;
+  border-radius: 12px;
+  color: #315a76;
+  background: #e8f0f7;
+}
+.savings .account-icon {
+  color: #28634f;
+  background: #dcefe7;
+}
+.account-icon svg {
+  width: 20px;
+}
+.account-card-grid article b {
+  padding: 5px 8px;
+  border-radius: 99px;
+  color: #33705a;
+  background: #e4f3ec;
+  font-size: 10px;
+  letter-spacing: 0.08em;
+}
+.account-card-grid article p {
+  display: grid;
+  align-self: end;
+  gap: 4px;
+  margin: 23px 0 16px;
+}
+.account-card-grid article p strong {
+  font-size: 17px;
+}
+.account-card-grid article p small,
+.account-card-grid article > span {
+  color: #6c7e91;
+  font-size: 12px;
+}
+.account-card-grid article h3 {
+  z-index: 1;
+  margin: 5px 0 0;
+  font-size: 25px;
+  letter-spacing: -0.035em;
+}
+.transaction-panel {
+  padding: 24px;
+  border: 1px solid #dce4ee;
+  border-radius: 20px;
+  background: white;
+  box-shadow: 0 12px 35px #1a34500a;
+}
+.transaction-panel select {
+  min-height: 40px;
+  padding: 0 32px 0 12px;
+  border: 1px solid #d4deea;
+  border-radius: 10px;
+  color: #314b67;
+  background: #f7f9fc;
+  font-size: 13px;
+}
+.transaction-list {
+  display: grid;
+  margin-top: 16px;
+}
+.transaction-list > div {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  align-items: center;
+  gap: 13px;
+  min-height: 70px;
+  border-top: 1px solid #edf1f5;
+}
+.transaction-list > div > span {
+  display: grid;
+  width: 39px;
+  height: 39px;
+  place-items: center;
+  border-radius: 12px;
+  color: #805448;
+  background: #f9efeb;
+}
+.transaction-list > div > span.credit {
+  color: #277059;
+  background: #e5f4ee;
+}
+.transaction-list svg {
+  width: 19px;
+}
+.transaction-list p {
+  display: grid;
+  gap: 5px;
+  margin: 0;
+}
+.transaction-list p strong {
+  font-size: 14px;
+}
+.transaction-list p small {
+  color: #7b8a9c;
+  font-size: 12px;
+}
+.transaction-list > div > b {
+  font-size: 14px;
+  color: #293f58;
+}
+.transaction-list > div > b.amount-credit {
+  color: #277059;
+}
+.banking-disclaimer {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  margin: -5px 0 0;
+  color: #718299;
+  font-size: 12px;
+  line-height: 1.5;
+}
+.banking-disclaimer svg {
+  width: 16px;
+  min-width: 16px;
+}
+
+/* Staff performance and manager analytics */
+.teller-shift-strip {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+  margin-bottom: 18px;
+}
+.teller-shift-strip > div {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 15px 17px;
+  border: 1px solid #dfe7ef;
+  border-radius: 14px;
+  background: #fff;
+}
+.teller-shift-strip svg {
+  width: 35px;
+  height: 35px;
+  padding: 8px;
+  border-radius: 10px;
+  color: #315a76;
+  background: #edf4f9;
+}
+.teller-shift-strip span {
+  display: grid;
+  gap: 3px;
+}
+.teller-shift-strip small {
+  color: #75869a;
+  font-size: 11px;
+}
+.teller-shift-strip strong {
+  font-size: 17px;
+}
+.manager-analytics-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1.55fr) minmax(280px, 0.75fr);
+  gap: 18px;
+  margin-bottom: 18px;
+}
+.analytics-trend,
+.demand-chart,
+.flow-panel,
+.service-performance-panel {
+  overflow: hidden;
+}
+.chart-legend {
+  display: flex;
+  gap: 16px;
+  color: #66798f;
+  font-size: 12px;
+}
+.chart-legend span::before {
+  content: "";
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  margin-right: 6px;
+  border-radius: 50%;
+  background: #426989;
+}
+.chart-legend .completed::before {
+  background: #35a078;
+}
+.line-chart-wrap {
+  padding: 5px 2px 0;
+}
+.line-chart {
+  display: block;
+  width: 100%;
+  min-height: 180px;
+  overflow: visible;
+}
+.line-chart line {
+  stroke: #e6edf4;
+  stroke-width: 1;
+}
+.line-chart polyline {
+  fill: none;
+  stroke-width: 4;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-dasharray: 900;
+  animation: chart-draw 1s ease both;
+}
+.line-chart .issued-line {
+  stroke: #426989;
+}
+.line-chart .completed-line {
+  stroke: #35a078;
+  animation-delay: 150ms;
+}
+.line-chart circle {
+  stroke: white;
+  stroke-width: 2;
+}
+.line-chart .issued-point {
+  fill: #426989;
+}
+.line-chart .completed-point {
+  fill: #35a078;
+}
+.line-chart text {
+  fill: #8291a2;
+  font-size: 11px;
+  text-anchor: middle;
+}
+.chart-empty {
+  display: grid;
+  min-height: 180px;
+  place-items: center;
+  color: #788a9f;
+  font-size: 14px;
+}
+.hour-bars {
+  display: flex;
+  align-items: end;
+  justify-content: space-between;
+  gap: 5px;
+  min-height: 190px;
+  padding-top: 15px;
+}
+.hour-bars > div {
+  display: grid;
+  flex: 1;
+  height: 170px;
+  grid-template-rows: 18px 1fr 18px;
+  gap: 5px;
+  color: #8291a2;
+  text-align: center;
+}
+.hour-bars b,
+.hour-bars small {
+  font-size: 10px;
+}
+.hour-bars > div > span {
+  display: flex;
+  align-items: end;
+  overflow: hidden;
+  border-radius: 7px 7px 3px 3px;
+  background: #edf2f7;
+}
+.hour-bars i {
+  display: block;
+  width: 100%;
+  min-height: 5px;
+  border-radius: 6px 6px 2px 2px;
+  background: linear-gradient(#5c82a1, #294c6d);
+  animation: bar-rise 0.65s cubic-bezier(0.2, 0.8, 0.2, 1) both;
+  transform-origin: bottom;
+}
+.flow-panel {
+  margin-bottom: 18px;
+}
+.flow-panel .manager-panel-head > svg {
+  width: 21px;
+  color: #52718d;
+}
+.flow-diagram {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 14px;
+}
+.flow-diagram > div {
+  position: relative;
+  display: grid;
+  gap: 3px;
+  min-height: 103px;
+  padding: 15px;
+  border: 1px solid #dce6ef;
+  border-radius: 14px;
+  background: linear-gradient(145deg, #fff, #f6f9fc);
+}
+.flow-diagram > div > span {
+  display: grid;
+  width: 24px;
+  height: 24px;
+  place-items: center;
+  border-radius: 50%;
+  color: #496984;
+  background: #e8f0f6;
+  font-size: 10px;
+  font-weight: 800;
+}
+.flow-diagram strong {
+  align-self: end;
+  font-size: 26px;
+}
+.flow-diagram small {
+  color: #718398;
+}
+.flow-diagram i {
+  position: absolute;
+  z-index: 2;
+  top: 42%;
+  right: -22px;
+  color: #9daebf;
+  font-style: normal;
+}
+.service-performance-panel {
+  margin-bottom: 18px;
+}
+.service-performance-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 11px;
+}
+.service-performance-grid > div {
+  display: grid;
+  grid-template-columns: auto minmax(120px, 1fr) minmax(260px, 1.5fr);
+  align-items: center;
+  gap: 13px;
+  padding: 15px;
+  border: 1px solid #e2e8ef;
+  border-radius: 14px;
+}
+.service-performance-grid p {
+  display: grid;
+  gap: 3px;
+  margin: 0;
+}
+.service-performance-grid p small {
+  color: #7a8999;
+}
+.service-performance-grid dl {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  margin: 0;
+}
+.service-performance-grid dl > div {
+  display: grid;
+  gap: 4px;
+  padding-left: 12px;
+  border-left: 1px solid #e6ebf1;
+}
+.service-performance-grid dt {
+  color: #8190a1;
+  font-size: 10px;
+}
+.service-performance-grid dd {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 750;
+}
+
+/* Manager-only administration */
+.admin-view {
+  padding: 42px 5vw 70px;
+  animation: wl-enter 0.4s ease both;
+}
+.admin-identity {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 250px;
+  padding: 16px 18px;
+  border: 1px solid #cddfd8;
+  border-radius: 15px;
+  background: #edf7f3;
+}
+.admin-identity > svg {
+  width: 38px;
+  height: 38px;
+  padding: 9px;
+  border-radius: 11px;
+  color: #28634f;
+  background: #d9eee6;
+}
+.admin-identity span {
+  display: grid;
+  gap: 2px;
+}
+.admin-identity small,
+.admin-identity b {
+  color: #647d74;
+  font-size: 11px;
+}
+.admin-summary-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 13px;
+  margin: 26px 0 18px;
+}
+.admin-summary-grid article {
+  display: flex;
+  align-items: center;
+  gap: 13px;
+  min-height: 100px;
+  padding: 18px;
+  border: 1px solid #dfe7ef;
+  border-radius: 16px;
+  background: white;
+  box-shadow: 0 10px 28px #18344d09;
+}
+.admin-summary-grid svg {
+  width: 42px;
+  height: 42px;
+  padding: 10px;
+  border-radius: 12px;
+  color: #345d7a;
+  background: #edf4f9;
+}
+.admin-summary-grid span {
+  display: grid;
+  gap: 3px;
+}
+.admin-summary-grid small {
+  color: #74869a;
+  font-size: 11px;
+}
+.admin-summary-grid strong {
+  font-size: 25px;
+}
+.admin-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1.25fr) minmax(360px, 0.75fr);
+  gap: 18px;
+  margin-bottom: 18px;
+}
+.admin-staff-list,
+.admin-service-list {
+  display: grid;
+  gap: 9px;
+}
+.admin-staff-list > div {
+  display: grid;
+  grid-template-columns:
+    auto minmax(145px, 1fr) minmax(112px, 0.6fr) minmax(145px, 0.9fr)
+    auto;
+  align-items: end;
+  gap: 11px;
+  padding: 13px;
+  border: 1px solid #e1e8ef;
+  border-radius: 13px;
+  transition: 180ms ease;
+}
+.admin-staff-list > div:hover,
+.admin-service-list > div:hover {
+  border-color: #bccddd;
+  box-shadow: 0 8px 20px #17344f0b;
+}
+.admin-staff-list > div.is-inactive,
+.admin-service-list > div.is-inactive {
+  opacity: 0.62;
+  background: #f4f5f7;
+}
+.staff-avatar {
+  display: grid;
+  width: 43px;
+  height: 43px;
+  place-items: center;
+  align-self: center;
+  border-radius: 13px;
+  color: #274f6b;
+  background: #e8f0f6;
+  font-size: 12px;
+  font-weight: 850;
+}
+.admin-staff-list p,
+.admin-service-list p {
+  display: grid;
+  align-self: center;
+  gap: 3px;
+  margin: 0;
+}
+.admin-staff-list p small,
+.admin-service-list p small {
+  color: #77889a;
+  font-size: 11px;
+}
+.admin-staff-list label,
+.admin-service-list label {
+  display: grid;
+  gap: 5px;
+  color: #748499;
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+}
+.admin-staff-list select,
+.admin-service-list select,
+.branch-policy-panel select {
+  min-height: 38px;
+  padding: 0 9px;
+  border: 1px solid #d3dde7;
+  border-radius: 9px;
+  color: #2c4863;
+  background: white;
+  font-size: 12px;
+  text-transform: none;
+}
+.admin-staff-list button,
+.admin-service-list button {
+  min-height: 38px;
+}
+.protected-role {
+  grid-column: span 3;
+  display: flex;
+  align-items: center;
+  align-self: center;
+  gap: 7px;
+  color: #49705f;
+  font-size: 12px;
+  font-weight: 700;
+}
+.protected-role svg {
+  width: 16px;
+}
+.admin-service-list > div {
+  display: grid;
+  grid-template-columns: auto minmax(110px, 1fr) minmax(88px, 0.6fr) auto auto;
+  align-items: end;
+  gap: 10px;
+  padding: 13px;
+  border: 1px solid #e1e8ef;
+  border-radius: 13px;
+}
+.admin-switch {
+  align-self: center;
+  display: flex !important;
+  align-items: center;
+  gap: 7px !important;
+  padding-bottom: 5px;
+}
+.secondary-admin-grid {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+.branch-policy-panel dl {
+  display: grid;
+  gap: 0;
+  margin: 0;
+}
+.branch-policy-panel dl > div {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 15px;
+  min-height: 52px;
+  border-top: 1px solid #e7ecf1;
+}
+.branch-policy-panel dt {
+  color: #718398;
+  font-size: 13px;
+}
+.branch-policy-panel dd {
+  margin: 0;
+  color: #2d465f;
+  font-size: 13px;
+  font-weight: 700;
+}
+.security-actions {
+  display: grid;
+}
+.security-actions > div {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 18px;
+  min-height: 76px;
+  border-top: 1px solid #e7ecf1;
+}
+.security-actions p {
+  display: grid;
+  gap: 4px;
+  margin: 0;
+}
+.security-actions small {
+  color: #78899b;
+}
+.admin-confirm {
+  display: flex;
+  gap: 7px;
+}
+.admin-audit-table {
+  margin-top: 18px;
+}
+
+@keyframes chart-draw {
+  from {
+    stroke-dashoffset: 900;
+  }
+  to {
+    stroke-dashoffset: 0;
+  }
+}
+@keyframes bar-rise {
+  from {
+    transform: scaleY(0.08);
+    opacity: 0.45;
+  }
+  to {
+    transform: scaleY(1);
+    opacity: 1;
+  }
+}
+@keyframes banking-orbit {
+  to {
+    transform: translate(-16px, -12px) scale(1.05);
+  }
+}
+
+@media (max-width: 1100px) {
+  .service-performance-grid {
+    grid-template-columns: 1fr;
+  }
+  .admin-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 900px) {
+  .manager-analytics-grid,
+  .secondary-admin-grid {
+    grid-template-columns: 1fr;
+  }
+  .admin-summary-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .flow-diagram {
+    grid-template-columns: repeat(5, minmax(110px, 1fr));
+    overflow-x: auto;
+    padding-bottom: 8px;
+  }
+  .admin-staff-list > div {
+    grid-template-columns:
+      auto minmax(145px, 1fr) repeat(2, minmax(120px, 0.7fr))
+      auto;
+  }
+}
+
+@media (max-width: 700px) {
+  .wl-topbar {
+    flex-wrap: wrap;
+    gap: 12px;
+  }
+  .wl-customer-nav {
+    order: 3;
+    width: 100%;
+  }
+  .wl-customer-nav button {
+    flex: 1;
+    justify-content: center;
+  }
+  .wl-banking-dashboard {
+    gap: 16px;
+  }
+  .banking-hero {
+    min-height: 175px;
+    padding: 23px 20px;
+    border-radius: 18px;
+  }
+  .banking-hero div > strong {
+    font-size: 31px;
+  }
+  .banking-quick-actions,
+  .account-card-grid,
+  .service-performance-grid,
+  .teller-shift-strip,
+  .admin-summary-grid {
+    grid-template-columns: 1fr;
+  }
+  .account-card-grid article {
+    min-height: 185px;
+  }
+  .transaction-panel {
+    padding: 18px 16px;
+  }
+  .banking-section-heading {
+    align-items: flex-start;
+  }
+  .banking-section-heading h2 {
+    font-size: 22px;
+  }
+  .transaction-list > div > b {
+    font-size: 12px;
+  }
+  .service-performance-grid > div {
+    grid-template-columns: auto 1fr;
+  }
+  .service-performance-grid dl {
+    grid-column: 1 / -1;
+  }
+  .admin-view {
+    padding: 24px 15px 55px;
+  }
+  .admin-identity {
+    min-width: 0;
+  }
+  .admin-staff-list > div,
+  .admin-service-list > div {
+    grid-template-columns: auto 1fr;
+    align-items: center;
+  }
+  .admin-staff-list label,
+  .admin-staff-list button,
+  .admin-service-list label,
+  .admin-service-list button,
+  .protected-role {
+    grid-column: 1 / -1;
+  }
+  .security-actions > div {
+    align-items: flex-start;
+    flex-direction: column;
+    padding: 14px 0;
+  }
+  .admin-confirm {
+    width: 100%;
+  }
+  .hour-bars > div:nth-child(even) small {
+    visibility: hidden;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .wl-banking-dashboard,
+  .banking-hero::after,
+  .line-chart polyline,
+  .hour-bars i,
+  .admin-view {
+    animation: none !important;
+  }
+}

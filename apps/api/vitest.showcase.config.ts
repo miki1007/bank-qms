@@ -12,6 +12,8 @@ export default defineConfig({
   test: {
     environment: "node",
     include: ["test/showcase/**/*.spec.ts"],
-    testTimeout: 15000,
+    // The five-round, 100-ticket concurrency stress case intentionally takes
+    // longer than an ordinary unit test on the synchronous SQLite harness.
+    testTimeout: 45_000,
   },
 });

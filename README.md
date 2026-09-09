@@ -1,14 +1,15 @@
 # Bank QMS
 
-Bank QMS is the academic queue-management showcase branded as **WorldLink Bank**. The supplied WorldLink emblem is used with the project owner's direction; this repository is a demonstration and does not provide banking transactions or account access.
+Bank QMS is the academic queue-management showcase branded as **WorldLink Bank**. The supplied WorldLink emblem is used with the project owner's direction. The customer showcase includes clearly labelled, synthetic account balances and activity for product demonstration; it is not connected to core banking and cannot move real funds.
 
 The product has six connected surfaces backed by the same domain rules:
 
 | Surface           | Purpose                                                                          | Local URL                       |
 | ----------------- | -------------------------------------------------------------------------------- | ------------------------------- |
-| Customer app      | Register, join a queue, track and cancel account-owned tickets, view history     | `http://localhost:5176`         |
+| Customer app      | Read-only demo accounts plus queue reservation, tracking, cancellation, history  | `http://localhost:5176`         |
 | Staff app/web     | Teller counter sessions and manager operations, selected by server-enforced role | `http://localhost:5173`         |
 | Manager dashboard | Configuration, KPIs, reports, CSV, and audit logs                                | `http://localhost:5173/manager` |
+| Administration    | Manager-only staff assignments, services, policy, and session controls           | `http://localhost:5173/admin`   |
 | Public display    | Branch number monitor with large live calls and safe reconnect state             | `http://localhost:5175`         |
 | Web kiosk         | Optional branch fallback for walk-in customers without the mobile app            | `http://localhost:5174`         |
 | API and Swagger   | REST, Socket.IO, health, and OpenAPI                                             | `http://localhost:3000/docs`    |
@@ -128,7 +129,7 @@ Deploy PostgreSQL and the NestJS API behind HTTPS, serve the four Vite web clien
 
 ## Private hosted showcase
 
-The owner-only Sites URL is a constrained portfolio preview. It contains `/customer`, `/kiosk`, `/teller`, `/manager`, and `/display`, all connected to one persistent queue adapter. That runtime cannot open PostgreSQL TCP connections or host the canonical Socket.IO process, so it uses D1 and authoritative polling. This adapter is not the production backend and is explained in `docs/implementation-decisions.md`; the production target remains NestJS/PostgreSQL/Socket.IO.
+The owner-only Sites URL is a constrained portfolio preview. It contains `/customer`, `/kiosk`, `/teller`, `/manager`, `/admin`, and `/display`, all connected to one persistent queue adapter. Teller entry always establishes an independent Teller session; an existing Manager cookie is never reused as a teller identity. The Manager dashboard includes live queue charts, while `/admin` is a separately protected Manager surface. The customer page includes an identity-scoped, synthetic read-only portfolio and CSV statement alongside the working queue flow. That runtime cannot open PostgreSQL TCP connections or host the canonical Socket.IO process, so it uses D1 and authoritative polling. This adapter is not the production backend and is explained in `docs/implementation-decisions.md`; the production target remains NestJS/PostgreSQL/Socket.IO.
 
 ## Security notes
 

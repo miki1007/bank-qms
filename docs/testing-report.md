@@ -1,5 +1,13 @@
 # Testing report
 
+## 2026-09-09 role separation, analytics, administration, and customer overview
+
+- The hosted route suite passed 15/15 against a fresh SQLite database with all eight D1 migrations. New cases prove customer ticket creation through the real route, identity-scoped synthetic portfolios, Manager-to-Teller session replacement, Teller rejection from `/admin`, audited staff/service administration, and priority-policy enforcement. The existing five-round, 100-ticket simultaneous Call Next stress case also passed.
+- Repository/UI contracts passed 16/16. They now require the dedicated `/admin` route, Teller/Manager destination isolation, manager throughput and demand charts, the live customer-flow diagram, and customer account/statement wiring.
+- `pnpm lint`, `pnpm typecheck`, `pnpm format:check`, `pnpm test`, `pnpm build`, and the hosted production build passed. The build contains `/customer`, `/teller`, `/manager`, `/admin`, `/display`, and `/kiosk` plus both PWA routes and the API.
+- Agent-side browser QA could not run in this checkpoint because the supervised preview runtime supported an older Cloudflare compatibility date than the checkout. The configuration was corrected to the supported date and the production build passed afterward. Functional route behavior was verified directly against the migrated database rather than claimed from an unavailable browser session.
+- Customer balances and transactions are explicitly synthetic, masked, read-only, and identity-scoped. There are no payment, transfer, beneficiary, or balance-mutation endpoints; real core-banking integration remains outside this academic QMS.
+
 ## 2026-09-08 WorldLink multi-branch web checkpoint
 
 - Hosted workflow integration suite: 11/11 passed against real SQLite after applying all seven D1 migrations. Coverage includes branch/day numbering, ticket and teller idempotency, preserved remote-booking order after arrival, expiry, remote limits/cooldown, priority verification/fairness, session ownership, transfer/no-show behavior, public-data privacy, branch authorization, CSV auditing, and five rounds of 20-ticket simultaneous Call Next simulation.

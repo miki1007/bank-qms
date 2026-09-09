@@ -57,6 +57,13 @@
       "when": 1788851455758,
       "tag": "0007_atomic_workflow_operations",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "6",
+      "when": 1788895798889,
+      "tag": "0008_magenta_swarm",
+      "breakpoints": true
     }
   ]
 }

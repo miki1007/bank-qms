@@ -1,11 +1,11 @@
 import {
   businessDate,
   ensureBranches,
+  ensureServiceConfiguration,
   expireReservations,
   getShowcaseDb,
   readSnapshot,
   safeTicket,
-  services,
   type StoredTicket,
 } from "./showcase-adapter";
 import { bankBranch, DEFAULT_BRANCH_CODE } from "./bank-brand";
@@ -81,6 +81,22 @@ export class TicketWorkflowService {
       );
     return value;
   }
+  private async configuredService(branch: string, value: unknown) {
+    await ensureServiceConfiguration(this.db, branch);
+    return this.db
+      .prepare(
+        `SELECT code, name, target_minutes AS minutes, priority_enabled
+         FROM qms_service_configuration
+         WHERE branch_code=? AND code=? AND active=1 LIMIT 1`,
+      )
+      .bind(branch, String(value ?? ""))
+      .first<{
+        code: string;
+        name: string;
+        minutes: number;
+        priority_enabled: number;
+      }>();
+  }
   private async ticket(id: string) {
     const ticket = await this.db
       .prepare("SELECT * FROM qms_demo_tickets WHERE id=?")
@@ -135,7 +151,8 @@ export class TicketWorkflowService {
   }
   async issue(payload: Record<string, unknown>, subject: string) {
     const branch = this.branch(payload.branchCode);
-    const service = services.find((item) => item.code === payload.serviceCode);
+    await ensureBranches(this.db);
+    const service = await this.configuredService(branch, payload.serviceCode);
     if (!service)
       throw new QueueError("Choose a valid service.", 400, "VALIDATION_ERROR");
     const key = this.key(payload.idempotencyKey);
@@ -148,6 +165,12 @@ export class TicketWorkflowService {
     )
       throw new QueueError(
         "Choose a valid priority eligibility reason.",
+        400,
+        "VALIDATION_ERROR",
+      );
+    if (payload.priority === true && !service.priority_enabled)
+      throw new QueueError(
+        "Priority service is not enabled for this service.",
         400,
         "VALIDATION_ERROR",
       );
@@ -166,7 +189,6 @@ export class TicketWorkflowService {
     const hash = await sha256Hex(
       JSON.stringify({ branch, service: service.code, channel, reason, proof }),
     );
-    await ensureBranches(this.db);
     const now = this.clock();
     const at = now.toISOString();
     const date = businessDate(now);
@@ -754,8 +776,9 @@ export class TicketWorkflowService {
           "NO_SHOW_TOO_EARLY",
         );
       if (action === "transfer") {
-        const service = services.find(
-          (item) => item.code === payload.serviceCode,
+        const service = await this.configuredService(
+          actor.branchCode,
+          payload.serviceCode,
         );
         if (!service || service.code === ticket.service_code)
           throw new QueueError("Choose a different destination service.", 400);

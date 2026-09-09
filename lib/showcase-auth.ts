@@ -146,9 +146,10 @@ export async function ensureShowcaseStaff(db = getShowcaseDb()) {
       db
         .prepare(
           `INSERT INTO qms_demo_staff
-         (id, username, display_name, role, assigned_counter, password_salt, password_hash, branch_code, failed_login_count, active)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, 0, 1)
-         ON CONFLICT(username) DO NOTHING`,
+         (id, username, display_name, role, assigned_counter, assigned_service_code, password_salt, password_hash, branch_code, failed_login_count, active)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 0, 1)
+         ON CONFLICT(username) DO UPDATE SET
+           assigned_service_code=COALESCE(qms_demo_staff.assigned_service_code, excluded.assigned_service_code)`,
         )
         .bind(
           staff.id,
@@ -156,6 +157,7 @@ export async function ensureShowcaseStaff(db = getShowcaseDb()) {
           staff.displayName,
           staff.role,
           staff.assignedCounter,
+          staff.assignedServiceCode,
           staff.salt,
           staff.passwordHash,
           staff.branchCode,
@@ -178,7 +180,7 @@ export async function getWorkspaceShowcaseActor(
   if (!staff) return null;
   const persisted = await db
     .prepare(
-      `SELECT id, username, display_name, role, assigned_counter, branch_code
+      `SELECT id, username, display_name, role, assigned_counter, assigned_service_code, branch_code
        FROM qms_demo_staff WHERE username = ? AND active = 1 LIMIT 1`,
     )
     .bind(staff.username)
@@ -188,6 +190,7 @@ export async function getWorkspaceShowcaseActor(
       display_name: string;
       role: ShowcaseRole;
       assigned_counter: string | null;
+      assigned_service_code: string | null;
       branch_code: string;
     }>();
   if (!persisted || persisted.role !== role) return null;
@@ -197,7 +200,7 @@ export async function getWorkspaceShowcaseActor(
     displayName: persisted.display_name,
     role: persisted.role,
     assignedCounter: persisted.assigned_counter,
-    assignedServiceCode: staff.assignedServiceCode,
+    assignedServiceCode: persisted.assigned_service_code,
     branchCode: persisted.branch_code,
   } satisfies ShowcaseActor;
 }
@@ -208,7 +211,7 @@ export async function authenticate(username: string, password: string) {
   const normalized = username.trim().toLowerCase();
   const staff = await db
     .prepare(
-      `SELECT id, username, display_name, role, assigned_counter, branch_code, password_salt, password_hash,
+      `SELECT id, username, display_name, role, assigned_counter, assigned_service_code, branch_code, password_salt, password_hash,
               failed_login_count, locked_until, active
        FROM qms_demo_staff WHERE username = ? LIMIT 1`,
     )
@@ -219,6 +222,7 @@ export async function authenticate(username: string, password: string) {
       display_name: string;
       role: ShowcaseRole;
       assigned_counter: string | null;
+      assigned_service_code: string | null;
       branch_code: string;
       password_salt: string;
       password_hash: string;
@@ -263,9 +267,7 @@ export async function authenticate(username: string, password: string) {
     role: staff.role,
     assignedCounter: staff.assigned_counter,
     branchCode: staff.branch_code,
-    assignedServiceCode:
-      showcaseStaff.find((candidate) => candidate.username === staff.username)
-        ?.assignedServiceCode ?? null,
+    assignedServiceCode: staff.assigned_service_code,
   } satisfies ShowcaseActor;
 }
 
@@ -275,6 +277,12 @@ export async function createSession(actor: ShowcaseActor, secure = true) {
   const tokenHash = await sha256Hex(token);
   const createdAt = new Date();
   const expiresAt = new Date(createdAt.getTime() + SESSION_SECONDS * 1000);
+  await db
+    .prepare(
+      "UPDATE qms_demo_sessions SET revoked_at=? WHERE staff_id=? AND revoked_at IS NULL",
+    )
+    .bind(createdAt.toISOString(), actor.id)
+    .run();
   await db
     .prepare(
       `INSERT INTO qms_demo_sessions
@@ -314,7 +322,7 @@ export async function getActor(
   const tokenHash = await sha256Hex(token);
   const row = await db
     .prepare(
-      `SELECT staff.id, staff.username, staff.display_name, staff.role, staff.assigned_counter, staff.branch_code
+      `SELECT staff.id, staff.username, staff.display_name, staff.role, staff.assigned_counter, staff.assigned_service_code, staff.branch_code
        FROM qms_demo_sessions session
        JOIN qms_demo_staff staff ON staff.id = session.staff_id
        WHERE session.token_hash = ? AND session.revoked_at IS NULL
@@ -328,6 +336,7 @@ export async function getActor(
       display_name: string;
       role: ShowcaseRole;
       assigned_counter: string | null;
+      assigned_service_code: string | null;
       branch_code: string;
     }>();
   return row
@@ -338,9 +347,7 @@ export async function getActor(
         role: row.role,
         assignedCounter: row.assigned_counter,
         branchCode: row.branch_code,
-        assignedServiceCode:
-          showcaseStaff.find((candidate) => candidate.username === row.username)
-            ?.assignedServiceCode ?? null,
+        assignedServiceCode: row.assigned_service_code,
       }
     : null;
 }
@@ -360,7 +367,8 @@ export async function revokeSession(
       .run();
   }
   if (actor) await appendAudit(actor, "auth.logout", "Staff session closed");
-  return `${SESSION_COOKIE}=; HttpOnly; Secure; SameSite=Strict; Path=/; Max-Age=0`;
+  const secure = new URL(request.url).hostname !== "terminal.local";
+  return `${SESSION_COOKIE}=; HttpOnly; ${secure ? "Secure; " : ""}SameSite=Strict; Path=/; Max-Age=0`;
 }
 
 export async function appendAudit(

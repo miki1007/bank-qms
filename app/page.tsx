@@ -3,6 +3,7 @@ import {
   LayoutDashboard,
   MapPin,
   MonitorUp,
+  Settings,
   Smartphone,
   Store,
   UsersRound,
@@ -20,18 +21,25 @@ const products = [
     accent: "mint",
   },
   {
-    href: "/teller",
+    href: "/staff/login?next=%2Fteller",
     icon: UsersRound,
     title: "Teller console",
     description: "Sign in to your assigned counter and call the next customer.",
     accent: "blue",
   },
   {
-    href: "/manager",
+    href: "/staff/login?next=%2Fmanager",
     icon: LayoutDashboard,
     title: "Manager dashboard",
     description: "Monitor your branch, approve priority and review reports.",
     accent: "green",
+  },
+  {
+    href: "/staff/login?next=%2Fadmin",
+    icon: Settings,
+    title: "Administration",
+    description: "Manage staff assignments, services and branch security.",
+    accent: "amber",
   },
   {
     href: "/display",
@@ -124,8 +132,8 @@ export default function Home() {
         </Link>
       </aside>
       <footer className="wl-footer">
-        WorldLink Bank · Academic queue-management demonstration. No banking
-        transactions or account access.
+        WorldLink Bank · Academic demonstration. Account balances and activity
+        are sample data; no real banking transactions are available.
         <Link href="/customer-app">Customer PWA</Link>
         <Link href="/staff-app">Staff companion</Link>
       </footer>

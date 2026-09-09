@@ -32,11 +32,15 @@ export function StaffLoginClient() {
   const [error, setError] = useState("");
 
   function enterWorkspace(actor: LoginActor) {
+    const requested = new URLSearchParams(window.location.search).get("next");
     if (actor.role === "MANAGER") {
-      window.location.replace("/manager");
+      const managerDestination =
+        requested && ["/manager", "/admin"].includes(requested)
+          ? requested
+          : "/manager";
+      window.location.replace(managerDestination);
       return;
     }
-    const requested = new URLSearchParams(window.location.search).get("next");
     const allowed = ["/teller", "/staff-app"];
     const destination =
       requested && allowed.includes(requested) ? requested : "/teller";
@@ -171,7 +175,7 @@ export function StaffLoginClient() {
                 disabled={busy}
                 onClick={() => openShowcase("TELLER")}
               >
-                Teller view
+                Open Teller 1
               </Button>
             </div>
             <p className="showcase-note">

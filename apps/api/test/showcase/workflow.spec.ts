@@ -8,8 +8,13 @@ import {
   createSession,
   type ShowcaseActor,
 } from "../../../../lib/showcase-auth";
-import { readSnapshot, publicSnapshot } from "../../../../lib/showcase-adapter";
+import {
+  readCustomerPortfolio,
+  readSnapshot,
+  publicSnapshot,
+} from "../../../../lib/showcase-adapter";
 import { GET, POST } from "../../../../app/api/showcase/route";
+import { POST as AUTH_POST } from "../../../../app/api/showcase/auth/route";
 
 let db: SqliteD1, workflow: TicketWorkflowService;
 const teller: ShowcaseActor = {
@@ -316,6 +321,98 @@ describe("WorldLink hosted workflow on real SQLite with all migrations", () => {
     expect(data.tickets).toHaveLength(1);
     expect(data.branch.code).toBe("SUMMIT");
   });
+  it("keeps synthetic customer portfolios identity-scoped and read-only", async () => {
+    const alice = await readCustomerPortfolio("customer-alice", db as never);
+    const aliceAgain = await readCustomerPortfolio(
+      "customer-alice",
+      db as never,
+    );
+    const bob = await readCustomerPortfolio("customer-bob", db as never);
+
+    expect(alice.accounts).toHaveLength(2);
+    expect(alice.transactions.length).toBeGreaterThan(2);
+    expect(aliceAgain.accounts.map((account) => account.id)).toEqual(
+      alice.accounts.map((account) => account.id),
+    );
+    expect(
+      db.sql
+        .prepare("SELECT COUNT(*) AS count FROM qms_customer_accounts")
+        .get()?.count,
+    ).toBe(4);
+    expect(
+      alice.accounts.every((account) =>
+        account.masked_number.startsWith("•••• "),
+      ),
+    ).toBe(true);
+    expect(bob.accounts.map((account) => account.id)).not.toEqual(
+      alice.accounts.map((account) => account.id),
+    );
+    expect(JSON.stringify(alice)).not.toContain("customer_subject");
+    expect(alice.disclaimer).toMatch(/demonstration/i);
+  });
+  it("creates a customer ticket through the real route and returns its account-owned history", async () => {
+    const created = await POST(
+      new Request("https://terminal.local/api/showcase", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ operation: "issue", ...intent() }),
+      }),
+    );
+    expect(created.status).toBe(201);
+    const receipt = (await created.json()) as {
+      ticket: { public_number: string; status: string };
+      lookupToken: string;
+    };
+    expect(receipt.ticket.public_number).toBe("DEP-001");
+    expect(receipt.ticket.status).toBe("RESERVED");
+    expect(receipt.lookupToken.length).toBeGreaterThan(31);
+
+    const history = await GET(
+      new Request(
+        "https://terminal.local/api/showcase?surface=customer-history",
+      ),
+    );
+    expect(history.status).toBe(200);
+    expect(
+      ((await history.json()) as { tickets: unknown[] }).tickets,
+    ).toHaveLength(1);
+  });
+  it("replaces a manager showcase session with the requested teller identity", async () => {
+    const managerSession = await createSession(manager);
+    const oldCookie = managerSession.cookie.split(";")[0];
+    const switched = await AUTH_POST(
+      new Request("https://terminal.local/api/showcase/auth", {
+        method: "POST",
+        headers: { cookie: oldCookie, "Content-Type": "application/json" },
+        body: JSON.stringify({
+          action: "workspace_showcase",
+          role: "TELLER",
+          username: "teller.one",
+        }),
+      }),
+    );
+    expect(switched.status).toBe(200);
+    expect(
+      ((await switched.clone().json()) as { actor: ShowcaseActor }).actor.role,
+    ).toBe("TELLER");
+    const tellerCookie = switched.headers.get("set-cookie")?.split(";")[0];
+    expect(tellerCookie).toBeTruthy();
+    const tellerWorkspace = await GET(
+      new Request("https://qms.test/api/showcase?surface=teller", {
+        headers: { cookie: tellerCookie ?? "" },
+      }),
+    );
+    expect(tellerWorkspace.status).toBe(200);
+    expect(
+      ((await tellerWorkspace.json()) as { actor: ShowcaseActor }).actor.role,
+    ).toBe("TELLER");
+    const revokedManager = await GET(
+      new Request("https://qms.test/api/showcase?surface=manager", {
+        headers: { cookie: oldCookie },
+      }),
+    );
+    expect(revokedManager.status).toBe(401);
+  });
   it("denies teller manager APIs and cross-branch access; audits CSV export", async () => {
     const session = await createSession(teller);
     const cookie = session.cookie.split(";")[0];
@@ -325,6 +422,12 @@ describe("WorldLink hosted workflow on real SQLite with all migrations", () => {
       }),
     );
     expect(cross.status).toBe(403);
+    const admin = await GET(
+      new Request("https://qms.test/api/showcase?surface=admin", {
+        headers: { cookie },
+      }),
+    );
+    expect(admin.status).toBe(403);
     for (const operation of ["audit", "set_priority_limit", "export_csv"]) {
       const response = await POST(
         new Request("https://qms.test/api/showcase", {
@@ -355,6 +458,66 @@ describe("WorldLink hosted workflow on real SQLite with all migrations", () => {
         )
         .get()?.count,
     ).toBe(1);
+  });
+  it("lets managers administer teller assignments and service policy with an audit trail", async () => {
+    const session = await createSession(manager);
+    const cookie = session.cookie.split(";")[0];
+    const headers = { cookie, "Content-Type": "application/json" };
+
+    const staffUpdate = await POST(
+      new Request("https://qms.test/api/showcase", {
+        method: "POST",
+        headers,
+        body: JSON.stringify({
+          operation: "admin_staff_update",
+          staffId: teller.id,
+          assignedCounter: "Counter 1",
+          assignedServiceCode: "LON",
+          active: true,
+        }),
+      }),
+    );
+    expect(staffUpdate.status).toBe(200);
+    expect(
+      db.sql
+        .prepare("SELECT assigned_service_code FROM qms_demo_staff WHERE id=?")
+        .get(teller.id)?.assigned_service_code,
+    ).toBe("LON");
+
+    const serviceUpdate = await POST(
+      new Request("https://qms.test/api/showcase", {
+        method: "POST",
+        headers,
+        body: JSON.stringify({
+          operation: "admin_service_update",
+          serviceCode: "DEP",
+          targetMinutes: 6,
+          priorityEnabled: false,
+          active: true,
+        }),
+      }),
+    );
+    expect(serviceUpdate.status).toBe(200);
+    expect(
+      db.sql
+        .prepare(
+          "SELECT target_minutes, priority_enabled FROM qms_service_configuration WHERE branch_code='SUMMIT' AND code='DEP'",
+        )
+        .get(),
+    ).toEqual({ target_minutes: 6, priority_enabled: 0 });
+    await expect(
+      workflow.issue(
+        intent({ priority: true, priorityReason: "ELDERLY" }),
+        "customer-policy-test",
+      ),
+    ).rejects.toMatchObject({ code: "VALIDATION_ERROR" });
+    expect(
+      db.sql
+        .prepare(
+          "SELECT COUNT(*) AS count FROM qms_demo_audit WHERE action LIKE 'admin.%'",
+        )
+        .get()?.count,
+    ).toBe(2);
   });
   it("repeated parallel calls assign unique tickets and lose no waiting customers", async () => {
     for (let round = 0; round < 5; round++) {

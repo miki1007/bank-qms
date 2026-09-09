@@ -2,11 +2,13 @@
 
 import {
   AlertTriangle,
+  Activity,
   ArrowRightLeft,
   BanknoteArrowDown,
   BanknoteArrowUp,
   BellRing,
   BriefcaseBusiness,
+  Building2,
   Check,
   CircleDollarSign,
   Clock3,
@@ -17,9 +19,11 @@ import {
   RefreshCw,
   RotateCcw,
   ShieldCheck,
+  Settings,
   TicketCheck,
   Tickets,
   UserRound,
+  UserCog,
   UsersRound,
   Volume2,
   X,
@@ -38,7 +42,7 @@ import { clientUuid } from "@/lib/client-id";
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
 
-export type QmsSurface = "kiosk" | "display" | "teller" | "manager";
+export type QmsSurface = "kiosk" | "display" | "teller" | "manager" | "admin";
 
 type Ticket = {
   id: string;
@@ -69,6 +73,55 @@ type Service = {
   minutes: number;
   icon: string;
   waiting: number;
+  priorityEnabled?: boolean;
+};
+
+type ServiceConfiguration = {
+  code: string;
+  name: string;
+  target_minutes: number;
+  priority_enabled: boolean;
+  active: boolean;
+};
+
+type StaffDirectoryEntry = {
+  id: string;
+  username: string;
+  display_name: string;
+  role: "TELLER" | "MANAGER";
+  assigned_counter: string | null;
+  assigned_service_code: string | null;
+  active: number;
+  last_login_at: string | null;
+};
+
+type Analytics = {
+  statusDistribution: Array<{ status: string; value: number }>;
+  hourlyDemand: Array<{ hour: number; value: number }>;
+  weeklyThroughput: Array<{
+    date: string;
+    label: string;
+    issued: number;
+    completed: number;
+  }>;
+  servicePerformance: Array<{
+    code: string;
+    name: string;
+    targetMinutes: number;
+    issued: number;
+    waiting: number;
+    completed: number;
+    averageWaitMinutes: number;
+    averageServiceMinutes: number;
+    slaBreaches: number;
+  }>;
+  flow: {
+    reserved: number;
+    waiting: number;
+    called: number;
+    serving: number;
+    completed: number;
+  };
 };
 
 type Snapshot = {
@@ -80,6 +133,14 @@ type Snapshot = {
   activeCall: Ticket | null;
   settings: { priorityStreak: number; priorityLimit: number };
   counters?: Array<{ counter: string; status: string; service_code: string }>;
+  serviceConfiguration?: ServiceConfiguration[];
+  staff?: StaffDirectoryEntry[];
+  actorMetrics?: {
+    servedToday: number;
+    averageServiceMinutes: number;
+    noShow: number;
+  };
+  analytics?: Analytics;
   actor?: {
     id: string;
     username: string;
@@ -187,6 +248,7 @@ export function QmsClient({ surface }: { surface: QmsSurface }) {
     new Date().toLocaleDateString("en-CA", { timeZone: "Africa/Addis_Ababa" }),
   );
   const [reportTo, setReportTo] = useState(reportFrom);
+  const [confirmRevoke, setConfirmRevoke] = useState(false);
   const requestIntents = useRef(
     new Map<string, { key: string; proof: string }>(),
   );
@@ -210,7 +272,7 @@ export function QmsClient({ surface }: { surface: QmsSurface }) {
         if (!response.ok)
           throw new Error(data.error || "Queue data is unavailable.");
         if (surface === "teller" && data.actor?.role === "MANAGER") {
-          window.location.replace("/manager");
+          window.location.replace("/staff/login?next=%2Fteller&switch=1");
           return;
         }
         setSnapshot(data);
@@ -286,7 +348,7 @@ export function QmsClient({ surface }: { surface: QmsSurface }) {
       };
       if (
         (response.status === 401 || response.status === 403) &&
-        (surface === "teller" || surface === "manager")
+        (surface === "teller" || surface === "manager" || surface === "admin")
       ) {
         window.location.assign(
           `/staff/login?next=${encodeURIComponent(`/${surface}`)}`,
@@ -372,6 +434,32 @@ export function QmsClient({ surface }: { surface: QmsSurface }) {
     snapshot.services.find(
       (service) => service.code === snapshot.actor?.assignedServiceCode,
     )?.waiting ?? 0;
+  const analytics = snapshot.analytics;
+  const weeklyMaximum = Math.max(
+    1,
+    ...(analytics?.weeklyThroughput.flatMap((day) => [
+      day.issued,
+      day.completed,
+    ]) ?? [1]),
+  );
+  const weeklyIssuedPoints =
+    analytics?.weeklyThroughput
+      .map(
+        (day, index) =>
+          `${35 + index * 105},${150 - (day.issued / weeklyMaximum) * 110}`,
+      )
+      .join(" ") ?? "";
+  const weeklyCompletedPoints =
+    analytics?.weeklyThroughput
+      .map(
+        (day, index) =>
+          `${35 + index * 105},${150 - (day.completed / weeklyMaximum) * 110}`,
+      )
+      .join(" ") ?? "";
+  const hourlyMaximum = Math.max(
+    1,
+    ...(analytics?.hourlyDemand.map((hour) => hour.value) ?? [1]),
+  );
 
   async function issue() {
     const result = await mutate(
@@ -495,19 +583,29 @@ export function QmsClient({ surface }: { surface: QmsSurface }) {
             </div>
           ) : (
             <nav className="staff-navigation" aria-label="Staff navigation">
-              <a
-                href="/teller"
-                aria-current={surface === "teller" ? "page" : undefined}
-              >
-                Teller console
-              </a>
-              {snapshot.actor?.role === "MANAGER" && (
-                <a
-                  href="/manager"
-                  aria-current={surface === "manager" ? "page" : undefined}
-                >
-                  Manager dashboard
-                </a>
+              {snapshot.actor?.role === "TELLER" ? (
+                <>
+                  <a href="/teller" aria-current="page">
+                    Teller console
+                  </a>
+                  <a href="/staff/login?next=%2Fteller">Switch staff</a>
+                </>
+              ) : (
+                <>
+                  <a
+                    href="/manager"
+                    aria-current={surface === "manager" ? "page" : undefined}
+                  >
+                    Dashboard
+                  </a>
+                  <a
+                    href="/admin"
+                    aria-current={surface === "admin" ? "page" : undefined}
+                  >
+                    Administration
+                  </a>
+                  <a href="/staff/login?next=%2Fteller">Open teller login</a>
+                </>
               )}
             </nav>
           )}
@@ -737,6 +835,35 @@ export function QmsClient({ surface }: { surface: QmsSurface }) {
                 <small>
                   {snapshot.branch.name} · {counterState.toLowerCase()}
                 </small>
+              </div>
+            </div>
+
+            <div
+              className="teller-shift-strip"
+              aria-label="Today's shift summary"
+            >
+              <div>
+                <TicketCheck />
+                <span>
+                  <small>Completed today</small>
+                  <strong>{snapshot.actorMetrics?.servedToday ?? 0}</strong>
+                </span>
+              </div>
+              <div>
+                <Clock3 />
+                <span>
+                  <small>Average service</small>
+                  <strong>
+                    {snapshot.actorMetrics?.averageServiceMinutes ?? 0} min
+                  </strong>
+                </span>
+              </div>
+              <div>
+                <Activity />
+                <span>
+                  <small>Your ready queue</small>
+                  <strong>{assignedQueueWaiting}</strong>
+                </span>
               </div>
             </div>
 
@@ -1267,6 +1394,152 @@ export function QmsClient({ surface }: { surface: QmsSurface }) {
               </article>
             </div>
 
+            <div className="manager-analytics-grid">
+              <article className="manager-panel analytics-trend">
+                <div className="manager-panel-head">
+                  <div>
+                    <strong>Seven-day throughput</strong>
+                    <span>Issued and completed tickets from real records</span>
+                  </div>
+                  <div className="chart-legend" aria-label="Chart legend">
+                    <span className="issued">Issued</span>
+                    <span className="completed">Completed</span>
+                  </div>
+                </div>
+                {analytics?.weeklyThroughput.some(
+                  (day) => day.issued || day.completed,
+                ) ? (
+                  <div className="line-chart-wrap">
+                    <svg
+                      className="line-chart"
+                      viewBox="0 0 700 190"
+                      role="img"
+                      aria-label="Issued and completed tickets over seven days"
+                    >
+                      {[40, 95, 150].map((y) => (
+                        <line key={y} x1="35" y1={y} x2="665" y2={y} />
+                      ))}
+                      <polyline
+                        className="issued-line"
+                        points={weeklyIssuedPoints}
+                      />
+                      <polyline
+                        className="completed-line"
+                        points={weeklyCompletedPoints}
+                      />
+                      {analytics.weeklyThroughput.map((day, index) => (
+                        <g key={day.date}>
+                          <circle
+                            className="issued-point"
+                            cx={35 + index * 105}
+                            cy={150 - (day.issued / weeklyMaximum) * 110}
+                            r="4"
+                          />
+                          <circle
+                            className="completed-point"
+                            cx={35 + index * 105}
+                            cy={150 - (day.completed / weeklyMaximum) * 110}
+                            r="4"
+                          />
+                          <text x={35 + index * 105} y="178">
+                            {day.label}
+                          </text>
+                        </g>
+                      ))}
+                    </svg>
+                  </div>
+                ) : (
+                  <div className="chart-empty">
+                    Create tickets to begin the trend.
+                  </div>
+                )}
+              </article>
+
+              <article className="manager-panel demand-chart">
+                <div className="manager-panel-head">
+                  <div>
+                    <strong>Hourly demand</strong>
+                    <span>Reservations by Addis Ababa hour</span>
+                  </div>
+                </div>
+                <div className="hour-bars" aria-label="Hourly ticket demand">
+                  {analytics?.hourlyDemand.map((hour) => (
+                    <div key={hour.hour} title={`${hour.value} tickets`}>
+                      <b>{hour.value}</b>
+                      <span>
+                        <i
+                          style={{
+                            height: `${Math.max(5, (hour.value / hourlyMaximum) * 100)}%`,
+                          }}
+                        />
+                      </span>
+                      <small>{String(hour.hour).padStart(2, "0")}</small>
+                    </div>
+                  ))}
+                </div>
+              </article>
+            </div>
+
+            <article className="manager-panel flow-panel">
+              <div className="manager-panel-head">
+                <div>
+                  <strong>Live customer flow</strong>
+                  <span>Current movement through the branch queue</span>
+                </div>
+                <Activity />
+              </div>
+              <div className="flow-diagram" aria-label="Live ticket flow">
+                {[
+                  ["Reserved", analytics?.flow.reserved ?? 0],
+                  ["Checked in", analytics?.flow.waiting ?? 0],
+                  ["Called", analytics?.flow.called ?? 0],
+                  ["In service", analytics?.flow.serving ?? 0],
+                  ["Completed", analytics?.flow.completed ?? 0],
+                ].map(([label, value], index) => (
+                  <div key={String(label)}>
+                    <span>{index + 1}</span>
+                    <strong>{value}</strong>
+                    <small>{label}</small>
+                    {index < 4 && <i aria-hidden="true">→</i>}
+                  </div>
+                ))}
+              </div>
+            </article>
+
+            <article className="manager-panel service-performance-panel">
+              <div className="manager-panel-head">
+                <div>
+                  <strong>Service performance</strong>
+                  <span>Wait, service time and SLA comparison</span>
+                </div>
+              </div>
+              <div className="service-performance-grid">
+                {analytics?.servicePerformance.map((service) => (
+                  <div key={service.code}>
+                    <span className="service-code">{service.code}</span>
+                    <p>
+                      <strong>{service.name}</strong>
+                      <small>{service.completed} completed today</small>
+                    </p>
+                    <dl>
+                      <div>
+                        <dt>Avg wait</dt>
+                        <dd>{service.averageWaitMinutes}m</dd>
+                      </div>
+                      <div>
+                        <dt>Avg service</dt>
+                        <dd>{service.averageServiceMinutes}m</dd>
+                      </div>
+                      <div>
+                        <dt>SLA breaches</dt>
+                        <dd>{service.slaBreaches}</dd>
+                      </div>
+                    </dl>
+                  </div>
+                ))}
+              </div>
+            </article>
+
             <div className="manager-grid">
               <div className="manager-panel">
                 <div className="manager-panel-head">
@@ -1423,6 +1696,440 @@ export function QmsClient({ surface }: { surface: QmsSurface }) {
                 )}
               </div>
             </div>
+          </section>
+        )}
+
+        {surface === "admin" && (
+          <section className="admin-view">
+            <div className="view-heading split-heading">
+              <div>
+                <span className="eyebrow">Manager-only administration</span>
+                <h1>Branch control center</h1>
+                <p>
+                  Configure staff and services without changing operational
+                  history or exposing customer information.
+                </p>
+              </div>
+              <div className="admin-identity">
+                <ShieldCheck />
+                <span>
+                  <small>Authorized administrator</small>
+                  <strong>{snapshot.actor?.displayName}</strong>
+                  <b>{snapshot.branch.name}</b>
+                </span>
+              </div>
+            </div>
+
+            <div className="admin-summary-grid">
+              <article>
+                <UserCog />
+                <span>
+                  <small>Active staff</small>
+                  <strong>
+                    {snapshot.staff?.filter((staff) => staff.active).length ??
+                      0}
+                  </strong>
+                </span>
+              </article>
+              <article>
+                <Building2 />
+                <span>
+                  <small>Configured counters</small>
+                  <strong>{counters.length}</strong>
+                </span>
+              </article>
+              <article>
+                <Settings />
+                <span>
+                  <small>Active services</small>
+                  <strong>
+                    {snapshot.serviceConfiguration?.filter(
+                      (service) => service.active,
+                    ).length ?? 0}
+                  </strong>
+                </span>
+              </article>
+              <article>
+                <ShieldCheck />
+                <span>
+                  <small>Priority fairness</small>
+                  <strong>{snapshot.settings.priorityLimit}:1</strong>
+                </span>
+              </article>
+            </div>
+
+            <div className="admin-grid">
+              <article className="manager-panel admin-staff-panel">
+                <div className="manager-panel-head">
+                  <div>
+                    <strong>Staff and counter assignments</strong>
+                    <span>
+                      Each teller keeps one manager-controlled identity
+                    </span>
+                  </div>
+                  <UserCog />
+                </div>
+                <div className="admin-staff-list">
+                  {snapshot.staff?.map((staff) => (
+                    <div
+                      key={staff.id}
+                      className={!staff.active ? "is-inactive" : ""}
+                    >
+                      <span className="staff-avatar">
+                        {staff.display_name
+                          .split(" ")
+                          .map((name) => name[0])
+                          .join("")
+                          .slice(0, 2)}
+                      </span>
+                      <p>
+                        <strong>{staff.display_name}</strong>
+                        <small>
+                          {staff.username} · {staff.role.toLowerCase()}
+                        </small>
+                      </p>
+                      {staff.role === "TELLER" ? (
+                        <>
+                          <label>
+                            <span>Counter</span>
+                            <select
+                              value={staff.assigned_counter ?? "Counter 1"}
+                              disabled={!!busy || !staff.active}
+                              onChange={(event) =>
+                                void mutate(
+                                  `staff-counter:${staff.id}`,
+                                  {
+                                    operation: "admin_staff_update",
+                                    staffId: staff.id,
+                                    assignedCounter: event.target.value,
+                                    assignedServiceCode:
+                                      staff.assigned_service_code ?? "DEP",
+                                    active: Boolean(staff.active),
+                                  },
+                                  `${staff.display_name}'s counter was updated.`,
+                                )
+                              }
+                            >
+                              {counters.map((counter) => (
+                                <option key={counter}>{counter}</option>
+                              ))}
+                            </select>
+                          </label>
+                          <label>
+                            <span>Service</span>
+                            <select
+                              value={staff.assigned_service_code ?? "DEP"}
+                              disabled={!!busy || !staff.active}
+                              onChange={(event) =>
+                                void mutate(
+                                  `staff-service:${staff.id}`,
+                                  {
+                                    operation: "admin_staff_update",
+                                    staffId: staff.id,
+                                    assignedCounter:
+                                      staff.assigned_counter ?? "Counter 1",
+                                    assignedServiceCode: event.target.value,
+                                    active: Boolean(staff.active),
+                                  },
+                                  `${staff.display_name}'s service was updated.`,
+                                )
+                              }
+                            >
+                              {snapshot.serviceConfiguration
+                                ?.filter((service) => service.active)
+                                .map((service) => (
+                                  <option
+                                    value={service.code}
+                                    key={service.code}
+                                  >
+                                    {service.code} · {service.name}
+                                  </option>
+                                ))}
+                            </select>
+                          </label>
+                          <Button
+                            variant="outline"
+                            disabled={!!busy}
+                            onClick={() =>
+                              void mutate(
+                                `staff-active:${staff.id}`,
+                                {
+                                  operation: "admin_staff_update",
+                                  staffId: staff.id,
+                                  assignedCounter:
+                                    staff.assigned_counter ?? "Counter 1",
+                                  assignedServiceCode:
+                                    staff.assigned_service_code ?? "DEP",
+                                  active: !Boolean(staff.active),
+                                },
+                                `${staff.display_name} is now ${staff.active ? "inactive" : "active"}.`,
+                              )
+                            }
+                          >
+                            {staff.active ? "Deactivate" : "Activate"}
+                          </Button>
+                        </>
+                      ) : (
+                        <span className="protected-role">
+                          <ShieldCheck /> Protected manager account
+                        </span>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              </article>
+
+              <article className="manager-panel admin-service-panel">
+                <div className="manager-panel-head">
+                  <div>
+                    <strong>Service configuration</strong>
+                    <span>Targets and private priority availability</span>
+                  </div>
+                  <Settings />
+                </div>
+                <div className="admin-service-list">
+                  {snapshot.serviceConfiguration?.map((service) => (
+                    <div
+                      key={service.code}
+                      className={!service.active ? "is-inactive" : ""}
+                    >
+                      <span className="service-code">{service.code}</span>
+                      <p>
+                        <strong>{service.name}</strong>
+                        <small>
+                          {service.active ? "Available" : "Unavailable"}
+                        </small>
+                      </p>
+                      <label>
+                        <span>Target</span>
+                        <select
+                          value={service.target_minutes}
+                          disabled={!!busy}
+                          onChange={(event) =>
+                            void mutate(
+                              `service-target:${service.code}`,
+                              {
+                                operation: "admin_service_update",
+                                serviceCode: service.code,
+                                targetMinutes: Number(event.target.value),
+                                priorityEnabled: service.priority_enabled,
+                                active: service.active,
+                              },
+                              `${service.name} target updated.`,
+                            )
+                          }
+                        >
+                          {[2, 4, 5, 10, 15, 20, 30, 45, 60].map((minutes) => (
+                            <option value={minutes} key={minutes}>
+                              {minutes} min
+                            </option>
+                          ))}
+                        </select>
+                      </label>
+                      <label className="admin-switch">
+                        <Switch
+                          checked={service.priority_enabled}
+                          disabled={!!busy}
+                          onCheckedChange={(checked) =>
+                            void mutate(
+                              `service-priority:${service.code}`,
+                              {
+                                operation: "admin_service_update",
+                                serviceCode: service.code,
+                                targetMinutes: service.target_minutes,
+                                priorityEnabled: checked,
+                                active: service.active,
+                              },
+                              `${service.name} priority setting updated.`,
+                            )
+                          }
+                        />
+                        <span>Priority</span>
+                      </label>
+                      <Button
+                        variant="outline"
+                        disabled={!!busy}
+                        onClick={() =>
+                          void mutate(
+                            `service-active:${service.code}`,
+                            {
+                              operation: "admin_service_update",
+                              serviceCode: service.code,
+                              targetMinutes: service.target_minutes,
+                              priorityEnabled: service.priority_enabled,
+                              active: !service.active,
+                            },
+                            `${service.name} is now ${service.active ? "inactive" : "active"}.`,
+                          )
+                        }
+                      >
+                        {service.active ? "Deactivate" : "Activate"}
+                      </Button>
+                    </div>
+                  ))}
+                </div>
+              </article>
+            </div>
+
+            <div className="admin-grid secondary-admin-grid">
+              <article className="manager-panel branch-policy-panel">
+                <div className="manager-panel-head">
+                  <div>
+                    <strong>Branch policy</strong>
+                    <span>Queue safeguards for {snapshot.branch.name}</span>
+                  </div>
+                  <Building2 />
+                </div>
+                <dl>
+                  <div>
+                    <dt>Timezone</dt>
+                    <dd>{snapshot.branch.timezone}</dd>
+                  </div>
+                  <div>
+                    <dt>Remote tickets</dt>
+                    <dd>3 per customer / day</dd>
+                  </div>
+                  <div>
+                    <dt>Cancellation cooldown</dt>
+                    <dd>10 minutes</dd>
+                  </div>
+                  <div>
+                    <dt>Priority call limit</dt>
+                    <dd>
+                      <select
+                        value={snapshot.settings.priorityLimit}
+                        disabled={!!busy}
+                        onChange={(event) =>
+                          void mutate(
+                            "priority-limit-admin",
+                            {
+                              operation: "set_priority_limit",
+                              limit: Number(event.target.value),
+                            },
+                            "Priority fairness limit updated.",
+                          )
+                        }
+                      >
+                        {[1, 2, 3, 4, 5].map((limit) => (
+                          <option value={limit} key={limit}>
+                            {limit} consecutive calls
+                          </option>
+                        ))}
+                      </select>
+                    </dd>
+                  </div>
+                </dl>
+              </article>
+
+              <article className="manager-panel security-panel">
+                <div className="manager-panel-head">
+                  <div>
+                    <strong>Security operations</strong>
+                    <span>Manager actions are audited and branch-scoped</span>
+                  </div>
+                  <ShieldCheck />
+                </div>
+                <div className="security-actions">
+                  <div>
+                    <p>
+                      <strong>Audit trail</strong>
+                      <small>
+                        Review recent administrative and queue actions.
+                      </small>
+                    </p>
+                    <Button
+                      variant="outline"
+                      disabled={!!busy}
+                      onClick={() =>
+                        void mutate(
+                          "audit-admin",
+                          { operation: "audit" },
+                          "Audit log loaded.",
+                        )
+                      }
+                    >
+                      View log
+                    </Button>
+                  </div>
+                  <div>
+                    <p>
+                      <strong>Revoke teller sessions</strong>
+                      <small>
+                        Require every teller at this branch to sign in again.
+                      </small>
+                    </p>
+                    {confirmRevoke ? (
+                      <span className="admin-confirm">
+                        <Button
+                          variant="destructive"
+                          disabled={!!busy}
+                          onClick={async () => {
+                            await mutate(
+                              "revoke-teller-sessions",
+                              { operation: "admin_revoke_teller_sessions" },
+                              "All teller sessions were revoked.",
+                            );
+                            setConfirmRevoke(false);
+                          }}
+                        >
+                          Confirm revoke
+                        </Button>
+                        <Button
+                          variant="outline"
+                          onClick={() => setConfirmRevoke(false)}
+                        >
+                          Cancel
+                        </Button>
+                      </span>
+                    ) : (
+                      <Button
+                        variant="outline"
+                        onClick={() => setConfirmRevoke(true)}
+                      >
+                        Revoke sessions
+                      </Button>
+                    )}
+                  </div>
+                </div>
+              </article>
+            </div>
+
+            {auditEntries && (
+              <article className="manager-panel table-panel admin-audit-table">
+                <div className="manager-panel-head">
+                  <div>
+                    <strong>Administrative audit log</strong>
+                    <span>Immutable branch activity</span>
+                  </div>
+                  <Button
+                    variant="outline"
+                    onClick={() => setAuditEntries(null)}
+                  >
+                    Close
+                  </Button>
+                </div>
+                <div className="ticket-table-wrap">
+                  <table className="ticket-table">
+                    <thead>
+                      <tr>
+                        <th>Time</th>
+                        <th>Action</th>
+                        <th>Details</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {auditEntries.map((entry) => (
+                        <tr key={entry.id}>
+                          <td>{formatTime(entry.created_at)}</td>
+                          <td>{entry.action}</td>
+                          <td>{entry.detail}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </article>
+            )}
           </section>
         )}
       </div>
