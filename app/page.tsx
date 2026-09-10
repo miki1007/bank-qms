@@ -3,7 +3,6 @@ import {
   LayoutDashboard,
   MapPin,
   MonitorUp,
-  Settings,
   Smartphone,
   Store,
   UsersRound,
@@ -33,13 +32,6 @@ const products = [
     title: "Manager dashboard",
     description: "Monitor your branch, approve priority and review reports.",
     accent: "green",
-  },
-  {
-    href: "/staff/login?next=%2Fadmin",
-    icon: Settings,
-    title: "Administration",
-    description: "Manage staff assignments, services and branch security.",
-    accent: "amber",
   },
   {
     href: "/display",

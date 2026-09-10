@@ -63,6 +63,16 @@ describe.skipIf(!run)("authorization integration with PostgreSQL", () => {
     }
   });
 
+  it("returns 403 when a manager tries to use the teller API", async () => {
+    const manager = await login("manager.dev", managerPassword);
+    expect(manager.status).toBe(201);
+    const response = await request(app.getHttpServer())
+      .get("/api/v1/teller/counter-session/current")
+      .set("Authorization", `Bearer ${manager.body.accessToken}`);
+    expect(response.status).toBe(403);
+    expect(response.body.error.code).toBe("FORBIDDEN");
+  });
+
   it("rotates an Android staff refresh token without exposing it to browsers", async () => {
     expect(browserTellerBody.refreshToken).toBeUndefined();
 
@@ -121,6 +131,40 @@ describe.skipIf(!run)("authorization integration with PostgreSQL", () => {
       .post("/api/v1/teller/counter-session/close")
       .set("Authorization", `Bearer ${tellerOneAccessToken}`);
     expect(close.status).toBe(201);
+  });
+
+  it("closes an idle teller counter session during logout", async () => {
+    const teller = await login("teller.four", tellerPassword);
+    expect(teller.status).toBe(201);
+    const token = teller.body.accessToken as string;
+    const account = await prisma.staff.findUniqueOrThrow({
+      where: { username: "teller.four" },
+    });
+    expect(account.assignedCounterId).not.toBeNull();
+
+    const opened = await request(app.getHttpServer())
+      .post("/api/v1/teller/counter-sessions")
+      .set("Authorization", `Bearer ${token}`)
+      .send({ counterId: account.assignedCounterId });
+    expect(opened.status).toBe(201);
+
+    const loggedOut = await request(app.getHttpServer())
+      .post("/api/v1/auth/logout")
+      .set("Authorization", `Bearer ${token}`);
+    expect(loggedOut.status).toBe(201);
+    expect(loggedOut.body.success).toBe(true);
+    expect(
+      await prisma.counterSession.findFirst({
+        where: { id: opened.body.session.id },
+        select: { status: true },
+      }),
+    ).toEqual({ status: "CLOSED" });
+    expect(
+      await prisma.counter.findUnique({
+        where: { id: account.assignedCounterId! },
+        select: { status: true },
+      }),
+    ).toEqual({ status: "CLOSED" });
   });
 
   it("rejects inactive accounts with a generic login message", async () => {

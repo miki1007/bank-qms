@@ -99,17 +99,12 @@
 .sidebar-user {
   margin-top: auto;
   display: grid;
-  grid-template-columns: auto 1fr auto;
+  grid-template-columns: auto 1fr;
   align-items: center;
   gap: 10px;
   padding: 12px;
   background: rgba(255, 255, 255, 0.07);
   border-radius: 15px;
-}
-.sidebar-user button {
-  background: none;
-  border: 0;
-  color: #c3d5cd;
 }
 .avatar {
   width: 38px;
@@ -132,6 +127,38 @@
   justify-content: space-between;
   align-items: center;
   border-bottom: 1px solid #dce5df;
+}
+.session-actions {
+  display: grid;
+  justify-items: end;
+  gap: 4px;
+}
+.logout-control {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  min-height: 38px;
+  padding: 0 12px;
+  border: 1px solid #d8e2dd;
+  border-radius: 11px;
+  color: #173d31;
+  background: #fff;
+  font-weight: 750;
+  cursor: pointer;
+}
+.logout-control:hover {
+  color: #9b342f;
+  border-color: #e6bbb7;
+  background: #fff7f6;
+}
+.logout-control:disabled {
+  opacity: 0.65;
+  cursor: wait;
+}
+.session-error {
+  max-width: 380px;
+  color: #9b342f;
+  font-size: 0.72rem;
 }
 .workspace-page {
   width: min(1220px, calc(100% - 48px));
@@ -268,6 +295,12 @@
   }
   .workspace-header {
     padding: 0 16px;
+  }
+  .workspace-header > div:first-child {
+    display: none;
+  }
+  .session-actions {
+    width: 100%;
   }
   .login-art h1 {
     font-size: 3.4rem;

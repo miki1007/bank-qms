@@ -271,10 +271,6 @@ export function QmsClient({ surface }: { surface: QmsSurface }) {
         }
         if (!response.ok)
           throw new Error(data.error || "Queue data is unavailable.");
-        if (surface === "teller" && data.actor?.role === "MANAGER") {
-          window.location.replace("/staff/login?next=%2Fteller&switch=1");
-          return;
-        }
         setSnapshot(data);
         setConnected(true);
         setError("");
@@ -497,14 +493,22 @@ export function QmsClient({ surface }: { surface: QmsSurface }) {
 
   async function logout() {
     setBusy("logout");
+    setError("");
     try {
-      await fetch("/api/showcase/auth", {
+      const response = await fetch("/api/showcase/auth", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ action: "logout" }),
       });
-    } finally {
+      const result = (await response.json()) as { error?: string };
+      if (!response.ok)
+        throw new Error(result.error || "Unable to log out safely.");
       window.location.assign("/staff/login");
+    } catch (caught) {
+      setError(
+        caught instanceof Error ? caught.message : "Unable to log out safely.",
+      );
+      setBusy("");
     }
   }
 
@@ -552,7 +556,17 @@ export function QmsClient({ surface }: { surface: QmsSurface }) {
     <main className={`qms-shell surface-${surface}`}>
       {surface !== "display" && (
         <header className="qms-header">
-          <Link className="qms-brand" aria-label={BANK_NAME} href="/">
+          <Link
+            className="qms-brand"
+            aria-label={BANK_NAME}
+            href={
+              surface === "teller"
+                ? "/teller"
+                : surface === "manager" || surface === "admin"
+                  ? "/manager"
+                  : "/"
+            }
+          >
             <BankLogo />
             <span>
               <strong>{BANK_NAME}</strong>
@@ -581,34 +595,19 @@ export function QmsClient({ surface }: { surface: QmsSurface }) {
                 Staff sign in
               </a>
             </div>
-          ) : (
+          ) : snapshot.actor ? (
             <nav className="staff-navigation" aria-label="Staff navigation">
               {snapshot.actor?.role === "TELLER" ? (
-                <>
-                  <a href="/teller" aria-current="page">
-                    Teller console
-                  </a>
-                  <a href="/staff/login?next=%2Fteller">Switch staff</a>
-                </>
+                <a href="/teller" aria-current="page">
+                  Teller console
+                </a>
               ) : (
-                <>
-                  <a
-                    href="/manager"
-                    aria-current={surface === "manager" ? "page" : undefined}
-                  >
-                    Dashboard
-                  </a>
-                  <a
-                    href="/admin"
-                    aria-current={surface === "admin" ? "page" : undefined}
-                  >
-                    Administration
-                  </a>
-                  <a href="/staff/login?next=%2Fteller">Open teller login</a>
-                </>
+                <a href="/manager" aria-current="page">
+                  Manager dashboard
+                </a>
               )}
             </nav>
-          )}
+          ) : null}
           <div className="header-meta">
             {snapshot.actor && (
               <span className="actor-name">{snapshot.actor.displayName}</span>
@@ -630,6 +629,7 @@ export function QmsClient({ surface }: { surface: QmsSurface }) {
                 disabled={busy === "logout"}
               >
                 <LogOut />
+                <span>{busy === "logout" ? "Logging out…" : "Log out"}</span>
               </button>
             )}
           </div>

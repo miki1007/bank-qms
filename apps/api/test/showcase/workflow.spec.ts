@@ -377,7 +377,7 @@ describe("WorldLink hosted workflow on real SQLite with all migrations", () => {
       ((await history.json()) as { tickets: unknown[] }).tickets,
     ).toHaveLength(1);
   });
-  it("replaces a manager showcase session with the requested teller identity", async () => {
+  it("requires logout before a manager session can become a teller session", async () => {
     const managerSession = await createSession(manager);
     const oldCookie = managerSession.cookie.split(";")[0];
     const switched = await AUTH_POST(
@@ -391,27 +391,95 @@ describe("WorldLink hosted workflow on real SQLite with all migrations", () => {
         }),
       }),
     );
-    expect(switched.status).toBe(200);
-    expect(
-      ((await switched.clone().json()) as { actor: ShowcaseActor }).actor.role,
-    ).toBe("TELLER");
-    const tellerCookie = switched.headers.get("set-cookie")?.split(";")[0];
-    expect(tellerCookie).toBeTruthy();
-    const tellerWorkspace = await GET(
-      new Request("https://qms.test/api/showcase?surface=teller", {
-        headers: { cookie: tellerCookie ?? "" },
-      }),
-    );
-    expect(tellerWorkspace.status).toBe(200);
-    expect(
-      ((await tellerWorkspace.json()) as { actor: ShowcaseActor }).actor.role,
-    ).toBe("TELLER");
-    const revokedManager = await GET(
+    expect(switched.status).toBe(409);
+    expect((await switched.json()).code).toBe("LOGOUT_REQUIRED");
+    expect(switched.headers.get("set-cookie")).toBeNull();
+
+    const managerWorkspace = await GET(
       new Request("https://qms.test/api/showcase?surface=manager", {
         headers: { cookie: oldCookie },
       }),
     );
-    expect(revokedManager.status).toBe(401);
+    expect(managerWorkspace.status).toBe(200);
+
+    const loggedOut = await AUTH_POST(
+      new Request("https://terminal.local/api/showcase/auth", {
+        method: "POST",
+        headers: { cookie: oldCookie, "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "logout" }),
+      }),
+    );
+    expect(loggedOut.status).toBe(200);
+
+    const tellerLogin = await AUTH_POST(
+      new Request("https://terminal.local/api/showcase/auth", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          action: "workspace_showcase",
+          role: "TELLER",
+          username: "teller.one",
+        }),
+      }),
+    );
+    expect(tellerLogin.status).toBe(200);
+    expect(
+      ((await tellerLogin.json()) as { actor: ShowcaseActor }).actor.role,
+    ).toBe("TELLER");
+  });
+  it("keeps a teller signed in until an active customer is resolved", async () => {
+    const issued = await workflow.issue(intent({ channel: "KIOSK" }), "lobby");
+    await workflow.counter("open", teller);
+    await workflow.staffAction(staffAction("call_next"), teller);
+    const session = await createSession(teller);
+    const cookie = session.cookie.split(";")[0];
+
+    const blocked = await AUTH_POST(
+      new Request("https://terminal.local/api/showcase/auth", {
+        method: "POST",
+        headers: { cookie, "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "logout" }),
+      }),
+    );
+    expect(blocked.status).toBe(409);
+    expect((await blocked.json()).code).toBe("COUNTER_BUSY");
+    expect(
+      await GET(
+        new Request("https://qms.test/api/showcase?surface=teller", {
+          headers: { cookie },
+        }),
+      ),
+    ).toMatchObject({ status: 200 });
+
+    await workflow.staffAction(
+      staffAction("transition", {
+        action: "start",
+        ticketId: issued.ticket.id,
+      }),
+      teller,
+    );
+    await workflow.staffAction(
+      staffAction("transition", {
+        action: "complete",
+        ticketId: issued.ticket.id,
+      }),
+      teller,
+    );
+    const completed = await AUTH_POST(
+      new Request("https://terminal.local/api/showcase/auth", {
+        method: "POST",
+        headers: { cookie, "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "logout" }),
+      }),
+    );
+    expect(completed.status).toBe(200);
+    expect(
+      db.sql
+        .prepare(
+          "SELECT status FROM qms_counter_operations WHERE branch_code=? AND counter=?",
+        )
+        .get("SUMMIT", "Counter 1")?.status,
+    ).toBe("CLOSED");
   });
   it("denies teller manager APIs and cross-branch access; audits CSV export", async () => {
     const session = await createSession(teller);
@@ -439,11 +507,29 @@ describe("WorldLink hosted workflow on real SQLite with all migrations", () => {
       expect(response.status).toBe(403);
     }
     const mgr = await createSession(manager);
+    const managerCookie = mgr.cookie.split(";")[0];
+    const tellerSurface = await GET(
+      new Request("https://qms.test/api/showcase?surface=teller", {
+        headers: { cookie: managerCookie },
+      }),
+    );
+    expect(tellerSurface.status).toBe(403);
+    const tellerAction = await POST(
+      new Request("https://qms.test/api/showcase", {
+        method: "POST",
+        headers: {
+          cookie: managerCookie,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(staffAction("call_next")),
+      }),
+    );
+    expect(tellerAction.status).toBe(403);
     const result = await POST(
       new Request("https://qms.test/api/showcase", {
         method: "POST",
         headers: {
-          cookie: mgr.cookie.split(";")[0],
+          cookie: managerCookie,
           "Content-Type": "application/json",
         },
         body: JSON.stringify({ operation: "export_csv" }),

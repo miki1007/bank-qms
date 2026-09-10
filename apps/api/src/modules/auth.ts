@@ -22,9 +22,11 @@ import { Throttle } from "@nestjs/throttler";
 import type { Request, Response } from "express";
 import * as argon2 from "argon2";
 import { createHash, randomUUID } from "node:crypto";
+import { Prisma } from "@prisma/client";
 import { PrismaService } from "../prisma.service";
 import { DomainError } from "../shared/domain-error";
 import { jwtRefreshSecret, refreshTokenTtlDays } from "../config";
+import { RealtimePublisher } from "./realtime";
 
 export interface RequestUser {
   kind: "staff";
@@ -113,6 +115,8 @@ export class AuthService {
   constructor(
     @Inject(PrismaService) private readonly prisma: PrismaService,
     @Inject(JwtService) private readonly jwt: JwtService,
+    @Inject(RealtimePublisher)
+    private readonly realtime: RealtimePublisher,
   ) {}
 
   private async audit(
@@ -335,8 +339,57 @@ export class AuthService {
     user: RequestUser,
     request: Request,
   ) {
-    await this.prisma.$transaction([
-      this.prisma.refreshSession.updateMany({
+    const now = new Date();
+    const closedCounterId = await this.prisma.$transaction(async (tx) => {
+      let counterId: string | null = null;
+      if (user.role === "TELLER") {
+        const sessions = await tx.$queryRaw<
+          Array<{ id: string; counter_id: string }>
+        >(
+          Prisma.sql`SELECT id, counter_id FROM counter_sessions
+            WHERE staff_id = ${user.sub}::uuid
+              AND branch_id = ${user.branchId}::uuid
+              AND status IN ('OPEN','PAUSED')
+            FOR UPDATE`,
+        );
+        const session = sessions[0];
+        if (session) {
+          const activeTicket = await tx.ticket.findFirst({
+            where: {
+              counterSessionId: session.id,
+              status: { in: ["CALLED", "IN_SERVICE"] },
+            },
+            select: { id: true },
+          });
+          if (activeTicket)
+            throw new DomainError(
+              "COUNTER_BUSY",
+              "Resolve the active ticket before logging out.",
+              409,
+            );
+          await tx.counterSession.update({
+            where: { id: session.id },
+            data: { status: "CLOSED", closedAt: now },
+          });
+          await tx.counter.update({
+            where: { id: session.counter_id },
+            data: { status: "CLOSED" },
+          });
+          await tx.auditLog.create({
+            data: {
+              branchId: user.branchId,
+              actorType: "STAFF",
+              actorId: user.sub,
+              action: "COUNTER_SESSION_CLOSED_ON_LOGOUT",
+              targetType: "COUNTER_SESSION",
+              targetId: session.id,
+              outcome: "SUCCESS",
+            },
+          });
+          counterId = session.counter_id;
+        }
+      }
+      await tx.refreshSession.updateMany({
         where: {
           ...(refreshToken
             ? {
@@ -348,20 +401,33 @@ export class AuthService {
           staffId: user.sub,
           revokedAt: null,
         },
-        data: { revokedAt: new Date() },
-      }),
-      this.prisma.staff.update({
+        data: { revokedAt: now },
+      });
+      await tx.staff.update({
         where: { id: user.sub },
         data: { authVersion: { increment: 1 } },
-      }),
-    ]);
-    await this.audit(
-      user.branchId,
-      user.sub,
-      "AUTH_LOGOUT",
-      "SUCCESS",
-      request,
-    );
+      });
+      await tx.auditLog.create({
+        data: {
+          branchId: user.branchId,
+          actorType: "STAFF",
+          actorId: user.sub,
+          action: "AUTH_LOGOUT",
+          outcome: "SUCCESS",
+          requestId: String(request.headers["x-request-id"] ?? randomUUID()),
+          ipAddress: request.ip,
+          userAgent: request.headers["user-agent"]?.slice(0, 255),
+        },
+      });
+      return counterId;
+    });
+    if (closedCounterId)
+      this.realtime.publish(
+        user.branchId,
+        "counter.updated",
+        { counterId: closedCounterId, status: "CLOSED", refetch: true },
+        ["staff"],
+      );
     return { success: true };
   }
 }

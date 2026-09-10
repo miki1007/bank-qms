@@ -69,15 +69,13 @@ class QmsApiClient(
 
     suspend fun logout() {
         val refresh = tokens?.refreshToken
-        runCatching {
-            execute(
-                "POST",
-                audience.logoutPath,
-                null,
-                authenticated = true,
-                refreshToken = refresh,
-            )
-        }
+        execute(
+            "POST",
+            audience.logoutPath,
+            null,
+            authenticated = true,
+            refreshToken = refresh,
+        )
         tokens = null
         store.clear()
     }
@@ -186,4 +184,3 @@ fun Any?.asObject(): JSONObject = this as? JSONObject
 
 fun Any?.asArray(): JSONArray = this as? JSONArray
     ?: throw ApiException(500, "INVALID_RESPONSE", "The server returned an invalid response.")
-

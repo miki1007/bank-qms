@@ -5,6 +5,11 @@ import {
   getWorkspaceShowcaseActor,
   revokeSession,
 } from "@/lib/showcase-auth";
+import { getShowcaseDb } from "@/lib/showcase-adapter";
+import {
+  QueueError,
+  TicketWorkflowService,
+} from "@/lib/showcase-ticket-workflow";
 
 export const dynamic = "force-dynamic";
 
@@ -13,6 +18,37 @@ function genericFailure() {
     { error: "Unable to sign in with those credentials." },
     { status: 401 },
   );
+}
+
+function logoutRequired() {
+  return Response.json(
+    {
+      error:
+        "Log out of the current workspace before signing in as another staff member.",
+      code: "LOGOUT_REQUIRED",
+    },
+    { status: 409 },
+  );
+}
+
+async function closeTellerCounterBeforeLogout(
+  actor: Awaited<ReturnType<typeof getActor>>,
+) {
+  if (
+    actor?.role !== "TELLER" ||
+    !actor.assignedCounter ||
+    !actor.assignedServiceCode
+  )
+    return;
+  const operation = await getShowcaseDb()
+    .prepare(
+      `SELECT status FROM qms_counter_operations
+       WHERE branch_code=? AND counter=? AND staff_id=? LIMIT 1`,
+    )
+    .bind(actor.branchCode, actor.assignedCounter, actor.id)
+    .first<{ status: string }>();
+  if (operation && ["OPEN", "PAUSED"].includes(operation.status))
+    await new TicketWorkflowService().counter("close", actor);
 }
 
 export async function GET(request: Request) {
@@ -27,6 +63,7 @@ export async function POST(request: Request) {
     const body = (await request.json()) as Record<string, unknown>;
     if (body.action === "logout") {
       const actor = await getActor(request);
+      await closeTellerCounterBeforeLogout(actor);
       const cookie = await revokeSession(request, actor);
       return Response.json(
         { success: true },
@@ -50,8 +87,8 @@ export async function POST(request: Request) {
       const actor = await getWorkspaceShowcaseActor(role, requestedUsername);
       if (!actor) return genericFailure();
       const currentActor = await getActor(request);
-      if (currentActor && currentActor.id !== actor.id)
-        await revokeSession(request, currentActor);
+      if (currentActor?.id === actor.id) return Response.json({ actor });
+      if (currentActor) return logoutRequired();
       const session = await createSession(
         actor,
         new URL(request.url).hostname !== "terminal.local",
@@ -68,8 +105,8 @@ export async function POST(request: Request) {
     const actor = await authenticate(username, password);
     if (!actor) return genericFailure();
     const currentActor = await getActor(request);
-    if (currentActor && currentActor.id !== actor.id)
-      await revokeSession(request, currentActor);
+    if (currentActor?.id === actor.id) return Response.json({ actor });
+    if (currentActor) return logoutRequired();
     const session = await createSession(
       actor,
       new URL(request.url).hostname !== "terminal.local",
@@ -79,6 +116,11 @@ export async function POST(request: Request) {
       { headers: { "Set-Cookie": session.cookie } },
     );
   } catch (error) {
+    if (error instanceof QueueError)
+      return Response.json(
+        { error: error.message, code: error.code },
+        { status: error.status },
+      );
     console.error("Bank QMS staff authentication service failed", {
       message: error instanceof Error ? error.message : "Unknown error",
     });

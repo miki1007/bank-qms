@@ -280,7 +280,10 @@ private fun StaffHeader(state: StaffUiState, viewModel: StaffViewModel) {
             Text(state.user?.branchName.orEmpty(), color = QmsMuted, fontSize = 12.sp)
         }
         StaffConnectionPill(state.connected)
-        IconButton(onClick = viewModel::logout) { Icon(Icons.Rounded.Logout, "Sign out") }
+        TextButton(onClick = viewModel::logout, enabled = !state.busy) {
+            Icon(Icons.Rounded.Logout, null, modifier = Modifier.size(18.dp))
+            Text("Log out", modifier = Modifier.padding(start = 6.dp))
+        }
     }
 }
 
@@ -658,4 +661,3 @@ private fun InfoCard(icon: ImageVector, title: String, body: String) {
         }
     }
 }
-

@@ -296,13 +296,22 @@ function Shell({
 }: React.PropsWithChildren<{ mode: "teller" | "manager" }>) {
   const { user, setUser } = React.useContext(AuthContext);
   const navigate = useNavigate();
+  const [logoutBusy, setLogoutBusy] = useState(false);
+  const [logoutError, setLogoutError] = useState("");
   const logout = async () => {
+    setLogoutBusy(true);
+    setLogoutError("");
     try {
       await api("/auth/logout", { method: "POST" });
-    } finally {
       accessToken = "";
       setUser(null);
+      queryClient.clear();
       navigate("/login");
+    } catch (caught) {
+      setLogoutError(
+        caught instanceof Error ? caught.message : "Unable to log out safely.",
+      );
+      setLogoutBusy(false);
     }
   };
   const managerLinks = [
@@ -352,9 +361,6 @@ function Shell({
             <strong>{user?.name}</strong>
             <div className="sidebar-caption">{user?.role}</div>
           </div>
-          <button aria-label="Logout" onClick={logout}>
-            <LogOut size={18} />
-          </button>
         </div>
       </aside>
       <div className="workspace">
@@ -363,9 +369,25 @@ function Shell({
             <strong>{user?.branchName}</strong>
             <span className="muted small"> · {user?.branchCode}</span>
           </div>
-          <div className="row">
-            <span className="status-pill status-success">● Live</span>
-            <Clock />
+          <div className="session-actions">
+            <div className="row">
+              <span className="status-pill status-success">● Live</span>
+              <Clock />
+              <button
+                className="logout-control"
+                aria-label="Log out"
+                onClick={() => void logout()}
+                disabled={logoutBusy}
+              >
+                <LogOut size={17} />
+                <span>{logoutBusy ? "Logging out…" : "Log out"}</span>
+              </button>
+            </div>
+            {logoutError && (
+              <span className="session-error" role="alert">
+                {logoutError}
+              </span>
+            )}
           </div>
         </header>
         {children}

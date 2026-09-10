@@ -1,12 +1,18 @@
 # Testing report
 
-## 2026-09-09 role separation, analytics, administration, and customer overview
+## 2026-09-10 explicit cross-workspace entry
 
-- The hosted route suite passed 15/15 against a fresh SQLite database with all eight D1 migrations. New cases prove customer ticket creation through the real route, identity-scoped synthetic portfolios, Manager-to-Teller session replacement, Teller rejection from `/admin`, audited staff/service administration, and priority-policy enforcement. The existing five-round, 100-ticket simultaneous Call Next stress case also passed.
-- Repository/UI contracts passed 16/16. They now require the dedicated `/admin` route, Teller/Manager destination isolation, manager throughput and demand charts, the live customer-flow diagram, and customer account/statement wiring.
-- `pnpm lint`, `pnpm typecheck`, `pnpm format:check`, `pnpm test`, `pnpm build`, and the hosted production build passed. The build contains `/customer`, `/teller`, `/manager`, `/admin`, `/display`, and `/kiosk` plus both PWA routes and the API.
-- Agent-side browser QA could not run in this checkpoint because the supervised preview runtime supported an older Cloudflare compatibility date than the checkout. The configuration was corrected to the supported date and the production build passed afterward. Functional route behavior was verified directly against the migrated database rather than claimed from an unavailable browser session.
-- Customer balances and transactions are explicitly synthetic, masked, read-only, and identity-scoped. There are no payment, transfer, beneficiary, or balance-mutation endpoints; real core-banking integration remains outside this academic QMS.
+- Opening the Teller entry while a Manager session is active now shows the signed-in Manager and a visible **Log out of Manager** action instead of silently returning to the Manager dashboard. The reverse Manager-entry/Teller-session case uses the same protected flow.
+- A successful logout leaves the visitor on the requested entry page and confirms that the previous session closed; the visitor then explicitly enters the other role. No identity-switch control was added.
+- Formatting, lint, all TypeScript projects, 19 API unit tests, 16 hosted SQLite workflow tests, 17 repository/UI/build contracts, and the complete production build passed for this source state.
+
+## 2026-09-09 actor-owned workspaces and explicit logout
+
+- The hosted SQLite workflow suite passed 16/16 with all migrations, including five rounds of concurrent Call Next. New cases prove that a Manager session cannot become a Teller session without logout, a Manager receives `403` from the Teller surface and mutations, logout closes an idle teller counter, and an unresolved active ticket blocks logout without revoking the session.
+- Production API unit tests passed 19/19, including direct tests for transaction-safe teller logout. The PostgreSQL integration suite now also checks that Manager tokens are rejected by Teller endpoints and that idle teller counter sessions close on logout; this runtime did not provide Docker/PostgreSQL, so those database-backed cases remain a clean-CI gate.
+- Repository/UI contracts passed 17/17. They require actor-owned header navigation, visible logout controls, strict `@Roles("TELLER")` protection, the retired `/admin` redirect, and the absence of Administration, Teller, or Switch Staff links from the Manager header.
+- `pnpm format:check`, `pnpm lint`, `pnpm typecheck`, `pnpm test`, the 16-test hosted workflow suite, and `pnpm build` passed. The production build covers NestJS, all four Vite clients, and the Sites compatibility application.
+- The localhost guide now documents prerequisites, environment values, seed accounts, all seven local URLs, a complete queue walkthrough, role-boundary checks, stop/reset commands, and every source directory.
 
 ## 2026-09-08 WorldLink multi-branch web checkpoint
 

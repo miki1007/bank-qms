@@ -2,7 +2,7 @@
 
 Transport controllers validate input and delegate to application/domain services. `TicketWorkflowService` locks, validates, mutates, and records every ticket transition. Prisma is the persistence adapter. PostgreSQL constraints backstop application invariants. Real-time messages publish after commit and instruct clients to update or refetch authoritative snapshots.
 
-The monorepo separates `api`, `customer-web`, `kiosk-web`, `display-web`, and `staff-web`, plus shared types, validation, UI, configuration, and localization packages. `apps/android` and `apps/ios` package the customer and staff experiences as independent installable applications. Manager and teller screens have separate protected routes; API guards enforce role and branch scope independently of navigation visibility.
+The monorepo separates `api`, `customer-web`, `kiosk-web`, `display-web`, and `staff-web`, plus shared types, validation, UI, configuration, and localization packages. `apps/android` and `apps/ios` package the customer and staff experiences as independent installable applications. Manager and teller screens have separate protected routes. API guards make the roles mutually exclusive: manager tokens cannot call teller routes and teller tokens cannot call manager routes.
 
 The primary deployment surfaces are Bank QMS Customer (Android/iOS), Bank QMS Staff (Android/iOS), Manager Dashboard (web), and Public Display (web). The customer kiosk is a secondary branch fallback rather than a dependency of the mobile customer journey. All surfaces share the backend and authoritative queue state.
 

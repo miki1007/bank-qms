@@ -774,6 +774,7 @@ function AppShell({
           <span>{user.name.split(" ")[0]}</span>
           <button aria-label="Sign out" onClick={onLogout}>
             <LogOut size={17} />
+            <span>Log out</span>
           </button>
         </div>
       </header>

@@ -1619,15 +1619,18 @@ select:focus-visible,
 }
 
 .logout-button {
-  display: grid;
-  width: 34px;
+  display: inline-flex;
   height: 34px;
-  place-items: center;
-  padding: 0;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  padding: 0 11px;
   border: 1px solid var(--line);
   border-radius: 10px;
   color: #60716b;
   background: white;
+  font-size: 11px;
+  font-weight: 750;
   cursor: pointer;
   transition: 180ms ease;
 }
@@ -1641,6 +1644,7 @@ select:focus-visible,
 
 .logout-button svg {
   width: 15px;
+  flex: 0 0 auto;
 }
 
 .surface-kiosk {
@@ -2339,6 +2343,13 @@ select:focus-visible,
 .login-icon svg {
   width: 24px;
 }
+
+.login-icon-warning {
+  color: #9a4f13;
+  background: #fff3df;
+  box-shadow: 0 12px 28px rgba(154, 79, 19, 0.12);
+}
+
 .login-card h2 {
   margin: 7px 0;
   font-size: 37px;
@@ -2375,6 +2386,66 @@ select:focus-visible,
 
 .showcase-teller-picker {
   margin-top: 0.75rem;
+}
+
+.session-conflict {
+  display: grid;
+  gap: 0.55rem;
+  margin: 1.3rem 0 1rem;
+  padding: 1rem;
+  border: 1px solid #edd1a9;
+  border-radius: 1rem;
+  background: #fff9ee;
+}
+
+.session-conflict-label {
+  color: #996121;
+  font-size: 0.875rem;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.session-conflict strong {
+  color: var(--ink);
+  font-size: 1.1rem;
+}
+
+.session-conflict p {
+  margin: 0;
+  color: #66584a;
+  font-size: 0.925rem;
+  line-height: 1.6;
+}
+
+.session-conflict-actions {
+  display: grid;
+  gap: 0.7rem;
+  margin-top: 1rem;
+}
+
+.session-conflict-actions button {
+  width: 100%;
+}
+
+.login-notice {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.6rem;
+  margin: 0 0 1rem;
+  padding: 0.8rem 0.9rem;
+  border: 1px solid #b9dfd1;
+  border-radius: 0.75rem;
+  color: #075f49;
+  background: #effaf6;
+  font-size: 0.875rem;
+  line-height: 1.5;
+}
+
+.login-notice svg {
+  width: 1.1rem;
+  min-width: 1.1rem;
+  margin-top: 0.1rem;
 }
 
 .login-divider {
@@ -3553,14 +3624,18 @@ select:focus-visible,
 }
 
 .staff-header-actions > button {
-  display: grid;
-  width: 38px;
+  display: inline-flex;
   height: 38px;
-  place-items: center;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 0 10px;
   border: 1px solid #d9e5e0;
   border-radius: 12px;
   color: var(--muted-ink);
   background: white;
+  font-size: 11px;
+  font-weight: 800;
 }
 
 .staff-header-actions svg {

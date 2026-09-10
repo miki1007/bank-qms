@@ -18,10 +18,12 @@ test("exposes all four working Bank QMS interfaces", async () => {
 });
 
 test("separates operational surfaces into dedicated routes", async () => {
-  for (const route of ["kiosk", "display", "teller", "manager", "admin"]) {
+  for (const route of ["kiosk", "display", "teller", "manager"]) {
     const page = await read(`../app/${route}/page.tsx`);
     assert.match(page, new RegExp(`surface=["']${route}["']`));
   }
+  const retiredAdmin = await read("../app/admin/page.tsx");
+  assert.match(retiredAdmin, /redirect\("\/manager"\)/);
   const login = await read("../app/staff/login/page.tsx");
   assert.match(login, /StaffLoginClient/);
 });
@@ -67,7 +69,9 @@ test("enforces staff sessions, manager roles, and private cancellation proof", a
   assert.match(authRoute, /workspace_showcase/);
   assert.match(authRoute, /sign-in service is temporarily unavailable/i);
   assert.match(auth, /FROM qms_demo_staff WHERE username = \?/);
-  assert.match(queueRoute, /Manager permission required/);
+  assert.match(queueRoute, /requiredRole === "MANAGER"/);
+  assert.match(queueRoute, /surface === "teller"\s*\? "TELLER"/);
+  assert.match(authRoute, /LOGOUT_REQUIRED/);
   assert.match(workflow, /lookup_token_hash/);
 });
 
@@ -81,7 +85,7 @@ test("routes managers to the full dashboard and keeps daily ticket identities", 
   const workflow = await read("../lib/showcase-ticket-workflow.ts");
 
   assert.match(login, /actor\.role === "MANAGER"/);
-  assert.match(login, /\["\/manager", "\/admin"\]\.includes\(requested\)/);
+  assert.match(login, /window\.location\.replace\("\/manager"\)/);
   assert.match(login, /\["\/teller", "\/staff-app"\]/);
   assert.match(staffApp, /data\.actor\?\.role === "MANAGER"/);
   assert.match(schema, /qms_demo_ticket_number_per_branch_day_unique/);
@@ -137,7 +141,7 @@ test("provides two installable mobile apps on the shared queue backend", async (
   assert.equal(staffManifest.start_url, "/staff-app");
 });
 
-test("launches every product surface and exposes audited manager controls", async () => {
+test("launches each actor-owned product surface and exposes audited manager controls", async () => {
   const home = await read("../app/page.tsx");
   const client = await read("../app/qms-client.tsx");
   const route = await read("../app/api/showcase/route.ts");
@@ -149,10 +153,11 @@ test("launches every product surface and exposes audited manager controls", asyn
     "/display",
     "next=%2Fteller",
     "next=%2Fmanager",
-    "next=%2Fadmin",
   ]) {
     assert.ok(home.includes(path));
   }
+  assert.ok(!home.includes("next=%2Fadmin"));
+  assert.ok(!home.includes("Administration"));
   assert.match(client, /operation: "set_priority_limit"/);
   assert.match(client, /operation: "export_csv"/);
   assert.match(route, /Priority limit must be between 1 and 5/);
@@ -160,10 +165,11 @@ test("launches every product surface and exposes audited manager controls", asyn
   assert.match(route, /Content-Disposition/);
 });
 
-test("adds real manager analytics, manager-only administration, and a safe customer portfolio", async () => {
+test("adds real manager analytics, retires the separate admin surface, and keeps customer data safe", async () => {
   const manager = await read("../app/qms-client.tsx");
   const customer = await read("../app/mobile-customer-client.tsx");
   const route = await read("../app/api/showcase/route.ts");
+  const adminRoute = await read("../app/admin/page.tsx");
   const schema = await read("../db/schema.ts");
 
   assert.match(manager, /Seven-day throughput/);
@@ -176,10 +182,35 @@ test("adds real manager analytics, manager-only administration, and a safe custo
   assert.match(customer, /Recent transactions/);
   assert.match(customer, /customer-banking/);
   assert.match(customer, /customer_statement/);
-  assert.match(route, /surface === "admin"/);
-  assert.match(route, /requireActor\(request, true\)/);
+  assert.match(adminRoute, /redirect\("\/manager"\)/);
+  assert.match(route, /requireActor\(request, "MANAGER"\)/);
   assert.match(schema, /qms_customer_accounts/);
   assert.match(schema, /qms_customer_transactions/);
+});
+
+test("keeps manager and teller workspaces isolated with visible logout controls", async () => {
+  const hosted = await read("../app/qms-client.tsx");
+  const staffLogin = await read("../app/staff-login-client.tsx");
+  const hostedAuth = await read("../app/api/showcase/auth/route.ts");
+  const productionTeller = await read("../apps/api/src/modules/teller.ts");
+  const staffWeb = await read("../apps/staff-web/src/main.tsx");
+
+  assert.doesNotMatch(hosted, /Switch staff|Open teller login|href="\/admin"/);
+  assert.match(hosted, /Manager dashboard/);
+  assert.match(hosted, /Teller console/);
+  assert.match(hosted, /"Log out"/);
+  assert.match(hostedAuth, /LOGOUT_REQUIRED/);
+  assert.match(hostedAuth, /closeTellerCounterBeforeLogout/);
+  assert.match(staffLogin, /requestedRole !== result\.actor\.role/);
+  assert.match(staffLogin, /setSessionConflict/);
+  assert.match(staffLogin, /action: "logout"/);
+  assert.match(staffLogin, /Staff identity is never switched silently/);
+  assert.match(
+    productionTeller,
+    /@Roles\("TELLER"\)\s*@Controller\("teller"\)/,
+  );
+  assert.match(staffWeb, /className="logout-control"/);
+  assert.match(staffWeb, /Logging out…/);
 });
 
 test("ships full native Android customer and teller applications", async () => {

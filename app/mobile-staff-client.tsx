@@ -207,12 +207,24 @@ export function MobileStaffClient() {
   }
 
   async function logout() {
-    await fetch("/api/showcase/auth", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ action: "logout" }),
-    });
-    window.location.assign("/staff/login?next=%2Fstaff-app");
+    setBusy("logout");
+    setError("");
+    try {
+      const response = await fetch("/api/showcase/auth", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "logout" }),
+      });
+      const result = (await response.json()) as { error?: string };
+      if (!response.ok)
+        throw new Error(result.error || "Unable to log out safely.");
+      window.location.assign("/staff/login?next=%2Fstaff-app");
+    } catch (caught) {
+      setError(
+        caught instanceof Error ? caught.message : "Unable to log out safely.",
+      );
+      setBusy("");
+    }
   }
 
   return (
@@ -231,8 +243,13 @@ export function MobileStaffClient() {
           <span className={online ? "mobile-live" : "mobile-live offline"}>
             <i /> {online ? "Live" : "Offline"}
           </span>
-          <button onClick={() => void logout()} aria-label="Log out">
+          <button
+            onClick={() => void logout()}
+            aria-label="Log out"
+            disabled={Boolean(busy)}
+          >
             <LogOut />
+            <span>{busy === "logout" ? "Logging out…" : "Log out"}</span>
           </button>
         </div>
       </header>

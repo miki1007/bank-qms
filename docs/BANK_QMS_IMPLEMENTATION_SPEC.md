@@ -153,14 +153,14 @@ The MVP is successful when:
 
 ## 6. Stakeholders and Actors
 
-| Actor                | Type                      | Responsibilities                                                                                                                     | Authentication                                                          |
-| -------------------- | ------------------------- | ------------------------------------------------------------------------------------------------------------------------------------ | ----------------------------------------------------------------------- |
-| Customer             | Human                     | Select service, request priority service, generate ticket, print ticket, view status, cancel waiting ticket                          | No staff login; ticket access uses ticket number and private code/QR    |
-| Teller               | Human                     | Sign in, open assigned counter session, call next, recall, start service, complete, transfer, mark no-show                           | Username and password                                                   |
-| Branch Manager       | Human                     | All teller capabilities where authorized; configure services/counters, assign staff, manage accounts, view reports and audit records | Username and password; manager role                                     |
-| Display Screen       | System boundary device    | Subscribe to branch events and show called tickets/counters                                                                          | Device token or read-only display key                                   |
-| Kiosk                | System boundary device    | Present services, create/print tickets, support status lookup and cancellation                                                       | Registered kiosk device key for production; optional in local prototype |
-| System Administrator | Supporting technical role | Initial deployment, environment configuration, database backup, service health                                                       | Infrastructure access; not a normal in-app MVP role                     |
+| Actor                | Type                      | Responsibilities                                                                                                      | Authentication                                                          |
+| -------------------- | ------------------------- | --------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------- |
+| Customer             | Human                     | Select service, request priority service, generate ticket, print ticket, view status, cancel waiting ticket           | No staff login; ticket access uses ticket number and private code/QR    |
+| Teller               | Human                     | Sign in, open assigned counter session, call next, recall, start service, complete, transfer, mark no-show            | Username and password                                                   |
+| Branch Manager       | Human                     | Monitor branch operations; configure services/counters, assign staff, manage accounts, view reports and audit records | Username and password; manager role                                     |
+| Display Screen       | System boundary device    | Subscribe to branch events and show called tickets/counters                                                           | Device token or read-only display key                                   |
+| Kiosk                | System boundary device    | Present services, create/print tickets, support status lookup and cancellation                                        | Registered kiosk device key for production; optional in local prototype |
+| System Administrator | Supporting technical role | Initial deployment, environment configuration, database backup, service health                                        | Infrastructure access; not a normal in-app MVP role                     |
 
 ### 6.1 Role permissions
 
@@ -170,11 +170,11 @@ The MVP is successful when:
 | Generate ticket                |      Yes       |   No   | Optional assisted mode |   No    |
 | View own ticket status         |      Yes       |   No   |          Yes           |   No    |
 | Cancel waiting ticket          |      Yes       |   No   | Yes with audit reason  |   No    |
-| Call next ticket               |       No       |  Yes   |          Yes           |   No    |
-| Start/complete service         |       No       |  Yes   |          Yes           |   No    |
-| Mark no-show                   |       No       |  Yes   |          Yes           |   No    |
-| Transfer ticket                |       No       |  Yes   |          Yes           |   No    |
-| Open/close own counter session |       No       |  Yes   |          Yes           |   No    |
+| Call next ticket               |       No       |  Yes   |           No           |   No    |
+| Start/complete service         |       No       |  Yes   |           No           |   No    |
+| Mark no-show                   |       No       |  Yes   |           No           |   No    |
+| Transfer ticket                |       No       |  Yes   |           No           |   No    |
+| Open/close own counter session |       No       |  Yes   |           No           |   No    |
 | Configure counters/services    |       No       |   No   |          Yes           |   No    |
 | Manage staff accounts          |       No       |   No   |          Yes           |   No    |
 | View reports                   |       No       |   No   |          Yes           |   No    |
@@ -348,6 +348,7 @@ The following rules are mandatory unless explicitly changed by a future approved
 - **FR-036:** A teller shall be able to transfer a called or in-service ticket to another active service.
 - **FR-037:** A transfer shall record source service, destination service, teller, counter, time, and optional note.
 - **FR-038:** A teller shall not see manager configuration or reports.
+- **FR-038A:** A manager session shall not open the teller console or invoke teller endpoints; changing staff identity requires logout.
 - **FR-039:** A teller shall be able to pause and resume the counter only when there is no active ticket.
 - **FR-040:** A teller shall be able to close the counter session only when there is no active ticket.
 - **FR-041:** Logout shall close or require resolution of the teller's active counter session.

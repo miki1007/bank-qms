@@ -284,11 +284,14 @@ select:focus-visible {
   border: 0;
   background: #edf2f7;
   border-radius: 10px;
-  width: 34px;
   height: 34px;
-  display: grid;
-  place-items: center;
+  padding: 0 10px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
   color: var(--ink);
+  font-size: 12px;
+  font-weight: 750;
   cursor: pointer;
 }
 .app-content {

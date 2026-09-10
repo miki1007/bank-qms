@@ -365,7 +365,10 @@ private fun HomeScreen(state: CustomerUiState, viewModel: CustomerViewModel) {
                     Text(state.user?.name.orEmpty(), style = MaterialTheme.typography.headlineMedium)
                 }
                 ConnectionPill(state.connected)
-                IconButton(onClick = viewModel::logout) { Icon(Icons.Rounded.Logout, "Sign out") }
+                TextButton(onClick = viewModel::logout, enabled = !state.busy) {
+                    Icon(Icons.Rounded.Logout, null, modifier = Modifier.size(18.dp))
+                    Text("Log out", modifier = Modifier.padding(start = 6.dp))
+                }
             }
         }
         item {
@@ -777,4 +780,3 @@ private fun EmptyCard(title: String, body: String) {
         }
     }
 }
-

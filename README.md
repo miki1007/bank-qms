@@ -4,15 +4,14 @@ Bank QMS is the academic queue-management showcase branded as **WorldLink Bank**
 
 The product has six connected surfaces backed by the same domain rules:
 
-| Surface           | Purpose                                                                          | Local URL                       |
-| ----------------- | -------------------------------------------------------------------------------- | ------------------------------- |
-| Customer app      | Read-only demo accounts plus queue reservation, tracking, cancellation, history  | `http://localhost:5176`         |
-| Staff app/web     | Teller counter sessions and manager operations, selected by server-enforced role | `http://localhost:5173`         |
-| Manager dashboard | Configuration, KPIs, reports, CSV, and audit logs                                | `http://localhost:5173/manager` |
-| Administration    | Manager-only staff assignments, services, policy, and session controls           | `http://localhost:5173/admin`   |
-| Public display    | Branch number monitor with large live calls and safe reconnect state             | `http://localhost:5175`         |
-| Web kiosk         | Optional branch fallback for walk-in customers without the mobile app            | `http://localhost:5174`         |
-| API and Swagger   | REST, Socket.IO, health, and OpenAPI                                             | `http://localhost:3000/docs`    |
+| Surface           | Purpose                                                                         | Local URL                       |
+| ----------------- | ------------------------------------------------------------------------------- | ------------------------------- |
+| Customer app      | Read-only demo accounts plus queue reservation, tracking, cancellation, history | `http://localhost:5176`         |
+| Staff app/web     | Strictly separated teller and manager routes selected by server-enforced role   | `http://localhost:5173`         |
+| Manager dashboard | Configuration, KPIs, reports, CSV, and audit logs                               | `http://localhost:5173/manager` |
+| Public display    | Branch number monitor with large live calls and safe reconnect state            | `http://localhost:5175`         |
+| Web kiosk         | Optional branch fallback for walk-in customers without the mobile app           | `http://localhost:5174`         |
+| API and Swagger   | REST, Socket.IO, health, and OpenAPI                                            | `http://localhost:3000/docs`    |
 
 The customer and staff products are also packaged as separate applications. The Android customer and teller experiences are native Jetpack Compose applications; ticket state, permissions, queue selection, and reporting remain server-authoritative. Manager administration and the public number display remain purpose-built web interfaces.
 
@@ -40,6 +39,8 @@ See [architecture](docs/architecture.md), [diagrams](docs/diagrams/system-diagra
 - macOS/Xcode 16+/XcodeGen for iOS builds
 
 ## Local setup
+
+For a start-to-finish walkthrough, exact URLs, test accounts, role checks, troubleshooting, and a map of every source directory, see [Run the complete Bank QMS locally](docs/operations/local-development.md).
 
 ```bash
 pnpm install
@@ -129,12 +130,12 @@ Deploy PostgreSQL and the NestJS API behind HTTPS, serve the four Vite web clien
 
 ## Private hosted showcase
 
-The owner-only Sites URL is a constrained portfolio preview. It contains `/customer`, `/kiosk`, `/teller`, `/manager`, `/admin`, and `/display`, all connected to one persistent queue adapter. Teller entry always establishes an independent Teller session; an existing Manager cookie is never reused as a teller identity. The Manager dashboard includes live queue charts, while `/admin` is a separately protected Manager surface. The customer page includes an identity-scoped, synthetic read-only portfolio and CSV statement alongside the working queue flow. That runtime cannot open PostgreSQL TCP connections or host the canonical Socket.IO process, so it uses D1 and authoritative polling. This adapter is not the production backend and is explained in `docs/implementation-decisions.md`; the production target remains NestJS/PostgreSQL/Socket.IO.
+The owner-only Sites URL is a constrained portfolio preview. It contains `/customer`, `/kiosk`, `/teller`, `/manager`, and `/display`, all connected to one persistent queue adapter. Teller and manager sessions cannot replace one another; the current actor must log out before a different staff identity signs in. The old `/admin` URL redirects to the Manager Dashboard. The customer page includes an identity-scoped, synthetic read-only portfolio and CSV statement alongside the working queue flow. That runtime cannot open PostgreSQL TCP connections or host the canonical Socket.IO process, so it uses D1 and authoritative polling. This adapter is not the production backend and is explained in `docs/implementation-decisions.md`; the production target remains NestJS/PostgreSQL/Socket.IO.
 
 ## Security notes
 
 - Never commit `.env`, database credentials, JWT keys, device secrets, signing keys, access tokens, refresh tokens, or lookup codes.
-- Teller and manager authorization is enforced by backend role, branch, and counter-session ownership checks; hidden navigation is not a security boundary.
+- Teller and manager authorization is enforced by mutually exclusive backend roles, branch scope, and teller counter-session ownership checks. A manager token cannot call teller endpoints, and a teller token cannot call manager endpoints.
 - Customer and staff access tokens stay in memory. Refresh tokens are rotated and hashed server-side; browsers receive them only through HTTP-only cookies, while native Android clients receive them over TLS and encrypt them at rest with Android Keystore AES-GCM.
 - Public display events contain public ticket number, counter, service, and call time only—never customer data, lookup proof, tokens, private notes, or priority reasons.
 - Logs and health responses must not include credentials or request authorization material.

@@ -289,7 +289,7 @@ export class CounterSessionService {
 }
 
 @UseGuards(JwtAuthGuard, RolesGuard)
-@Roles("TELLER", "MANAGER")
+@Roles("TELLER")
 @Controller("teller")
 export class TellerController {
   constructor(
