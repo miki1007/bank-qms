@@ -25,6 +25,7 @@ jobs:
       KIOSK_ORIGIN: http://localhost:5174
       DISPLAY_ORIGIN: http://localhost:5175
       DEV_MANAGER_PASSWORD: CIManagerPassword2026
+      DEV_ADMIN_PASSWORD: CIAdminPassword2026
       DEV_TELLER_PASSWORD: CITellerPassword2026
       KIOSK_DEVICE_SECRET: ci-kiosk-device-secret
       DISPLAY_DEVICE_SECRET: ci-display-device-secret
@@ -80,6 +81,7 @@ jobs:
       KIOSK_ORIGIN: http://localhost:5174
       DISPLAY_ORIGIN: http://localhost:5175
       DEV_MANAGER_PASSWORD: CIManagerPassword2026
+      DEV_ADMIN_PASSWORD: CIAdminPassword2026
       DEV_TELLER_PASSWORD: CITellerPassword2026
       KIOSK_DEVICE_SECRET: ci-kiosk-device-secret
       DISPLAY_DEVICE_SECRET: ci-display-device-secret
