@@ -191,7 +191,7 @@ describe.skipIf(!run)("authorization integration with PostgreSQL", () => {
     const foreign = await prisma.serviceType.create({
       data: {
         branchId: branchTwo.id,
-        code: `B2${randomUUID().slice(0, 6)}`,
+        code: `B2${randomUUID().slice(0, 6).toUpperCase()}`,
         name: "Branch Two Test",
         averageServiceMinutes: 5,
       },
