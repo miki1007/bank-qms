@@ -32,7 +32,7 @@ export interface RequestUser {
   kind: "staff";
   sub: string;
   branchId: string;
-  role: "TELLER" | "MANAGER";
+  role: "TELLER" | "MANAGER" | "ADMIN";
   username: string;
   name: string;
   sessionVersion: number;

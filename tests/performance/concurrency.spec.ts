@@ -3,7 +3,7 @@ import { describe, expect, it } from "vitest";
 const run = process.env.RUN_DATABASE_TESTS === "1";
 const apiUrl = process.env.E2E_API_URL ?? "http://localhost:3000/api/v1";
 const tellerPassword = process.env.DEV_TELLER_PASSWORD ?? "";
-const managerPassword = process.env.DEV_MANAGER_PASSWORD ?? "";
+const adminPassword = process.env.DEV_ADMIN_PASSWORD ?? "";
 const kioskSecret = process.env.KIOSK_DEVICE_SECRET ?? "";
 
 describe.skipIf(!run)("real PostgreSQL Call Next concurrency", () => {
@@ -16,35 +16,35 @@ describe.skipIf(!run)("real PostgreSQL Call Next concurrency", () => {
       });
       return (await response.json()).accessToken as string;
     };
-    const managerLogin = await fetch(`${apiUrl}/auth/login`, {
+    const adminLogin = await fetch(`${apiUrl}/auth/login`, {
       method: "POST",
       headers: { "content-type": "application/json" },
       body: JSON.stringify({
-        username: "manager.dev",
-        password: managerPassword,
+        username: "admin.dev",
+        password: adminPassword,
       }),
     });
-    const managerToken = (await managerLogin.json()).accessToken as string;
-    const managerHeaders = {
-      Authorization: `Bearer ${managerToken}`,
+    const adminToken = (await adminLogin.json()).accessToken as string;
+    const adminHeaders = {
+      Authorization: `Bearer ${adminToken}`,
       "content-type": "application/json",
     };
-    const servicesResponse = await fetch(`${apiUrl}/manager/services`, {
-      headers: managerHeaders,
+    const servicesResponse = await fetch(`${apiUrl}/admin/services`, {
+      headers: adminHeaders,
     });
     const services = (await servicesResponse.json()) as Array<{
       id: string;
       code: string;
     }>;
     const deposit = services.find((service) => service.code === "DEP")!;
-    const countersResponse = await fetch(`${apiUrl}/manager/counters`, {
-      headers: managerHeaders,
+    const countersResponse = await fetch(`${apiUrl}/admin/counters`, {
+      headers: adminHeaders,
     });
     const counters = (await countersResponse.json()) as Array<{ id: string }>;
     for (const counter of counters.slice(0, 3))
-      await fetch(`${apiUrl}/manager/counters/${counter.id}/assign-service`, {
+      await fetch(`${apiUrl}/admin/counters/${counter.id}/assign-service`, {
         method: "POST",
-        headers: managerHeaders,
+        headers: adminHeaders,
         body: JSON.stringify({ serviceTypeId: deposit.id }),
       });
     const createTicket = (idempotencyKey: string, priority = false) =>

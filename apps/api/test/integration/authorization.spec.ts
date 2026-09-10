@@ -12,6 +12,7 @@ import { RequestValidationPipe } from "../../src/shared/request-validation.pipe"
 const run = process.env.RUN_DATABASE_TESTS === "1";
 const tellerPassword = process.env.DEV_TELLER_PASSWORD ?? "";
 const managerPassword = process.env.DEV_MANAGER_PASSWORD ?? "";
+const adminPassword = process.env.DEV_ADMIN_PASSWORD ?? "";
 
 describe.skipIf(!run)("authorization integration with PostgreSQL", () => {
   let app: INestApplication;
@@ -19,6 +20,7 @@ describe.skipIf(!run)("authorization integration with PostgreSQL", () => {
   let tellerOneAccessToken = "";
   let tellerThreeAccessToken = "";
   let managerAccessToken = "";
+  let adminAccessToken = "";
   let browserTellerBody: Record<string, unknown> = {};
 
   beforeAll(async () => {
@@ -52,10 +54,11 @@ describe.skipIf(!run)("authorization integration with PostgreSQL", () => {
 
   it("returns 403 for teller privilege escalation", async () => {
     for (const path of [
-      "/api/v1/manager/staff",
-      "/api/v1/manager/services",
+      "/api/v1/admin/staff",
+      "/api/v1/admin/services",
+      "/api/v1/admin/branches",
       "/api/v1/manager/reports/summary",
-      "/api/v1/manager/audit-logs",
+      "/api/v1/admin/audit-logs",
     ]) {
       const response = await request(app.getHttpServer())
         .get(path)
@@ -65,15 +68,46 @@ describe.skipIf(!run)("authorization integration with PostgreSQL", () => {
     }
   });
 
-  it("returns 403 when a manager tries to use the teller API", async () => {
+  it("keeps administrator, manager, and teller APIs mutually isolated", async () => {
     const manager = await login("manager.dev", managerPassword);
     expect(manager.status).toBe(201);
     managerAccessToken = manager.body.accessToken as string;
-    const response = await request(app.getHttpServer())
+    const managerAtTeller = await request(app.getHttpServer())
       .get("/api/v1/teller/counter-session/current")
       .set("Authorization", `Bearer ${managerAccessToken}`);
-    expect(response.status).toBe(403);
-    expect(response.body.error.code).toBe("FORBIDDEN");
+    expect(managerAtTeller.status).toBe(403);
+    expect(managerAtTeller.body.error.code).toBe("FORBIDDEN");
+
+    const managerAtAdmin = await request(app.getHttpServer())
+      .get("/api/v1/admin/staff")
+      .set("Authorization", `Bearer ${managerAccessToken}`);
+    expect(managerAtAdmin.status).toBe(403);
+    expect(managerAtAdmin.body.error.code).toBe("FORBIDDEN");
+
+    const admin = await login("admin.dev", adminPassword);
+    expect(admin.status).toBe(201);
+    expect(admin.body.user.role).toBe("ADMIN");
+    adminAccessToken = admin.body.accessToken as string;
+
+    const adminAtManager = await request(app.getHttpServer())
+      .get("/api/v1/manager/dashboard/live")
+      .set("Authorization", `Bearer ${adminAccessToken}`);
+    expect(adminAtManager.status).toBe(403);
+    expect(adminAtManager.body.error.code).toBe("FORBIDDEN");
+
+    const adminAtTeller = await request(app.getHttpServer())
+      .get("/api/v1/teller/counter-session/current")
+      .set("Authorization", `Bearer ${adminAccessToken}`);
+    expect(adminAtTeller.status).toBe(403);
+    expect(adminAtTeller.body.error.code).toBe("FORBIDDEN");
+
+    const adminDirectory = await request(app.getHttpServer())
+      .get("/api/v1/admin/staff")
+      .set("Authorization", `Bearer ${adminAccessToken}`);
+    expect(adminDirectory.status).toBe(200);
+    expect(adminDirectory.body).toEqual(
+      expect.arrayContaining([expect.objectContaining({ role: "ADMIN" })]),
+    );
   });
 
   it("rotates an Android staff refresh token without exposing it to browsers", async () => {
@@ -97,7 +131,7 @@ describe.skipIf(!run)("authorization integration with PostgreSQL", () => {
     expect(rotated.body.user.role).toBe("TELLER");
   });
 
-  it("locks a teller session to the counter assigned by the manager", async () => {
+  it("locks a teller session to the counter assigned by an administrator", async () => {
     const account = await prisma.staff.findUniqueOrThrow({
       where: { username: "teller.one" },
       include: { assignedCounter: true },
@@ -184,7 +218,7 @@ describe.skipIf(!run)("authorization integration with PostgreSQL", () => {
     });
   });
 
-  it("prevents a manager from mutating another branch resource", async () => {
+  it("denies manager administration while allowing explicit administrator branch scope", async () => {
     const branchTwo = await prisma.branch.findUniqueOrThrow({
       where: { code: "TEST-B2" },
     });
@@ -196,11 +230,18 @@ describe.skipIf(!run)("authorization integration with PostgreSQL", () => {
         averageServiceMinutes: 5,
       },
     });
-    const attack = await request(app.getHttpServer())
-      .patch(`/api/v1/manager/services/${foreign.id}`)
+    const managerAttempt = await request(app.getHttpServer())
+      .patch(`/api/v1/admin/services/${foreign.id}?branchId=${branchTwo.id}`)
       .set("Authorization", `Bearer ${managerAccessToken}`)
       .send({ name: "Cross branch mutation" });
-    expect(attack.status).toBe(404);
+    expect(managerAttempt.status).toBe(403);
+
+    const administered = await request(app.getHttpServer())
+      .patch(`/api/v1/admin/services/${foreign.id}?branchId=${branchTwo.id}`)
+      .set("Authorization", `Bearer ${adminAccessToken}`)
+      .send({ name: "Administrator scoped update" });
+    expect(administered.status).toBe(200);
+    expect(administered.body.name).toBe("Administrator scoped update");
   });
 
   it("registers a customer, isolates the staff boundary, owns tickets, and revokes logout", async () => {

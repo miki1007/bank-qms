@@ -2,18 +2,20 @@
 
 Bank QMS is the academic queue-management showcase branded as **WorldLink Bank**. The supplied WorldLink emblem is used with the project owner's direction. The customer showcase includes clearly labelled, synthetic account balances and activity for product demonstration; it is not connected to core banking and cannot move real funds.
 
-The product has six connected surfaces backed by the same domain rules:
+The product has eight connected entry points backed by the same domain rules:
 
 | Surface           | Purpose                                                                         | Local URL                       |
 | ----------------- | ------------------------------------------------------------------------------- | ------------------------------- |
 | Customer app      | Read-only demo accounts plus queue reservation, tracking, cancellation, history | `http://localhost:5176`         |
-| Staff app/web     | Strictly separated teller and manager routes selected by server-enforced role   | `http://localhost:5173`         |
-| Manager dashboard | Configuration, KPIs, reports, CSV, and audit logs                               | `http://localhost:5173/manager` |
+| Staff login       | Routes each staff identity to its one server-enforced workspace                 | `http://localhost:5173/login`   |
+| Admin console     | Branches, users, counters, services, policy, security, and audit                | `http://localhost:5173/admin`   |
+| Manager dashboard | Live branch operations, queue analytics, reports, and CSV                       | `http://localhost:5173/manager` |
+| Teller console    | Assigned-counter queue service only                                             | `http://localhost:5173/teller`  |
 | Public display    | Branch number monitor with large live calls and safe reconnect state            | `http://localhost:5175`         |
 | Web kiosk         | Optional branch fallback for walk-in customers without the mobile app           | `http://localhost:5174`         |
 | API and Swagger   | REST, Socket.IO, health, and OpenAPI                                            | `http://localhost:3000/docs`    |
 
-The customer and staff products are also packaged as separate applications. The Android customer and teller experiences are native Jetpack Compose applications; ticket state, permissions, queue selection, and reporting remain server-authoritative. Manager administration and the public number display remain purpose-built web interfaces.
+The customer and teller products are also packaged as separate applications. The Android customer and teller experiences are native Jetpack Compose applications; ticket state, permissions, queue selection, and reporting remain server-authoritative. Administrator and manager workspaces and the public number display remain purpose-built web interfaces.
 
 ## Architecture
 
@@ -57,7 +59,7 @@ pnpm db:seed
 pnpm dev
 ```
 
-The hosted showcase exposes independent queues for Summit, CMC, Ayat, Piyassa, 4 Killo, Stadium, Megenagna, Mexico, Bole, Shola, and Lideta. Summit demo staff use `manager.dev` and `teller.one` through `teller.four`; other hosted branch usernames append the branch code (for example, `manager.dev.cmc`). Each teller has a manager-controlled counter assignment and cannot switch identities or counters from the teller console. Passwords and device secrets for the canonical PostgreSQL deployment come only from your `.env` values.
+The hosted showcase exposes independent queues for Summit, CMC, Ayat, Piyassa, 4 Killo, Stadium, Megenagna, Mexico, Bole, Shola, and Lideta. Summit demo staff use `admin.dev`, `manager.dev`, and `teller.one` through `teller.four`; other hosted branch usernames append the branch code (for example, `admin.dev.cmc`). Each teller has an administrator-controlled counter assignment and cannot switch identities or counters from the teller console. Passwords and device secrets for the canonical PostgreSQL deployment come only from your `.env` values.
 
 The customer web/PWA uses a virtual-queue reservation model: one active remote ticket per customer per branch, three remote reservations per day, a ten-minute cancellation cooldown, expiry/no-show abuse controls, and branch arrival-code check-in. A customer who checks in on time keeps the original booking timestamp; unconfirmed reservations cannot be called. Priority is only requested remotely and becomes active after staff verification. While standard customers wait, the configured fairness rule calls at most two priority tickets consecutively by default.
 
@@ -130,12 +132,12 @@ Deploy PostgreSQL and the NestJS API behind HTTPS, serve the four Vite web clien
 
 ## Private hosted showcase
 
-The owner-only Sites URL is a constrained portfolio preview. It contains `/customer`, `/kiosk`, `/teller`, `/manager`, and `/display`, all connected to one persistent queue adapter. Teller and manager sessions cannot replace one another; the current actor must log out before a different staff identity signs in. The old `/admin` URL redirects to the Manager Dashboard. The customer page includes an identity-scoped, synthetic read-only portfolio and CSV statement alongside the working queue flow. That runtime cannot open PostgreSQL TCP connections or host the canonical Socket.IO process, so it uses D1 and authoritative polling. This adapter is not the production backend and is explained in `docs/implementation-decisions.md`; the production target remains NestJS/PostgreSQL/Socket.IO.
+The owner-only Sites URL is a constrained portfolio preview. It contains `/customer`, `/kiosk`, `/teller`, `/manager`, `/admin`, and `/display`, all connected to one persistent queue adapter. Administrator, manager, and teller sessions cannot replace one another; the current actor must log out before a different staff identity signs in. `/admin` is a separately authenticated administration workspace, while `/manager` contains only branch operations and reporting. The customer page includes an identity-scoped, synthetic read-only portfolio and CSV statement alongside the working queue flow. That runtime cannot open PostgreSQL TCP connections or host the canonical Socket.IO process, so it uses D1 and authoritative polling. This adapter is not the production backend and is explained in `docs/implementation-decisions.md`; the production target remains NestJS/PostgreSQL/Socket.IO.
 
 ## Security notes
 
 - Never commit `.env`, database credentials, JWT keys, device secrets, signing keys, access tokens, refresh tokens, or lookup codes.
-- Teller and manager authorization is enforced by mutually exclusive backend roles, branch scope, and teller counter-session ownership checks. A manager token cannot call teller endpoints, and a teller token cannot call manager endpoints.
+- Administrator, manager, and teller authorization is enforced by mutually exclusive backend roles, branch scope, and teller counter-session ownership checks. Admin-only configuration routes reject managers and tellers; manager operations reject administrators and tellers; teller routes reject administrators and managers.
 - Customer and staff access tokens stay in memory. Refresh tokens are rotated and hashed server-side; browsers receive them only through HTTP-only cookies, while native Android clients receive them over TLS and encrypt them at rest with Android Keystore AES-GCM.
 - Public display events contain public ticket number, counter, service, and call time only—never customer data, lookup proof, tokens, private notes, or priority reasons.
 - Logs and health responses must not include credentials or request authorization material.

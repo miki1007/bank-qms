@@ -105,6 +105,29 @@ async function api<T>(
 }
 
 type User = AuthUser & { branchCode: string; branchName: string };
+type AdminOverviewResponse = {
+  totalBranches: number;
+  activeBranches: number;
+  totalStaff: number;
+  administrators: number;
+  lockedStaff: number;
+  activeServices: number;
+  activeSessions: number;
+};
+type AdminBranch = {
+  id: string;
+  code: string;
+  name: string;
+  location: string | null;
+  timezone: string;
+  status: "ACTIVE" | "INACTIVE";
+  _count: {
+    staff: number;
+    services: number;
+    counters: number;
+    tickets: number;
+  };
+};
 type NamedService = { id: string; name: string; code?: string };
 type ActiveTicket = {
   id: string;
@@ -204,6 +227,23 @@ const AuthContext = React.createContext<AuthState>({
   setUser: () => undefined,
 });
 
+const ADMIN_BRANCH_KEY = "bank-qms-admin-branch";
+
+function roleHome(role: User["role"]) {
+  if (role === "ADMIN") return "/admin";
+  if (role === "MANAGER") return "/manager";
+  return "/teller";
+}
+
+function adminEndpoint(path: string) {
+  const branchId =
+    typeof window === "undefined"
+      ? ""
+      : (window.localStorage.getItem(ADMIN_BRANCH_KEY) ?? "");
+  if (!branchId) return path;
+  return `${path}${path.includes("?") ? "&" : "?"}branchId=${encodeURIComponent(branchId)}`;
+}
+
 function Login() {
   const { setUser } = React.useContext(AuthContext);
   const navigate = useNavigate();
@@ -221,7 +261,7 @@ function Login() {
       );
       accessToken = result.accessToken;
       setUser(result.user);
-      navigate(result.user.role === "MANAGER" ? "/manager" : "/teller");
+      navigate(roleHome(result.user.role));
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : "Sign in failed.");
     } finally {
@@ -242,7 +282,8 @@ function Login() {
             One clear next step.
           </h1>
           <p>
-            Secure teller and manager access for the Main Branch queue system.
+            Separate administrator, manager and teller access for the branch
+            queue system.
           </p>
         </div>
         <div className="secure-note">
@@ -256,7 +297,7 @@ function Login() {
             <p className="eyebrow">Staff access</p>
             <h2>Sign in to your workspace</h2>
             <p className="muted">
-              Use the staff account issued by your branch manager.
+              Use the account issued by your system administrator.
             </p>
           </div>
           {error && (
@@ -293,9 +334,37 @@ function Login() {
 function Shell({
   children,
   mode,
-}: React.PropsWithChildren<{ mode: "teller" | "manager" }>) {
+}: React.PropsWithChildren<{ mode: "teller" | "manager" | "admin" }>) {
   const { user, setUser } = React.useContext(AuthContext);
   const navigate = useNavigate();
+  const branches = useQuery<AdminBranch[]>({
+    queryKey: ["admin-branches"],
+    queryFn: () => api("/admin/branches"),
+    enabled: mode === "admin",
+  });
+  const [selectedBranchId, setSelectedBranchId] = useState(() =>
+    typeof window === "undefined"
+      ? ""
+      : (window.localStorage.getItem(ADMIN_BRANCH_KEY) ?? ""),
+  );
+  useEffect(() => {
+    if (mode !== "admin" || selectedBranchId || !user?.branchId) return;
+    window.localStorage.setItem(ADMIN_BRANCH_KEY, user.branchId);
+    setSelectedBranchId(user.branchId);
+  }, [mode, selectedBranchId, user?.branchId]);
+  useEffect(() => {
+    if (
+      mode !== "admin" ||
+      !branches.data?.length ||
+      branches.data.some((branch) => branch.id === selectedBranchId)
+    )
+      return;
+    const fallback =
+      branches.data.find((branch) => branch.id === user?.branchId)?.id ??
+      branches.data[0].id;
+    window.localStorage.setItem(ADMIN_BRANCH_KEY, fallback);
+    setSelectedBranchId(fallback);
+  }, [branches.data, mode, selectedBranchId, user?.branchId]);
   const [logoutBusy, setLogoutBusy] = useState(false);
   const [logoutError, setLogoutError] = useState("");
   const logout = async () => {
@@ -316,13 +385,21 @@ function Shell({
   };
   const managerLinks = [
     ["/manager", "Overview", Gauge],
-    ["/manager/services", "Services", Ticket],
-    ["/manager/counters", "Counters", Building2],
-    ["/manager/staff", "Staff", UserCog],
     ["/manager/reports", "Reports", BarChart3],
-    ["/manager/audit", "Audit log", FileClock],
-    ["/manager/settings", "Settings", Settings],
   ] as const;
+  const adminLinks = [
+    ["/admin", "Overview", Gauge],
+    ["/admin/branches", "Branches", Building2],
+    ["/admin/staff", "Users", UserCog],
+    ["/admin/services", "Services", Ticket],
+    ["/admin/counters", "Counters", Activity],
+    ["/admin/settings", "Configuration", Settings],
+    ["/admin/audit", "Security & audit", FileClock],
+  ] as const;
+  const links = mode === "admin" ? adminLinks : managerLinks;
+  const activeBranch = branches.data?.find(
+    (branch) => branch.id === selectedBranchId,
+  );
   return (
     <div className="staff-shell">
       <aside className="sidebar">
@@ -331,13 +408,18 @@ function Shell({
           <div>
             Bank QMS
             <div className="sidebar-caption">
-              {mode === "manager" ? "Manager" : "Teller"} workspace
+              {mode === "admin"
+                ? "Administrator"
+                : mode === "manager"
+                  ? "Manager"
+                  : "Teller"}{" "}
+              workspace
             </div>
           </div>
         </div>
         <nav>
-          {mode === "manager" ? (
-            managerLinks.map(([path, label, Icon]) => (
+          {mode === "manager" || mode === "admin" ? (
+            links.map(([path, label, Icon]) => (
               <NavLink key={label} end={label === "Overview"} to={path}>
                 <Icon size={19} />
                 {label}
@@ -366,8 +448,32 @@ function Shell({
       <div className="workspace">
         <header className="workspace-header">
           <div>
-            <strong>{user?.branchName}</strong>
-            <span className="muted small"> · {user?.branchCode}</span>
+            <strong>{activeBranch?.name ?? user?.branchName}</strong>
+            <span className="muted small">
+              {" "}
+              · {activeBranch?.code ?? user?.branchCode}
+            </span>
+            {mode === "admin" && branches.data && (
+              <select
+                aria-label="Administration branch scope"
+                value={selectedBranchId || user?.branchId || ""}
+                onChange={(event) => {
+                  window.localStorage.setItem(
+                    ADMIN_BRANCH_KEY,
+                    event.target.value,
+                  );
+                  setSelectedBranchId(event.target.value);
+                  queryClient.clear();
+                  window.location.reload();
+                }}
+              >
+                {branches.data.map((branch) => (
+                  <option key={branch.id} value={branch.id}>
+                    {branch.code} · {branch.name}
+                  </option>
+                ))}
+              </select>
+            )}
           </div>
           <div className="session-actions">
             <div className="row">
@@ -461,8 +567,8 @@ function TellerWorkspace() {
           <p className="eyebrow">Start shift</p>
           <h1 className="section-title">Open your assigned counter</h1>
           <p className="muted">
-            Counter ownership is assigned by your manager and cannot be changed
-            from the teller workspace.
+            Counter ownership is assigned by an administrator and cannot be
+            changed from the teller workspace.
           </p>
           {error && <div className="error">{error}</div>}
           <div className="grid">
@@ -819,7 +925,7 @@ function ManagerPage({
   return (
     <Shell mode="manager">
       <main className="workspace-page">
-        <p className="eyebrow">Branch management</p>
+        <p className="eyebrow">Branch operations</p>
         <h1 className="section-title">{title}</h1>
         {subtitle && <p className="muted">{subtitle}</p>}
         {children}
@@ -828,11 +934,230 @@ function ManagerPage({
   );
 }
 
+function AdminPage({
+  title,
+  subtitle,
+  children,
+}: React.PropsWithChildren<{ title: string; subtitle?: string }>) {
+  return (
+    <Shell mode="admin">
+      <main className="workspace-page">
+        <p className="eyebrow">System administration</p>
+        <h1 className="section-title">{title}</h1>
+        {subtitle && <p className="muted">{subtitle}</p>}
+        {children}
+      </main>
+    </Shell>
+  );
+}
+
+function AdminOverview() {
+  const overview = useQuery<AdminOverviewResponse>({
+    queryKey: ["admin-overview"],
+    queryFn: () => api("/admin/overview"),
+  });
+  if (!overview.data)
+    return (
+      <AdminPage title="Administration overview">
+        <div className="card">Loading system administration…</div>
+      </AdminPage>
+    );
+  const data = overview.data;
+  return (
+    <AdminPage
+      title="Administration overview"
+      subtitle="System-wide identity, branch, configuration and security controls. Operational queue work remains in the Manager workspace."
+    >
+      <div className="grid kpi-grid">
+        <Metric
+          label="Active branches"
+          value={`${data.activeBranches}/${data.totalBranches}`}
+        />
+        <Metric label="Staff identities" value={data.totalStaff} />
+        <Metric label="Administrators" value={data.administrators} />
+        <Metric label="Locked accounts" value={data.lockedStaff} />
+      </div>
+      <div className="split">
+        <section className="card stack">
+          <h2>Configuration scope</h2>
+          <p className="muted">
+            Use the branch selector above to administer that branch’s users,
+            counters, services and queue policy.
+          </p>
+          <div className="row between">
+            <span>Active services across the system</span>
+            <strong>{data.activeServices}</strong>
+          </div>
+        </section>
+        <section className="card stack">
+          <h2>Security posture</h2>
+          <p className="muted">
+            Administrative changes are role-protected and written to the audit
+            log. Administrators cannot enter Manager or Teller routes.
+          </p>
+          <div className="row between">
+            <span>Open or paused teller sessions</span>
+            <strong>{data.activeSessions}</strong>
+          </div>
+        </section>
+      </div>
+    </AdminPage>
+  );
+}
+
+function BranchesPage() {
+  const qc = useQueryClient();
+  const branches = useQuery<AdminBranch[]>({
+    queryKey: ["admin-branches"],
+    queryFn: () => api("/admin/branches"),
+  });
+  const [form, setForm] = useState({
+    code: "",
+    name: "",
+    location: "",
+    timezone: "Africa/Addis_Ababa",
+  });
+  const [error, setError] = useState("");
+  const create = async () => {
+    setError("");
+    try {
+      await api("/admin/branches", {
+        method: "POST",
+        body: JSON.stringify(form),
+      });
+      setForm({
+        code: "",
+        name: "",
+        location: "",
+        timezone: "Africa/Addis_Ababa",
+      });
+      await qc.invalidateQueries({ queryKey: ["admin-branches"] });
+      await qc.invalidateQueries({ queryKey: ["admin-overview"] });
+    } catch (caught) {
+      setError(
+        caught instanceof Error ? caught.message : "Could not create branch.",
+      );
+    }
+  };
+  const toggle = async (branch: AdminBranch) => {
+    setError("");
+    try {
+      await api(`/admin/branches/${branch.id}`, {
+        method: "PATCH",
+        body: JSON.stringify({
+          status: branch.status === "ACTIVE" ? "INACTIVE" : "ACTIVE",
+        }),
+      });
+      await qc.invalidateQueries({ queryKey: ["admin-branches"] });
+      await qc.invalidateQueries({ queryKey: ["admin-overview"] });
+    } catch (caught) {
+      setError(
+        caught instanceof Error ? caught.message : "Could not update branch.",
+      );
+    }
+  };
+  return (
+    <AdminPage
+      title="Branch registry"
+      subtitle="Create branches and control whether they can accept operational traffic. Branch codes remain immutable after creation."
+    >
+      {error && <div className="error">{error}</div>}
+      <div className="split">
+        <div className="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Branch</th>
+                <th>Staff</th>
+                <th>Services</th>
+                <th>Counters</th>
+                <th>Status</th>
+                <th>Action</th>
+              </tr>
+            </thead>
+            <tbody>
+              {branches.data?.map((branch) => (
+                <tr key={branch.id}>
+                  <td>
+                    <strong>{branch.code}</strong> · {branch.name}
+                    <div className="small muted">
+                      {branch.location || branch.timezone}
+                    </div>
+                  </td>
+                  <td>{branch._count.staff}</td>
+                  <td>{branch._count.services}</td>
+                  <td>{branch._count.counters}</td>
+                  <td>{branch.status}</td>
+                  <td>
+                    <button
+                      className="secondary"
+                      onClick={() => void toggle(branch)}
+                    >
+                      {branch.status === "ACTIVE" ? "Deactivate" : "Activate"}
+                    </button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+        <div className="card stack">
+          <h2>Create branch</h2>
+          <label className="field">
+            <span>Branch code</span>
+            <input
+              maxLength={20}
+              value={form.code}
+              onChange={(event) =>
+                setForm({ ...form, code: event.target.value.toUpperCase() })
+              }
+            />
+          </label>
+          <label className="field">
+            <span>Name</span>
+            <input
+              value={form.name}
+              onChange={(event) =>
+                setForm({ ...form, name: event.target.value })
+              }
+            />
+          </label>
+          <label className="field">
+            <span>Location</span>
+            <input
+              value={form.location}
+              onChange={(event) =>
+                setForm({ ...form, location: event.target.value })
+              }
+            />
+          </label>
+          <label className="field">
+            <span>Timezone</span>
+            <input
+              value={form.timezone}
+              onChange={(event) =>
+                setForm({ ...form, timezone: event.target.value })
+              }
+            />
+          </label>
+          <button
+            className="primary"
+            disabled={!form.code || !form.name}
+            onClick={() => void create()}
+          >
+            Create branch
+          </button>
+        </div>
+      </div>
+    </AdminPage>
+  );
+}
+
 function ServicesPage() {
   const qc = useQueryClient();
   const list = useQuery<ManagerService[]>({
     queryKey: ["services"],
-    queryFn: () => api("/manager/services"),
+    queryFn: () => api(adminEndpoint("/admin/services")),
   });
   const [form, setForm] = useState({
     code: "",
@@ -843,7 +1168,7 @@ function ServicesPage() {
   const [error, setError] = useState("");
   const save = async () => {
     try {
-      await api("/manager/services", {
+      await api(adminEndpoint("/admin/services"), {
         method: "POST",
         body: JSON.stringify(form),
       });
@@ -859,7 +1184,7 @@ function ServicesPage() {
     }
   };
   return (
-    <ManagerPage
+    <AdminPage
       title="Service configuration"
       subtitle="Changes are audited; deactivation is blocked while active tickets exist."
     >
@@ -928,22 +1253,22 @@ function ServicesPage() {
           </button>
         </div>
       </div>
-    </ManagerPage>
+    </AdminPage>
   );
 }
 function CountersPage() {
   const qc = useQueryClient();
   const counters = useQuery<ManagerCounter[]>({
     queryKey: ["counters"],
-    queryFn: () => api("/manager/counters"),
+    queryFn: () => api(adminEndpoint("/admin/counters")),
   });
   const services = useQuery<NamedService[]>({
     queryKey: ["services"],
-    queryFn: () => api("/manager/services"),
+    queryFn: () => api(adminEndpoint("/admin/services")),
   });
   const [form, setForm] = useState({ label: "", assignedServiceId: "" });
   const create = async () => {
-    await api("/manager/counters", {
+    await api(adminEndpoint("/admin/counters"), {
       method: "POST",
       body: JSON.stringify(form),
     });
@@ -951,7 +1276,7 @@ function CountersPage() {
     void qc.invalidateQueries({ queryKey: ["counters"] });
   };
   return (
-    <ManagerPage title="Counter administration">
+    <AdminPage title="Counter administration">
       <div className="split">
         <div className="table-wrap">
           <table>
@@ -1005,18 +1330,18 @@ function CountersPage() {
           </button>
         </div>
       </div>
-    </ManagerPage>
+    </AdminPage>
   );
 }
 function StaffPage() {
   const qc = useQueryClient();
   const staff = useQuery<StaffListItem[]>({
     queryKey: ["staff"],
-    queryFn: () => api("/manager/staff"),
+    queryFn: () => api(adminEndpoint("/admin/staff")),
   });
   const counters = useQuery<ManagerCounter[]>({
     queryKey: ["counters"],
-    queryFn: () => api("/manager/counters"),
+    queryFn: () => api(adminEndpoint("/admin/counters")),
   });
   const [error, setError] = useState("");
   const [form, setForm] = useState({
@@ -1030,7 +1355,7 @@ function StaffPage() {
   const create = async () => {
     setError("");
     try {
-      await api("/manager/staff", {
+      await api(adminEndpoint("/admin/staff"), {
         method: "POST",
         body: JSON.stringify({
           ...form,
@@ -1059,7 +1384,7 @@ function StaffPage() {
   const reassign = async (staffId: string, assignedCounterId: string) => {
     setError("");
     try {
-      await api(`/manager/staff/${staffId}`, {
+      await api(adminEndpoint(`/admin/staff/${staffId}`), {
         method: "PATCH",
         body: JSON.stringify({ assignedCounterId }),
       });
@@ -1079,9 +1404,9 @@ function StaffPage() {
         !counter.assignedStaff || counter.assignedStaff.id === staffId,
     ) ?? [];
   return (
-    <ManagerPage
+    <AdminPage
       title="Staff access"
-      subtitle="Every teller has an independent account and one manager-controlled counter assignment."
+      subtitle="Every actor has an independent account; tellers receive one administrator-controlled counter assignment."
     >
       {error && <div className="error">{error}</div>}
       <div className="split">
@@ -1124,7 +1449,7 @@ function StaffPage() {
                         ))}
                       </select>
                     ) : (
-                      "Administration"
+                      "No counter required"
                     )}
                   </td>
                   <td>{s.status}</td>
@@ -1167,12 +1492,13 @@ function StaffPage() {
                   ...form,
                   role: e.target.value,
                   assignedCounterId:
-                    e.target.value === "MANAGER" ? "" : form.assignedCounterId,
+                    e.target.value === "TELLER" ? form.assignedCounterId : "",
                 })
               }
             >
               <option>TELLER</option>
               <option>MANAGER</option>
+              <option>ADMIN</option>
             </select>
           </label>
           {form.role === "TELLER" && (
@@ -1203,7 +1529,7 @@ function StaffPage() {
           </button>
         </div>
       </div>
-    </ManagerPage>
+    </AdminPage>
   );
 }
 function ReportsPage() {
@@ -1269,11 +1595,11 @@ function ReportsPage() {
 function AuditPage() {
   const logs = useQuery<AuditItem[]>({
     queryKey: ["audit"],
-    queryFn: () => api("/manager/audit-logs"),
+    queryFn: () => api(adminEndpoint("/admin/audit-logs")),
     refetchInterval: 10000,
   });
   return (
-    <ManagerPage title="Immutable audit log">
+    <AdminPage title="Security and audit log">
       <div className="table-wrap">
         <table>
           <thead>
@@ -1298,13 +1624,13 @@ function AuditPage() {
           </tbody>
         </table>
       </div>
-    </ManagerPage>
+    </AdminPage>
   );
 }
 function SettingsPage() {
   const settings = useQuery<SettingsResponse>({
     queryKey: ["settings"],
-    queryFn: () => api("/manager/settings"),
+    queryFn: () => api(adminEndpoint("/admin/settings")),
   });
   const [form, setForm] = useState<SettingsForm | null>(null);
   const values =
@@ -1314,17 +1640,17 @@ function SettingsPage() {
       : null);
   if (!values)
     return (
-      <ManagerPage title="Branch settings">
+      <AdminPage title="Branch configuration">
         <div className="card">Loading settings…</div>
-      </ManagerPage>
+      </AdminPage>
     );
   const save = () =>
-    api("/manager/settings", {
+    api(adminEndpoint("/admin/settings"), {
       method: "PATCH",
       body: JSON.stringify(values),
     });
   return (
-    <ManagerPage title="Branch settings">
+    <AdminPage title="Branch configuration">
       <div className="card stack" style={{ maxWidth: 700 }}>
         {[
           ["timezone", "Branch timezone"],
@@ -1355,7 +1681,7 @@ function SettingsPage() {
           Save audited settings
         </button>
       </div>
-    </ManagerPage>
+    </AdminPage>
   );
 }
 
@@ -1363,15 +1689,12 @@ function Protected({
   role,
   children,
 }: {
-  role: "TELLER" | "MANAGER";
+  role: "TELLER" | "MANAGER" | "ADMIN";
   children: React.ReactNode;
 }) {
   const { user } = React.useContext(AuthContext);
   if (!user) return <Navigate to="/login" replace />;
-  if (user.role !== role)
-    return (
-      <Navigate to={user.role === "MANAGER" ? "/manager" : "/teller"} replace />
-    );
+  if (user.role !== role) return <Navigate to={roleHome(user.role)} replace />;
   return children;
 }
 function Root() {
@@ -1424,30 +1747,6 @@ function Root() {
           }
         />
         <Route
-          path="/manager/services"
-          element={
-            <Protected role="MANAGER">
-              <ServicesPage />
-            </Protected>
-          }
-        />
-        <Route
-          path="/manager/counters"
-          element={
-            <Protected role="MANAGER">
-              <CountersPage />
-            </Protected>
-          }
-        />
-        <Route
-          path="/manager/staff"
-          element={
-            <Protected role="MANAGER">
-              <StaffPage />
-            </Protected>
-          }
-        />
-        <Route
           path="/manager/reports"
           element={
             <Protected role="MANAGER">
@@ -1456,17 +1755,57 @@ function Root() {
           }
         />
         <Route
-          path="/manager/audit"
+          path="/admin"
           element={
-            <Protected role="MANAGER">
+            <Protected role="ADMIN">
+              <AdminOverview />
+            </Protected>
+          }
+        />
+        <Route
+          path="/admin/branches"
+          element={
+            <Protected role="ADMIN">
+              <BranchesPage />
+            </Protected>
+          }
+        />
+        <Route
+          path="/admin/services"
+          element={
+            <Protected role="ADMIN">
+              <ServicesPage />
+            </Protected>
+          }
+        />
+        <Route
+          path="/admin/counters"
+          element={
+            <Protected role="ADMIN">
+              <CountersPage />
+            </Protected>
+          }
+        />
+        <Route
+          path="/admin/staff"
+          element={
+            <Protected role="ADMIN">
+              <StaffPage />
+            </Protected>
+          }
+        />
+        <Route
+          path="/admin/audit"
+          element={
+            <Protected role="ADMIN">
               <AuditPage />
             </Protected>
           }
         />
         <Route
-          path="/manager/settings"
+          path="/admin/settings"
           element={
-            <Protected role="MANAGER">
+            <Protected role="ADMIN">
               <SettingsPage />
             </Protected>
           }
@@ -1474,16 +1813,7 @@ function Root() {
         <Route
           path="*"
           element={
-            <Navigate
-              to={
-                user
-                  ? user.role === "MANAGER"
-                    ? "/manager"
-                    : "/teller"
-                  : "/login"
-              }
-              replace
-            />
+            <Navigate to={user ? roleHome(user.role) : "/login"} replace />
           }
         />
       </Routes>

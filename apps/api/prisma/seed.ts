@@ -16,6 +16,7 @@ function required(name: string) {
 async function main() {
   if (process.env.NODE_ENV === "production")
     throw new Error("Development seed is disabled in production.");
+  const adminPassword = required("DEV_ADMIN_PASSWORD");
   const managerPassword = required("DEV_MANAGER_PASSWORD");
   const tellerPassword = required("DEV_TELLER_PASSWORD");
   const branch = await prisma.branch.upsert({
@@ -106,6 +107,13 @@ async function main() {
     password: string;
     assignedCounterId?: string;
   }> = [
+    {
+      staffCode: "ADM-001",
+      name: "Development Administrator",
+      username: "admin.dev",
+      role: "ADMIN",
+      password: adminPassword,
+    },
     {
       staffCode: "MGR-001",
       name: "Development Manager",
@@ -242,7 +250,7 @@ async function main() {
   });
 
   console.log(
-    "Seeded MAIN with 4 services, 4 counters, 1 manager, 4 independently assigned tellers, 2 devices, and a cross-branch test fixture.",
+    "Seeded MAIN with 4 services, 4 counters, 1 administrator, 1 manager, 4 independently assigned tellers, 2 devices, and a cross-branch test fixture.",
   );
 }
 

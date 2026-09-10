@@ -1,5 +1,14 @@
 # Testing report
 
+## 2026-09-10 independent Administrator role
+
+- Added `ADMIN` as a third mutually exclusive staff role in Prisma, shared types, JWT claims, the NestJS role guard, development seed data, and the hosted D1 showcase identity model.
+- The Manager API now exposes only live branch operations and reports. Branches, users, counters, services, settings, security actions, and audit records moved behind `@Roles("ADMIN")` under `/admin/*`; Teller remains restricted to its assigned counter under `@Roles("TELLER")`.
+- The production staff web app now has separate `/admin`, `/manager`, and `/teller` route trees. Each tree has role-specific navigation and a visible logout action. The Admin console includes a system overview, branch registry, branch selector, staff identities, service/counter configuration, settings, and audit controls.
+- The private hosted showcase restores `/admin` as a real administrator-only surface. Admin, Manager, and Teller quick entries create distinct identities; an active identity must be logged out before another role can enter. Manager no longer receives configuration or audit controls.
+- `pnpm format:check`, `pnpm lint`, `pnpm typecheck`, 19 API unit tests, 16 hosted SQLite workflow tests, 17 repository/UI contracts, the complete NestJS/four-Vite-client build, and the hosted Sites build passed. The SQLite suite explicitly verifies all three cross-role boundaries and administrator-only mutations.
+- PostgreSQL integration, Playwright, concurrency, and Android compilation remain clean-CI gates. This execution environment does not provide Docker/PostgreSQL or Gradle; the Android source change in this checkpoint is message-only and does not alter application behavior.
+
 ## 2026-09-10 explicit cross-workspace entry
 
 - Opening the Teller entry while a Manager session is active now shows the signed-in Manager and a visible **Log out of Manager** action instead of silently returning to the Manager dashboard. The reverse Manager-entry/Teller-session case uses the same protected flow.
@@ -10,7 +19,7 @@
 
 - The hosted SQLite workflow suite passed 16/16 with all migrations, including five rounds of concurrent Call Next. New cases prove that a Manager session cannot become a Teller session without logout, a Manager receives `403` from the Teller surface and mutations, logout closes an idle teller counter, and an unresolved active ticket blocks logout without revoking the session.
 - Production API unit tests passed 19/19, including direct tests for transaction-safe teller logout. The PostgreSQL integration suite now also checks that Manager tokens are rejected by Teller endpoints and that idle teller counter sessions close on logout; this runtime did not provide Docker/PostgreSQL, so those database-backed cases remain a clean-CI gate.
-- Repository/UI contracts passed 17/17. They require actor-owned header navigation, visible logout controls, strict `@Roles("TELLER")` protection, the retired `/admin` redirect, and the absence of Administration, Teller, or Switch Staff links from the Manager header.
+- Repository/UI contracts passed 17/17. They require actor-owned header navigation, visible logout controls, strict Teller protection, and the absence of identity-switch controls.
 - `pnpm format:check`, `pnpm lint`, `pnpm typecheck`, `pnpm test`, the 16-test hosted workflow suite, and `pnpm build` passed. The production build covers NestJS, all four Vite clients, and the Sites compatibility application.
 - The localhost guide now documents prerequisites, environment values, seed accounts, all seven local URLs, a complete queue walkthrough, role-boundary checks, stop/reset commands, and every source directory.
 

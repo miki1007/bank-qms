@@ -1,4 +1,4 @@
-export type StaffRole = "TELLER" | "MANAGER";
+export type StaffRole = "TELLER" | "MANAGER" | "ADMIN";
 export type TicketStatus =
   "ISSUED" | "WAITING" | "CALLED" | "IN_SERVICE" | "COMPLETED" | "CANCELLED";
 

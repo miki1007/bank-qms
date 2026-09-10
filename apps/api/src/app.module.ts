@@ -17,6 +17,7 @@ import {
 import { TellerController, CounterSessionService } from "./modules/teller";
 import { QueueSelectionService } from "./modules/queue-selection.service";
 import {
+  AdminController,
   ManagerController,
   ManagerService,
   ReportQueryService,
@@ -47,6 +48,7 @@ import {
     CustomerQueueController,
     PublicController,
     TellerController,
+    AdminController,
     ManagerController,
     HealthController,
   ],

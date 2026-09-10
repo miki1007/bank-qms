@@ -41,7 +41,7 @@ type Snapshot = {
   actor?: {
     displayName: string;
     username: string;
-    role: "TELLER" | "MANAGER";
+    role: "TELLER" | "MANAGER" | "ADMIN";
     assignedCounter: string | null;
     assignedServiceCode: string | null;
   };
@@ -108,6 +108,10 @@ export function MobileStaffClient() {
         throw new Error(data.error || "Staff queue unavailable.");
       if (data.actor?.role === "MANAGER") {
         window.location.replace("/manager");
+        return;
+      }
+      if (data.actor?.role === "ADMIN") {
+        window.location.replace("/admin");
         return;
       }
       setSnapshot(data);
@@ -533,7 +537,7 @@ export function MobileStaffClient() {
               <LayoutDashboard />
               <span>
                 <strong>Open full manager dashboard</strong>
-                <small>Reports, counters, audit and settings</small>
+                <small>Live operations, queue monitoring and reports</small>
               </span>
             </a>
           </div>

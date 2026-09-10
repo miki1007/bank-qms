@@ -398,6 +398,183 @@ export class ManagerService {
     };
   }
 
+  async adminOverview() {
+    const [
+      totalBranches,
+      activeBranches,
+      totalStaff,
+      administrators,
+      lockedStaff,
+      activeServices,
+      activeSessions,
+    ] = await Promise.all([
+      this.prisma.branch.count(),
+      this.prisma.branch.count({ where: { status: "ACTIVE" } }),
+      this.prisma.staff.count(),
+      this.prisma.staff.count({ where: { role: "ADMIN", status: "ACTIVE" } }),
+      this.prisma.staff.count({
+        where: {
+          OR: [{ status: "LOCKED" }, { lockedUntil: { gt: new Date() } }],
+        },
+      }),
+      this.prisma.serviceType.count({ where: { status: "ACTIVE" } }),
+      this.prisma.counterSession.count({
+        where: { status: { in: ["OPEN", "PAUSED"] } },
+      }),
+    ]);
+    return {
+      totalBranches,
+      activeBranches,
+      totalStaff,
+      administrators,
+      lockedStaff,
+      activeServices,
+      activeSessions,
+    };
+  }
+
+  branches() {
+    return this.prisma.branch.findMany({
+      include: {
+        _count: {
+          select: {
+            staff: true,
+            services: true,
+            counters: true,
+            tickets: true,
+          },
+        },
+      },
+      orderBy: { code: "asc" },
+    });
+  }
+
+  async adminScope(user: RequestUser, requestedBranchId?: string) {
+    const branchId = requestedBranchId?.trim() || user.branchId;
+    const branch = await this.prisma.branch.findUnique({
+      where: { id: branchId },
+      select: { id: true },
+    });
+    if (!branch)
+      throw new DomainError("RESOURCE_NOT_FOUND", "Branch not found.", 404);
+    return { ...user, branchId: branch.id };
+  }
+
+  private validTimezone(timezone: string) {
+    try {
+      new Intl.DateTimeFormat("en", { timeZone: timezone }).format();
+      return true;
+    } catch {
+      return false;
+    }
+  }
+
+  private defaultBranchSettings() {
+    return {
+      noShowTimeoutSeconds: 120,
+      priorityFairnessLimit: 2,
+      kioskIdleTimeoutSeconds: 45,
+      displayHistoryCount: 5,
+      slaWaitMinutes: 20,
+      soundEnabled: true,
+    };
+  }
+
+  async createBranch(
+    user: RequestUser,
+    body: {
+      code?: string;
+      name?: string;
+      location?: string;
+      timezone?: string;
+    },
+  ) {
+    const code = body.code?.trim().toUpperCase() ?? "";
+    const name = body.name?.trim() ?? "";
+    const timezone = body.timezone?.trim() || "Africa/Addis_Ababa";
+    if (!/^[A-Z0-9-]{2,20}$/.test(code) || name.length < 2 || name.length > 120)
+      throw new DomainError(
+        "VALIDATION_ERROR",
+        "Use a 2–20 character branch code and a valid branch name.",
+        400,
+      );
+    if (!this.validTimezone(timezone))
+      throw new DomainError("VALIDATION_ERROR", "Timezone is invalid.", 400);
+    if (await this.prisma.branch.findUnique({ where: { code } }))
+      throw new DomainError(
+        "RESOURCE_CONFLICT",
+        "That branch code is already in use.",
+        409,
+      );
+    const branch = await this.prisma.branch.create({
+      data: {
+        code,
+        name,
+        location: body.location?.trim() || null,
+        timezone,
+        settings: this.defaultBranchSettings(),
+      },
+    });
+    await this.audit(user, "BRANCH_CREATE", "BRANCH", branch.id);
+    return branch;
+  }
+
+  async updateBranch(
+    user: RequestUser,
+    id: string,
+    body: Record<string, unknown>,
+  ) {
+    const existing = await this.prisma.branch.findUnique({ where: { id } });
+    if (!existing)
+      throw new DomainError("RESOURCE_NOT_FOUND", "Branch not found.", 404);
+    const name = typeof body.name === "string" ? body.name.trim() : undefined;
+    const timezone =
+      typeof body.timezone === "string" ? body.timezone.trim() : undefined;
+    if (name !== undefined && (name.length < 2 || name.length > 120))
+      throw new DomainError("VALIDATION_ERROR", "Branch name is invalid.", 400);
+    if (timezone !== undefined && !this.validTimezone(timezone))
+      throw new DomainError("VALIDATION_ERROR", "Timezone is invalid.", 400);
+    const status =
+      body.status === "ACTIVE" || body.status === "INACTIVE"
+        ? body.status
+        : undefined;
+    if (status === "INACTIVE" && existing.status !== "INACTIVE") {
+      const [activeTickets, activeSessions] = await Promise.all([
+        this.prisma.ticket.count({
+          where: {
+            branchId: id,
+            status: { in: ["WAITING", "CALLED", "IN_SERVICE"] },
+          },
+        }),
+        this.prisma.counterSession.count({
+          where: { branchId: id, status: { in: ["OPEN", "PAUSED"] } },
+        }),
+      ]);
+      if (activeTickets || activeSessions)
+        throw new DomainError(
+          "COUNTER_BUSY",
+          "Close active sessions and resolve active tickets before deactivating this branch.",
+          409,
+        );
+    }
+    const branch = await this.prisma.branch.update({
+      where: { id },
+      data: {
+        name,
+        location:
+          typeof body.location === "string"
+            ? body.location.trim() || null
+            : body.location === null
+              ? null
+              : undefined,
+        timezone,
+        status,
+      },
+    });
+    await this.audit({ ...user, branchId: id }, "BRANCH_UPDATE", "BRANCH", id);
+    return branch;
+  }
+
   services(branchId: string) {
     return this.prisma.serviceType.findMany({
       where: { branchId },
@@ -635,7 +812,10 @@ export class ManagerService {
       !body.username ||
       !body.password ||
       body.password.length < 8 ||
-      !body.role
+      !body.role ||
+      (body.role !== "TELLER" &&
+        body.role !== "MANAGER" &&
+        body.role !== "ADMIN")
     )
       throw new DomainError(
         "VALIDATION_ERROR",
@@ -696,16 +876,42 @@ export class ManagerService {
         404,
       );
     const nextRole =
-      body.role === "TELLER" || body.role === "MANAGER"
+      body.role === "TELLER" || body.role === "MANAGER" || body.role === "ADMIN"
         ? body.role
         : target.role;
+    const nextStatus =
+      body.status === "ACTIVE" ||
+      body.status === "INACTIVE" ||
+      body.status === "LOCKED"
+        ? body.status
+        : target.status;
+    if (id === user.sub && (nextRole !== "ADMIN" || nextStatus !== "ACTIVE"))
+      throw new DomainError(
+        "VALIDATION_ERROR",
+        "An administrator cannot remove or lock their own active administrator access.",
+        400,
+      );
+    if (
+      target.role === "ADMIN" &&
+      (nextRole !== "ADMIN" || nextStatus !== "ACTIVE") &&
+      (await this.prisma.staff.count({
+        where: { role: "ADMIN", status: "ACTIVE", id: { not: id } },
+      })) === 0
+    )
+      throw new DomainError(
+        "VALIDATION_ERROR",
+        "At least one active administrator account must remain.",
+        400,
+      );
     const requestedCounterId =
       typeof body.assignedCounterId === "string"
         ? body.assignedCounterId
         : body.assignedCounterId === null
           ? null
           : target.assignedCounterId;
-    const nextCounterId = nextRole === "MANAGER" ? null : requestedCounterId;
+    const nextCounterId = nextRole === "TELLER" ? requestedCounterId : null;
+    const accessChanged =
+      nextRole !== target.role || nextStatus !== target.status;
     if (nextRole === "TELLER" && !nextCounterId)
       throw new DomainError(
         "VALIDATION_ERROR",
@@ -734,20 +940,14 @@ export class ManagerService {
       data: {
         name: typeof body.name === "string" ? body.name : undefined,
         role:
-          body.role === "TELLER" || body.role === "MANAGER"
+          body.role === "TELLER" ||
+          body.role === "MANAGER" ||
+          body.role === "ADMIN"
             ? body.role
             : undefined,
         assignedCounterId: nextCounterId,
-        status:
-          body.status === "ACTIVE" ||
-          body.status === "INACTIVE" ||
-          body.status === "LOCKED"
-            ? body.status
-            : undefined,
-        authVersion:
-          body.status === "INACTIVE" || body.status === "LOCKED"
-            ? { increment: 1 }
-            : undefined,
+        status: nextStatus,
+        authVersion: accessChanged ? { increment: 1 } : undefined,
       },
       select: {
         id: true,
@@ -759,7 +959,7 @@ export class ManagerService {
         assignedCounter: { select: { id: true, label: true } },
       },
     });
-    if (staff.status !== "ACTIVE")
+    if (accessChanged)
       await this.prisma.refreshSession.updateMany({
         where: { staffId: id, revokedAt: null },
         data: { revokedAt: new Date() },
@@ -946,97 +1146,6 @@ export class ManagerController {
   @Get("dashboard/live") dashboard(@CurrentUser() user: RequestUser) {
     return this.manager.dashboard(user.branchId);
   }
-  @Get("services") services(@CurrentUser() user: RequestUser) {
-    return this.manager.services(user.branchId);
-  }
-  @Post("services") createService(
-    @CurrentUser() user: RequestUser,
-    @Body() body: Parameters<ManagerService["createService"]>[1],
-  ) {
-    return this.manager.createService(user, body);
-  }
-  @Patch("services/:id") updateService(
-    @CurrentUser() user: RequestUser,
-    @Param("id") id: string,
-    @Body() body: Record<string, unknown>,
-  ) {
-    return this.manager.updateService(user, id, body);
-  }
-  @Post("services/:id/activate") activateService(
-    @CurrentUser() user: RequestUser,
-    @Param("id") id: string,
-  ) {
-    return this.manager.updateService(user, id, { status: "ACTIVE" });
-  }
-  @Post("services/:id/deactivate") deactivateService(
-    @CurrentUser() user: RequestUser,
-    @Param("id") id: string,
-  ) {
-    return this.manager.updateService(user, id, { status: "INACTIVE" });
-  }
-  @Get("counters") counters(@CurrentUser() user: RequestUser) {
-    return this.manager.counters(user.branchId);
-  }
-  @Post("counters") createCounter(
-    @CurrentUser() user: RequestUser,
-    @Body() body: Parameters<ManagerService["createCounter"]>[1],
-  ) {
-    return this.manager.createCounter(user, body);
-  }
-  @Patch("counters/:id") updateCounter(
-    @CurrentUser() user: RequestUser,
-    @Param("id") id: string,
-    @Body() body: Record<string, unknown>,
-  ) {
-    return this.manager.updateCounter(user, id, body);
-  }
-  @Post("counters/:id/assign-service") assignCounter(
-    @CurrentUser() user: RequestUser,
-    @Param("id") id: string,
-    @Body() body: { serviceTypeId?: string },
-  ) {
-    return this.manager.updateCounter(user, id, {
-      assignedServiceId: body.serviceTypeId,
-    });
-  }
-  @Get("staff") staff(@CurrentUser() user: RequestUser) {
-    return this.manager.staff(user.branchId);
-  }
-  @Post("staff") createStaff(
-    @CurrentUser() user: RequestUser,
-    @Body() body: Parameters<ManagerService["createStaff"]>[1],
-  ) {
-    return this.manager.createStaff(user, body);
-  }
-  @Patch("staff/:id") updateStaff(
-    @CurrentUser() user: RequestUser,
-    @Param("id") id: string,
-    @Body() body: Record<string, unknown>,
-  ) {
-    return this.manager.updateStaff(user, id, body);
-  }
-  @Post("staff/:id/reset-password") resetPassword(
-    @CurrentUser() user: RequestUser,
-    @Param("id") id: string,
-    @Body() body: { password?: string },
-  ) {
-    return this.manager.resetPassword(user, id, body.password ?? "");
-  }
-  @Post("staff/:id/unlock") unlock(
-    @CurrentUser() user: RequestUser,
-    @Param("id") id: string,
-  ) {
-    return this.manager.unlock(user, id);
-  }
-  @Get("settings") settings(@CurrentUser() user: RequestUser) {
-    return this.manager.settings(user.branchId);
-  }
-  @Patch("settings") updateSettings(
-    @CurrentUser() user: RequestUser,
-    @Body() body: Record<string, unknown>,
-  ) {
-    return this.manager.updateSettings(user, body);
-  }
   @Get("reports/summary") report(
     @CurrentUser() user: RequestUser,
     @Query() query: ReportFilters,
@@ -1051,10 +1160,221 @@ export class ManagerController {
     await this.manager.audit(user, "REPORT_EXPORT", "REPORT", user.branchId);
     return this.reports.toCsv(report);
   }
-  @Get("audit-logs") audit(
+}
+
+@UseGuards(JwtAuthGuard, RolesGuard)
+@Roles("ADMIN")
+@Controller("admin")
+export class AdminController {
+  constructor(
+    @Inject(ManagerService) private readonly administration: ManagerService,
+  ) {}
+
+  @Get("overview") overview() {
+    return this.administration.adminOverview();
+  }
+
+  @Get("branches") branches() {
+    return this.administration.branches();
+  }
+
+  @Post("branches") createBranch(
+    @CurrentUser() user: RequestUser,
+    @Body() body: Parameters<ManagerService["createBranch"]>[1],
+  ) {
+    return this.administration.createBranch(user, body);
+  }
+
+  @Patch("branches/:id") updateBranch(
+    @CurrentUser() user: RequestUser,
+    @Param("id") id: string,
+    @Body() body: Record<string, unknown>,
+  ) {
+    return this.administration.updateBranch(user, id, body);
+  }
+
+  private scope(user: RequestUser, branchId?: string) {
+    return this.administration.adminScope(user, branchId);
+  }
+
+  @Get("services") async services(
+    @CurrentUser() user: RequestUser,
+    @Query("branchId") branchId?: string,
+  ) {
+    const scoped = await this.scope(user, branchId);
+    return this.administration.services(scoped.branchId);
+  }
+
+  @Post("services") async createService(
+    @CurrentUser() user: RequestUser,
+    @Query("branchId") branchId: string | undefined,
+    @Body() body: Parameters<ManagerService["createService"]>[1],
+  ) {
+    return this.administration.createService(
+      await this.scope(user, branchId),
+      body,
+    );
+  }
+
+  @Patch("services/:id") async updateService(
+    @CurrentUser() user: RequestUser,
+    @Query("branchId") branchId: string | undefined,
+    @Param("id") id: string,
+    @Body() body: Record<string, unknown>,
+  ) {
+    return this.administration.updateService(
+      await this.scope(user, branchId),
+      id,
+      body,
+    );
+  }
+
+  @Post("services/:id/activate") async activateService(
+    @CurrentUser() user: RequestUser,
+    @Query("branchId") branchId: string | undefined,
+    @Param("id") id: string,
+  ) {
+    return this.administration.updateService(
+      await this.scope(user, branchId),
+      id,
+      { status: "ACTIVE" },
+    );
+  }
+
+  @Post("services/:id/deactivate") async deactivateService(
+    @CurrentUser() user: RequestUser,
+    @Query("branchId") branchId: string | undefined,
+    @Param("id") id: string,
+  ) {
+    return this.administration.updateService(
+      await this.scope(user, branchId),
+      id,
+      { status: "INACTIVE" },
+    );
+  }
+
+  @Get("counters") async counters(
+    @CurrentUser() user: RequestUser,
+    @Query("branchId") branchId?: string,
+  ) {
+    const scoped = await this.scope(user, branchId);
+    return this.administration.counters(scoped.branchId);
+  }
+
+  @Post("counters") async createCounter(
+    @CurrentUser() user: RequestUser,
+    @Query("branchId") branchId: string | undefined,
+    @Body() body: Parameters<ManagerService["createCounter"]>[1],
+  ) {
+    return this.administration.createCounter(
+      await this.scope(user, branchId),
+      body,
+    );
+  }
+
+  @Patch("counters/:id") async updateCounter(
+    @CurrentUser() user: RequestUser,
+    @Query("branchId") branchId: string | undefined,
+    @Param("id") id: string,
+    @Body() body: Record<string, unknown>,
+  ) {
+    return this.administration.updateCounter(
+      await this.scope(user, branchId),
+      id,
+      body,
+    );
+  }
+
+  @Post("counters/:id/assign-service") async assignCounter(
+    @CurrentUser() user: RequestUser,
+    @Query("branchId") branchId: string | undefined,
+    @Param("id") id: string,
+    @Body() body: { serviceTypeId?: string },
+  ) {
+    return this.administration.updateCounter(
+      await this.scope(user, branchId),
+      id,
+      { assignedServiceId: body.serviceTypeId },
+    );
+  }
+
+  @Get("staff") async staff(
+    @CurrentUser() user: RequestUser,
+    @Query("branchId") branchId?: string,
+  ) {
+    const scoped = await this.scope(user, branchId);
+    return this.administration.staff(scoped.branchId);
+  }
+
+  @Post("staff") async createStaff(
+    @CurrentUser() user: RequestUser,
+    @Query("branchId") branchId: string | undefined,
+    @Body() body: Parameters<ManagerService["createStaff"]>[1],
+  ) {
+    return this.administration.createStaff(
+      await this.scope(user, branchId),
+      body,
+    );
+  }
+
+  @Patch("staff/:id") async updateStaff(
+    @CurrentUser() user: RequestUser,
+    @Query("branchId") branchId: string | undefined,
+    @Param("id") id: string,
+    @Body() body: Record<string, unknown>,
+  ) {
+    return this.administration.updateStaff(
+      await this.scope(user, branchId),
+      id,
+      body,
+    );
+  }
+
+  @Post("staff/:id/reset-password") async resetPassword(
+    @CurrentUser() user: RequestUser,
+    @Query("branchId") branchId: string | undefined,
+    @Param("id") id: string,
+    @Body() body: { password?: string },
+  ) {
+    return this.administration.resetPassword(
+      await this.scope(user, branchId),
+      id,
+      body.password ?? "",
+    );
+  }
+
+  @Post("staff/:id/unlock") async unlock(
+    @CurrentUser() user: RequestUser,
+    @Query("branchId") branchId: string | undefined,
+    @Param("id") id: string,
+  ) {
+    return this.administration.unlock(await this.scope(user, branchId), id);
+  }
+
+  @Get("settings") async settings(
+    @CurrentUser() user: RequestUser,
+    @Query("branchId") branchId?: string,
+  ) {
+    const scoped = await this.scope(user, branchId);
+    return this.administration.settings(scoped.branchId);
+  }
+
+  @Patch("settings") async updateSettings(
+    @CurrentUser() user: RequestUser,
+    @Query("branchId") branchId: string | undefined,
+    @Body() body: Record<string, unknown>,
+  ) {
+    return this.administration.updateSettings(
+      await this.scope(user, branchId),
+      body,
+    );
+  }
+
+  @Get("audit-logs") async audit(
     @CurrentUser() user: RequestUser,
     @Query() query: Record<string, string | undefined>,
   ) {
-    return this.manager.auditLogs(user.branchId, query);
+    const scoped = await this.scope(user, query.branchId);
+    return this.administration.auditLogs(scoped.branchId, query);
   }
 }

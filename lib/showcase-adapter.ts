@@ -62,7 +62,7 @@ export type StaffDirectoryEntry = {
   id: string;
   username: string;
   display_name: string;
-  role: "TELLER" | "MANAGER";
+  role: "TELLER" | "MANAGER" | "ADMIN";
   assigned_counter: string | null;
   assigned_service_code: string | null;
   active: number;

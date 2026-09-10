@@ -1,7 +1,7 @@
 import { getShowcaseDb } from "@/lib/showcase-adapter";
 import { BANK_BRANCHES, DEFAULT_BRANCH_CODE } from "@/lib/bank-brand";
 
-export type ShowcaseRole = "TELLER" | "MANAGER";
+export type ShowcaseRole = "TELLER" | "MANAGER" | "ADMIN";
 
 export type ShowcaseActor = {
   id: string;
@@ -19,6 +19,17 @@ const SESSION_SECONDS = 60 * 60 * 4;
 const PBKDF2_ITERATIONS = 100_000;
 
 const baseShowcaseStaff = [
+  {
+    id: "showcase-admin",
+    username: "admin.dev",
+    displayName: "Showcase Administrator",
+    role: "ADMIN" as const,
+    assignedCounter: null,
+    assignedServiceCode: null,
+    salt: "42347debaf04f652d29a982200c05ba1",
+    passwordHash:
+      "356ccf97995de685fc013a028d680e0d0a2be0396026e1913e48532027d02af0",
+  },
   {
     id: "showcase-manager",
     username: "manager.dev",

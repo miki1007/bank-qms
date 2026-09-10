@@ -91,7 +91,7 @@ The MVP is successful when:
 - Every ticket status change is recorded with a timestamp and responsible actor.
 - The public display reflects a call within two seconds.
 - A manager can view daily and weekly counts, average waiting time, and average service time.
-- Role restrictions prevent tellers from opening manager-only features.
+- Role restrictions keep administrator, manager, and teller workspaces mutually exclusive.
 - Core automated tests pass and all critical acceptance scenarios are verified.
 
 ---
@@ -108,6 +108,8 @@ The MVP is successful when:
 - Ticket lookup using ticket number plus a private cancellation code or QR code.
 - Customer cancellation while the ticket is waiting.
 - Staff authentication and role-based authorization.
+- Separate administrator, manager, and teller workspaces with logout-only identity changes.
+- Administrator-controlled branch registry, staff identities, services, counters, settings, and audit access.
 - Teller-counter assignment.
 - Counter opening, closing, pausing, and service reassignment.
 - Calling the next eligible customer.
@@ -142,7 +144,7 @@ The MVP is successful when:
 - SMS notification when a ticket is close to being called.
 - Mobile and web ticket creation before arriving at the branch.
 - Appointment booking.
-- Full multi-branch administration.
+- Enterprise-wide branch orchestration beyond the implemented branch registry and branch-scoped configuration.
 - Customer feedback and service rating.
 - Voice announcements in English and Amharic.
 - Digital signage content rotation.
@@ -153,32 +155,32 @@ The MVP is successful when:
 
 ## 6. Stakeholders and Actors
 
-| Actor                | Type                      | Responsibilities                                                                                                      | Authentication                                                          |
-| -------------------- | ------------------------- | --------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------- |
-| Customer             | Human                     | Select service, request priority service, generate ticket, print ticket, view status, cancel waiting ticket           | No staff login; ticket access uses ticket number and private code/QR    |
-| Teller               | Human                     | Sign in, open assigned counter session, call next, recall, start service, complete, transfer, mark no-show            | Username and password                                                   |
-| Branch Manager       | Human                     | Monitor branch operations; configure services/counters, assign staff, manage accounts, view reports and audit records | Username and password; manager role                                     |
-| Display Screen       | System boundary device    | Subscribe to branch events and show called tickets/counters                                                           | Device token or read-only display key                                   |
-| Kiosk                | System boundary device    | Present services, create/print tickets, support status lookup and cancellation                                        | Registered kiosk device key for production; optional in local prototype |
-| System Administrator | Supporting technical role | Initial deployment, environment configuration, database backup, service health                                        | Infrastructure access; not a normal in-app MVP role                     |
+| Actor                | Type                   | Responsibilities                                                                                            | Authentication                                                          |
+| -------------------- | ---------------------- | ----------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------- |
+| Customer             | Human                  | Select service, request priority service, generate ticket, print ticket, view status, cancel waiting ticket | Customer identity or private ticket proof                               |
+| Teller               | Human                  | Serve the queue only from one assigned counter                                                              | Username and password; teller role                                      |
+| Branch Manager       | Human                  | Monitor branch queues, counters, sessions, analytics, and reports                                           | Username and password; manager role                                     |
+| System Administrator | Human                  | Govern branches, staff identities, counters, services, settings, security, and audit                        | Username and password; administrator role                               |
+| Display Screen       | System boundary device | Subscribe to branch events and show called tickets/counters                                                 | Device token or read-only display key                                   |
+| Kiosk                | System boundary device | Present services, create/print tickets, support status lookup and cancellation                              | Registered kiosk device key for production; optional in local prototype |
 
 ### 6.1 Role permissions
 
-| Capability                     | Customer/Kiosk | Teller |        Manager         | Display |
-| ------------------------------ | :------------: | :----: | :--------------------: | :-----: |
-| View active services           |      Yes       |  Yes   |          Yes           |   No    |
-| Generate ticket                |      Yes       |   No   | Optional assisted mode |   No    |
-| View own ticket status         |      Yes       |   No   |          Yes           |   No    |
-| Cancel waiting ticket          |      Yes       |   No   | Yes with audit reason  |   No    |
-| Call next ticket               |       No       |  Yes   |           No           |   No    |
-| Start/complete service         |       No       |  Yes   |           No           |   No    |
-| Mark no-show                   |       No       |  Yes   |           No           |   No    |
-| Transfer ticket                |       No       |  Yes   |           No           |   No    |
-| Open/close own counter session |       No       |  Yes   |           No           |   No    |
-| Configure counters/services    |       No       |   No   |          Yes           |   No    |
-| Manage staff accounts          |       No       |   No   |          Yes           |   No    |
-| View reports                   |       No       |   No   |          Yes           |   No    |
-| Receive public call updates    |       No       |   No   |          Yes           |   Yes   |
+| Capability                     | Customer/Kiosk | Teller | Manager | Administrator | Display |
+| ------------------------------ | :------------: | :----: | :-----: | :-----------: | :-----: |
+| View active services           |      Yes       |  Yes   |   Yes   |      Yes      |   No    |
+| Generate ticket                |      Yes       |   No   |   No    |      No       |   No    |
+| View own ticket status         |      Yes       |   No   |   No    |      No       |   No    |
+| Cancel waiting ticket          |      Yes       |   No   |   No    |      No       |   No    |
+| Call/start/complete ticket     |       No       |  Yes   |   No    |      No       |   No    |
+| Mark no-show or transfer       |       No       |  Yes   |   No    |      No       |   No    |
+| Open/close own counter session |       No       |  Yes   |   No    |      No       |   No    |
+| Monitor branch operations      |       No       |   No   |   Yes   |      No       |   No    |
+| Configure counters/services    |       No       |   No   |   No    |      Yes      |   No    |
+| Manage branches/staff          |       No       |   No   |   No    |      Yes      |   No    |
+| View reports / export CSV      |       No       |   No   |   Yes   |      No       |   No    |
+| View security audit            |       No       |   No   |   No    |      Yes      |   No    |
+| Receive public call updates    |       No       |   No   |   Yes   |      No       |   Yes   |
 
 ---
 
@@ -229,17 +231,24 @@ It shows:
 
 ### 7.4 Manager dashboard
 
-Authenticated administration and reporting interface.
+Authenticated branch-operations and reporting interface.
 
 It includes:
 
 - Live branch dashboard.
-- Counter management.
-- Service-type configuration.
-- Staff account management.
 - Reports and CSV export.
-- Audit-log viewer.
+
+### 7.5 Administrator console
+
+Authenticated system-governance interface.
+
+It includes:
+
+- Branch registry and branch activation state.
+- Staff identity and teller-counter assignment management.
+- Counter and service configuration.
 - Branch-level settings for wait-time and no-show behavior.
+- Security operations and an immutable audit-log viewer.
 
 ---
 
@@ -265,7 +274,7 @@ The following rules are mandatory unless explicitly changed by a future approved
 - **BR-011:** Standard tickets are ordered first-come-first-served by `queue_entered_at`, then by sequence number.
 - **BR-012:** Priority tickets are ordered first-come-first-served within the priority group.
 - **BR-013:** Priority handling must use a starvation-safe policy. The default is at most two consecutive priority tickets when standard tickets are waiting; the next call must select the oldest standard ticket.
-- **BR-014:** A manager can configure the maximum consecutive priority calls from 1 to 5.
+- **BR-014:** An administrator can configure the maximum consecutive priority calls from 1 to 5.
 - **BR-015:** A transfer adds the ticket to the destination queue using the transfer time as its new queue-entry time, while preserving the ticket's complete history.
 - **BR-016:** A no-show returns the ticket to `WAITING`, increments `no_show_count`, and records a new queue-entry time.
 - **BR-017:** Queue positions and estimated waits are informational and may change as counters open, close, transfer, or handle priority customers.
@@ -295,7 +304,7 @@ The following rules are mandatory unless explicitly changed by a future approved
 ### 8.5 Security and audit rules
 
 - **BR-034:** Staff passwords are never stored in plain text.
-- **BR-035:** Manager-only operations are enforced by the backend, not only hidden in the UI.
+- **BR-035:** Administrator, manager, and teller operations are mutually exclusive and enforced by backend role guards, not only hidden in the UI.
 - **BR-036:** Login, logout, failed login, staff changes, service changes, counter changes, ticket overrides, and report exports are audited.
 - **BR-037:** Public displays receive only non-sensitive ticket and counter data.
 - **BR-038:** All API inputs are validated server-side.
@@ -356,20 +365,20 @@ The following rules are mandatory unless explicitly changed by a future approved
 ### 9.3 Manager requirements
 
 - **FR-042:** A manager shall see a live overview of queues, counters, active tickets, and staff sessions for the manager's branch.
-- **FR-043:** A manager shall create, edit, activate, deactivate, and reorder service types.
-- **FR-044:** A manager shall configure service code, display name, description, average-service-time baseline, and priority availability.
-- **FR-045:** A manager shall create, edit, activate, and deactivate counters.
-- **FR-046:** A manager shall open, close, pause, or reassign an inactive counter.
+- **FR-043:** An administrator shall create, edit, activate, deactivate, and reorder service types.
+- **FR-044:** An administrator shall configure service code, display name, description, average-service-time baseline, and priority availability.
+- **FR-045:** An administrator shall create, edit, activate, and deactivate counters.
+- **FR-046:** An administrator shall reassign an inactive counter.
 - **FR-047:** Reassigning a counter with an active ticket shall be blocked.
-- **FR-048:** A manager shall create teller and manager accounts within the manager's authorized branch scope.
-- **FR-049:** A manager shall activate, deactivate, unlock, and reset staff credentials.
-- **FR-050:** A manager shall never be able to view an existing password.
+- **FR-048:** An administrator shall create administrator, manager, and teller accounts within an explicitly selected branch scope.
+- **FR-049:** An administrator shall activate, deactivate, unlock, and reset staff credentials.
+- **FR-050:** An administrator shall never be able to view an existing password.
 - **FR-051:** A manager shall view daily and weekly reports.
 - **FR-052:** Reports shall support date range, service, counter, and teller filters.
 - **FR-053:** A manager shall export filtered report results as CSV.
-- **FR-054:** A manager shall view an audit log filtered by action, actor, target type, and date.
-- **FR-055:** A manager shall configure no-show timeout and priority fairness settings within allowed ranges.
-- **FR-056:** A manager may cancel a waiting or called ticket only with a recorded reason.
+- **FR-054:** An administrator shall view an audit log filtered by action, actor, target type, and date.
+- **FR-055:** An administrator shall configure no-show timeout and priority fairness settings within allowed ranges.
+- **FR-056:** Each staff actor shall have a visible logout action and shall never receive a cross-role switch control.
 
 ### 9.4 Display requirements
 
@@ -734,27 +743,7 @@ Actions by state:
 - Counter cards by state.
 - Long-wait alert list.
 
-#### M-02 Counters
-
-- Counter label, state, teller, service, active ticket, session duration.
-- Create/edit counter.
-- Assign/reassign service.
-- Pause/resume/close eligible counter.
-
-#### M-03 Services
-
-- Display order.
-- Code, name, status, baseline time, priority enabled.
-- Create/edit/activate/deactivate.
-- Prevent invalid deactivation.
-
-#### M-04 Staff
-
-- Name, username, role, branch, status, last login.
-- Create, edit, deactivate, unlock, reset password.
-- No password display.
-
-#### M-05 Reports
+#### M-02 Reports
 
 - Date range.
 - Service/counter/teller filters.
@@ -763,13 +752,48 @@ Actions by state:
 - Detailed table.
 - CSV export.
 
-#### M-06 Audit log
+The Manager workspace does not expose administrator or teller navigation.
+
+### 13.5 Administrator screen map
+
+#### A-01 Administration overview
+
+- System-wide branch, staff, service, session, and locked-account counts.
+- Explicit selected-branch scope for configuration work.
+
+#### A-02 Branches
+
+- Create branch with immutable branch code.
+- View branch staff, service, counter, and ticket counts.
+- Activate/deactivate only after active-ticket and session checks.
+
+#### A-03 Counters
+
+- Counter label, state, teller, service, active ticket, session duration.
+- Create/edit counter.
+- Assign/reassign service.
+- Pause/resume/close eligible counter.
+
+#### A-04 Services
+
+- Display order.
+- Code, name, status, baseline time, priority enabled.
+- Create/edit/activate/deactivate.
+- Prevent invalid deactivation.
+
+#### A-05 Staff
+
+- Name, username, role, branch, status, last login.
+- Create administrator, manager, and teller identities; edit, deactivate, unlock, and reset password.
+- No password display.
+
+#### A-06 Security and audit log
 
 - Time, actor, role, action, target, outcome, source IP/device, correlation ID.
 - Filters and pagination.
 - Read-only.
 
-#### M-07 Settings
+#### A-07 Settings
 
 - Branch timezone.
 - Ticket number format.
@@ -778,7 +802,9 @@ Actions by state:
 - Priority fairness limit.
 - Display history count.
 
-### 13.5 Display screen
+The Administrator workspace does not expose manager or teller navigation.
+
+### 13.6 Display screen
 
 - Landscape 16:9 responsive layout.
 - Current call uses at least 50% of the display area.
@@ -943,7 +969,11 @@ Specializes the staff role. Participates in counter sessions and ticket operatio
 
 #### `BranchManager`
 
-Specializes the staff role. Configures branch resources, manages staff, and accesses reports.
+Specializes the staff role. Monitors branch operations and accesses reports.
+
+#### `Administrator`
+
+Specializes the staff role. Governs branches, identities, services, counters, configuration, security, and audit records.
 
 #### `Branch`
 
@@ -1065,7 +1095,7 @@ Unique index: `(branch_id, code)`.
 | `name`               | VARCHAR(120) | Required                       |
 | `username`           | VARCHAR(80)  | Case-normalized unique         |
 | `password_hash`      | TEXT         | Required                       |
-| `role`               | ENUM         | `TELLER`, `MANAGER`            |
+| `role`               | ENUM         | `TELLER`, `MANAGER`, `ADMIN`   |
 | `status`             | ENUM         | `ACTIVE`, `INACTIVE`, `LOCKED` |
 | `failed_login_count` | INTEGER      | Default 0                      |
 | `locked_until`       | TIMESTAMPTZ  | Nullable                       |
@@ -1259,26 +1289,36 @@ Every mutation accepts an `Idempotency-Key` header where repeat submission could
 
 ### 19.4 Manager endpoints
 
-| Method      | Endpoint                               | Purpose                                    |
-| ----------- | -------------------------------------- | ------------------------------------------ |
-| `GET`       | `/manager/dashboard/live`              | Live branch snapshot                       |
-| `GET/POST`  | `/manager/services`                    | List/create services                       |
-| `GET/PATCH` | `/manager/services/:id`                | Read/update service                        |
-| `POST`      | `/manager/services/:id/activate`       | Activate service                           |
-| `POST`      | `/manager/services/:id/deactivate`     | Deactivate after validation                |
-| `GET/POST`  | `/manager/counters`                    | List/create counters                       |
-| `GET/PATCH` | `/manager/counters/:id`                | Read/update counter                        |
-| `POST`      | `/manager/counters/:id/assign-service` | Reassign eligible counter                  |
-| `GET/POST`  | `/manager/staff`                       | List/create staff                          |
-| `GET/PATCH` | `/manager/staff/:id`                   | Read/update staff                          |
-| `POST`      | `/manager/staff/:id/reset-password`    | Set temporary credential or reset workflow |
-| `POST`      | `/manager/staff/:id/unlock`            | Clear lock state                           |
-| `GET`       | `/manager/reports/summary`             | Aggregated report                          |
-| `GET`       | `/manager/reports/tickets.csv`         | CSV export                                 |
-| `GET`       | `/manager/audit-logs`                  | Paginated audit log                        |
-| `GET/PATCH` | `/manager/settings`                    | Read/update validated branch settings      |
+| Method | Endpoint                       | Purpose              |
+| ------ | ------------------------------ | -------------------- |
+| `GET`  | `/manager/dashboard/live`      | Live branch snapshot |
+| `GET`  | `/manager/reports/summary`     | Aggregated report    |
+| `GET`  | `/manager/reports/tickets.csv` | CSV export           |
 
-### 19.5 Health endpoints
+### 19.5 Administrator endpoints
+
+Administrator branch-scoped endpoints accept an optional `branchId` query parameter. The API validates the selected branch before executing an operation.
+
+| Method      | Endpoint                             | Purpose                                    |
+| ----------- | ------------------------------------ | ------------------------------------------ |
+| `GET`       | `/admin/overview`                    | System-wide administration summary         |
+| `GET/POST`  | `/admin/branches`                    | List/create branches                       |
+| `PATCH`     | `/admin/branches/:id`                | Update safe branch fields and status       |
+| `GET/POST`  | `/admin/services`                    | List/create services in selected branch    |
+| `PATCH`     | `/admin/services/:id`                | Update a service                           |
+| `POST`      | `/admin/services/:id/activate`       | Activate service                           |
+| `POST`      | `/admin/services/:id/deactivate`     | Deactivate after validation                |
+| `GET/POST`  | `/admin/counters`                    | List/create counters in selected branch    |
+| `PATCH`     | `/admin/counters/:id`                | Update a counter                           |
+| `POST`      | `/admin/counters/:id/assign-service` | Reassign eligible counter                  |
+| `GET/POST`  | `/admin/staff`                       | List/create staff in selected branch       |
+| `PATCH`     | `/admin/staff/:id`                   | Update staff                               |
+| `POST`      | `/admin/staff/:id/reset-password`    | Set temporary credential or reset workflow |
+| `POST`      | `/admin/staff/:id/unlock`            | Clear lock state                           |
+| `GET`       | `/admin/audit-logs`                  | Branch-scoped audit log                    |
+| `GET/PATCH` | `/admin/settings`                    | Read/update validated branch settings      |
+
+### 19.6 Health endpoints
 
 - `GET /health/live` — application process is running.
 - `GET /health/ready` — required dependencies are available.
@@ -1554,7 +1594,7 @@ Required unit-test areas:
 - Cancellation succeeds only from waiting.
 - No-show returns ticket to waiting and increments count.
 - Transfer changes queue/service and records event.
-- Manager-only endpoints reject tellers.
+- Administrator, manager, and teller endpoints reject both non-matching staff roles.
 - Branch A user cannot access Branch B data.
 - Inactive services cannot issue new tickets.
 - Closing a busy counter is rejected.
@@ -1861,7 +1901,8 @@ The project is done only when all applicable items are true.
 - [ ] Teller can authenticate and open a valid counter session.
 - [ ] Teller can call, recall, start, complete, no-show, and transfer as allowed.
 - [ ] Public display updates in real time and reveals no private data.
-- [ ] Manager can manage services, counters, and staff.
+- [ ] Administrator can manage branches, services, counters, staff, settings, and security/audit records.
+- [ ] Manager cannot access administrator or teller controls.
 - [ ] Manager can view daily/weekly reports and export CSV.
 - [ ] Audit records exist for required actions.
 
@@ -2017,9 +2058,10 @@ The final demonstration must prove the entire system, not only isolated screens:
 12. Customer cancels an eligible waiting ticket.
 13. Manager dashboard reflects current queue/counter state.
 14. Manager opens the daily report and verifies issued, completed, cancelled, no-show, transfer, wait, and service-time metrics.
-15. Manager exports CSV and the export is present in the audit log.
-16. Teller attempts a manager-only endpoint and is denied.
-17. Automated tests and build pipeline pass.
+15. Manager exports CSV; Administrator confirms the export in the audit log.
+16. Administrator, Manager, and Teller each attempt a different actor's endpoint and receive `403`.
+17. Every staff actor logs out before another identity signs in; no switch control is offered.
+18. Automated tests and build pipeline pass.
 
 If all steps succeed and the Definition of Done is satisfied, the Bank Queue Management System MVP is ready for academic submission and pilot demonstration.
 

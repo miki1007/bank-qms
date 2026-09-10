@@ -3,6 +3,7 @@ import { expect, test, type APIRequestContext } from "@playwright/test";
 const apiUrl = process.env.E2E_API_URL ?? "http://localhost:3000/api/v1";
 const tellerPassword = process.env.DEV_TELLER_PASSWORD ?? "";
 const managerPassword = process.env.DEV_MANAGER_PASSWORD ?? "";
+const adminPassword = process.env.DEV_ADMIN_PASSWORD ?? "";
 
 async function login(
   request: APIRequestContext,
@@ -16,13 +17,16 @@ async function login(
   return (await response.json()).accessToken as string;
 }
 
-test("teller login is isolated from manager endpoints", async ({ request }) => {
+test("teller login is isolated from manager and admin endpoints", async ({
+  request,
+}) => {
   const token = await login(request, "teller.one", tellerPassword);
   for (const path of [
-    "/manager/staff",
-    "/manager/services",
+    "/admin/staff",
+    "/admin/services",
+    "/admin/branches",
     "/manager/reports/summary",
-    "/manager/audit-logs",
+    "/admin/audit-logs",
   ]) {
     const response = await request.get(`${apiUrl}${path}`, {
       headers: { Authorization: `Bearer ${token}` },
@@ -31,11 +35,11 @@ test("teller login is isolated from manager endpoints", async ({ request }) => {
   }
 });
 
-test("each teller can open only the manager-assigned counter", async ({
+test("each teller can open only the administrator-assigned counter", async ({
   request,
 }) => {
   const tellerToken = await login(request, "teller.one", tellerPassword);
-  const managerToken = await login(request, "manager.dev", managerPassword);
+  const adminToken = await login(request, "admin.dev", adminPassword);
   const tellerHeaders = { Authorization: `Bearer ${tellerToken}` };
   const assignedResponse = await request.get(
     `${apiUrl}/teller/counters/available`,
@@ -49,8 +53,8 @@ test("each teller can open only the manager-assigned counter", async ({
   expect(assigned).toHaveLength(1);
   expect(assigned[0].label).toBe("Counter 1");
 
-  const allCountersResponse = await request.get(`${apiUrl}/manager/counters`, {
-    headers: { Authorization: `Bearer ${managerToken}` },
+  const allCountersResponse = await request.get(`${apiUrl}/admin/counters`, {
+    headers: { Authorization: `Bearer ${adminToken}` },
   });
   const allCounters = (await allCountersResponse.json()) as Array<{
     id: string;
@@ -123,9 +127,10 @@ test("manager report export creates an audit record", async ({ request }) => {
   );
   expect(exportResponse.ok()).toBeTruthy();
   expect(exportResponse.headers()["content-type"]).toContain("text/csv");
+  const adminToken = await login(request, "admin.dev", adminPassword);
   const audit = await request.get(
-    `${apiUrl}/manager/audit-logs?action=REPORT_EXPORT`,
-    { headers },
+    `${apiUrl}/admin/audit-logs?action=REPORT_EXPORT`,
+    { headers: { Authorization: `Bearer ${adminToken}` } },
   );
   expect(
     (await audit.json()).some(

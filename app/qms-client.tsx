@@ -88,7 +88,7 @@ type StaffDirectoryEntry = {
   id: string;
   username: string;
   display_name: string;
-  role: "TELLER" | "MANAGER";
+  role: "TELLER" | "MANAGER" | "ADMIN";
   assigned_counter: string | null;
   assigned_service_code: string | null;
   active: number;
@@ -145,7 +145,7 @@ type Snapshot = {
     id: string;
     username: string;
     displayName: string;
-    role: "TELLER" | "MANAGER";
+    role: "TELLER" | "MANAGER" | "ADMIN";
     assignedCounter: string | null;
     assignedServiceCode: string | null;
   };
@@ -562,9 +562,11 @@ export function QmsClient({ surface }: { surface: QmsSurface }) {
             href={
               surface === "teller"
                 ? "/teller"
-                : surface === "manager" || surface === "admin"
+                : surface === "manager"
                   ? "/manager"
-                  : "/"
+                  : surface === "admin"
+                    ? "/admin"
+                    : "/"
             }
           >
             <BankLogo />
@@ -597,9 +599,13 @@ export function QmsClient({ surface }: { surface: QmsSurface }) {
             </div>
           ) : snapshot.actor ? (
             <nav className="staff-navigation" aria-label="Staff navigation">
-              {snapshot.actor?.role === "TELLER" ? (
+              {snapshot.actor.role === "TELLER" ? (
                 <a href="/teller" aria-current="page">
                   Teller console
+                </a>
+              ) : snapshot.actor.role === "ADMIN" ? (
+                <a href="/admin" aria-current="page">
+                  Administration
                 </a>
               ) : (
                 <a href="/manager" aria-current="page">
@@ -1222,29 +1228,10 @@ export function QmsClient({ surface }: { surface: QmsSurface }) {
                 </p>
               </div>
               <div className="manager-actions">
-                <label className="fairness-setting">
-                  <span>Priority call limit</span>
-                  <select
-                    value={snapshot.settings.priorityLimit}
-                    onChange={(event) =>
-                      void mutate(
-                        "priority-limit",
-                        {
-                          operation: "set_priority_limit",
-                          limit: Number(event.target.value),
-                        },
-                        "Priority fairness limit updated.",
-                      )
-                    }
-                    disabled={Boolean(busy)}
-                  >
-                    {[1, 2, 3, 4, 5].map((limit) => (
-                      <option value={limit} key={limit}>
-                        {limit}
-                      </option>
-                    ))}
-                  </select>
-                </label>
+                <span className="fairness-setting">
+                  <span>Priority policy</span>
+                  <strong>{snapshot.settings.priorityLimit}:1</strong>
+                </span>
                 <Button
                   variant="outline"
                   onClick={() => void exportCsv()}
@@ -1266,18 +1253,6 @@ export function QmsClient({ surface }: { surface: QmsSurface }) {
                   }
                 >
                   Show arrival code
-                </Button>
-                <Button
-                  variant="outline"
-                  onClick={() =>
-                    void mutate(
-                      "audit",
-                      { operation: "audit" },
-                      "Audit log loaded.",
-                    )
-                  }
-                >
-                  View audit log
                 </Button>
               </div>
             </div>
@@ -1309,46 +1284,6 @@ export function QmsClient({ surface }: { surface: QmsSurface }) {
                   Valid for two minutes. Give it only to customers who have
                   arrived at this branch.
                 </small>
-              </div>
-            )}
-            {auditEntries && (
-              <div className="wl-audit">
-                <div className="wl-inline">
-                  <h2>Audit log</h2>
-                  <Button
-                    variant="outline"
-                    onClick={() => setAuditEntries(null)}
-                  >
-                    Close
-                  </Button>
-                </div>
-                {auditEntries.length ? (
-                  <table>
-                    <thead>
-                      <tr>
-                        <th>Time</th>
-                        <th>Action</th>
-                        <th>Details</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {auditEntries.map((entry) => (
-                        <tr key={entry.id}>
-                          <td>
-                            {new Date(entry.created_at).toLocaleString(
-                              "en-GB",
-                              { timeZone: "Africa/Addis_Ababa" },
-                            )}
-                          </td>
-                          <td>{entry.action}</td>
-                          <td>{entry.detail}</td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                ) : (
-                  <p>No audit entries yet.</p>
-                )}
               </div>
             )}
             <div className="metric-grid">
@@ -1703,11 +1638,11 @@ export function QmsClient({ surface }: { surface: QmsSurface }) {
           <section className="admin-view">
             <div className="view-heading split-heading">
               <div>
-                <span className="eyebrow">Manager-only administration</span>
-                <h1>Branch control center</h1>
+                <span className="eyebrow">System administration</span>
+                <h1>Administration control center</h1>
                 <p>
-                  Configure staff and services without changing operational
-                  history or exposing customer information.
+                  Govern branches, staff identities, services, policy and
+                  security without entering Manager or Teller workspaces.
                 </p>
               </div>
               <div className="admin-identity">
@@ -1758,13 +1693,44 @@ export function QmsClient({ surface }: { surface: QmsSurface }) {
               </article>
             </div>
 
+            <article className="manager-panel admin-branch-panel">
+              <div className="manager-panel-head">
+                <div>
+                  <strong>Branch registry</strong>
+                  <span>
+                    System-wide branches; this session is scoped to{" "}
+                    {snapshot.branch.name}
+                  </span>
+                </div>
+                <Building2 />
+              </div>
+              <div className="admin-branch-list">
+                {BANK_BRANCHES.map((branch) => (
+                  <div
+                    key={branch.code}
+                    className={
+                      branch.code === snapshot.branch.code ? "is-current" : ""
+                    }
+                  >
+                    <span>{branch.code}</span>
+                    <strong>{branch.name}</strong>
+                    <small>
+                      {branch.code === snapshot.branch.code
+                        ? "Current administration scope"
+                        : "Active branch"}
+                    </small>
+                  </div>
+                ))}
+              </div>
+            </article>
+
             <div className="admin-grid">
               <article className="manager-panel admin-staff-panel">
                 <div className="manager-panel-head">
                   <div>
                     <strong>Staff and counter assignments</strong>
                     <span>
-                      Each teller keeps one manager-controlled identity
+                      Each teller keeps one administrator-controlled identity
                     </span>
                   </div>
                   <UserCog />
@@ -1871,7 +1837,8 @@ export function QmsClient({ surface }: { surface: QmsSurface }) {
                         </>
                       ) : (
                         <span className="protected-role">
-                          <ShieldCheck /> Protected manager account
+                          <ShieldCheck /> Protected {staff.role.toLowerCase()}{" "}
+                          account
                         </span>
                       )}
                     </div>
@@ -2025,7 +1992,9 @@ export function QmsClient({ surface }: { surface: QmsSurface }) {
                 <div className="manager-panel-head">
                   <div>
                     <strong>Security operations</strong>
-                    <span>Manager actions are audited and branch-scoped</span>
+                    <span>
+                      Administrator actions are audited and branch-scoped
+                    </span>
                   </div>
                   <ShieldCheck />
                 </div>

@@ -81,7 +81,15 @@ export async function POST(request: Request) {
           { error: "Private showcase authentication is required." },
           { status: 403 },
         );
-      const role = body.role === "MANAGER" ? "MANAGER" : "TELLER";
+      const role =
+        body.role === "ADMIN"
+          ? "ADMIN"
+          : body.role === "MANAGER"
+            ? "MANAGER"
+            : body.role === "TELLER"
+              ? "TELLER"
+              : null;
+      if (!role) return genericFailure();
       const requestedUsername =
         typeof body.username === "string" ? body.username : undefined;
       const actor = await getWorkspaceShowcaseActor(role, requestedUsername);

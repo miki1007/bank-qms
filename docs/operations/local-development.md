@@ -1,6 +1,6 @@
 # Run the complete Bank QMS locally
 
-This guide runs the production architecture from the repository: NestJS, PostgreSQL, Socket.IO, the customer web app, the teller/manager web app, the kiosk, and the public display. The private hosted Site is a portability preview; these localhost commands use the full source and production data model.
+This guide runs the production architecture from the repository: NestJS, PostgreSQL, Socket.IO, the customer web app, the separate administrator/manager/teller web workspaces, the kiosk, and the public display. The private hosted Site is a portability preview; these localhost commands use the full source and production data model.
 
 ## 1. Install the prerequisites
 
@@ -55,6 +55,7 @@ openssl rand -base64 48
 Choose values for these local-only credentials:
 
 ```dotenv
+DEV_ADMIN_PASSWORD=your-local-administrator-password
 DEV_MANAGER_PASSWORD=your-local-manager-password
 DEV_TELLER_PASSWORD=your-local-teller-password
 KIOSK_DEVICE_SECRET=your-local-kiosk-secret
@@ -75,7 +76,7 @@ pnpm db:migrate
 pnpm db:seed
 ```
 
-`docker compose ps` should show the `postgres` service as healthy. Seeding creates the `MAIN` branch, four services, four counters, one manager, four tellers, and kiosk/display device registrations.
+`docker compose ps` should show the `postgres` service as healthy. Seeding creates the `MAIN` branch, four services, four counters, one administrator, one manager, four tellers, and kiosk/display device registrations.
 
 ## 5. Start every application
 
@@ -87,7 +88,8 @@ Leave that terminal open. The command starts all five application processes and 
 
 | Application       | Local URL                            | How to enter                                                  |
 | ----------------- | ------------------------------------ | ------------------------------------------------------------- |
-| Staff login       | `http://localhost:5173/login`        | Use a manager or teller account; the server routes by role    |
+| Staff login       | `http://localhost:5173/login`        | Use an administrator, manager, or teller account              |
+| Admin console     | `http://localhost:5173/admin`        | `admin.dev` plus `DEV_ADMIN_PASSWORD`                         |
 | Manager dashboard | `http://localhost:5173/manager`      | `manager.dev` plus `DEV_MANAGER_PASSWORD`                     |
 | Teller console    | `http://localhost:5173/teller`       | `teller.one` through `teller.four` plus `DEV_TELLER_PASSWORD` |
 | Customer app      | `http://localhost:5176`              | Register a new local customer account                         |
@@ -96,9 +98,9 @@ Leave that terminal open. The command starts all five application processes and 
 | API documentation | `http://localhost:3000/docs`         | Swagger/OpenAPI                                               |
 | API readiness     | `http://localhost:3000/health/ready` | Should return a healthy response                              |
 
-Manager and teller workspaces are isolated. A manager token receives `403` from teller endpoints, a teller token receives `403` from manager endpoints, and each interface redirects an authenticated user to the route for their own role. Use **Log out** before signing in as another staff member.
+Administrator, manager, and teller workspaces are isolated. Admin-only configuration routes reject manager and teller tokens, manager operations reject administrator and teller tokens, and teller operations reject administrator and manager tokens. Each interface returns an authenticated user to the route for their own role. Use **Log out** before signing in as another staff member.
 
-To keep Manager and Teller open at the same time during testing, use two separate browser profiles (or a normal window and a private window). One browser profile intentionally holds only one staff identity, so it cannot silently change a Manager session into a Teller session.
+To keep Administrator, Manager, and Teller open at the same time during testing, use separate browser profiles (for example, a normal window and independent private/profile windows). One browser profile intentionally holds only one staff identity, so it cannot silently change one actor into another.
 
 If a teller has an open counter with no active customer, logout closes that counter session automatically. If a ticket is `CALLED` or `IN_SERVICE`, the API keeps the teller signed in and asks them to complete, transfer, or otherwise resolve the ticket first.
 
@@ -109,10 +111,11 @@ If a teller has an open counter with no active customer, logout closes that coun
 3. Open `http://localhost:5173/login`, sign in as `teller.one`, and open the assigned counter.
 4. Select **Call next**. The public display should show the ticket and counter.
 5. Start service, then complete it. The teller counter is ready for the next ticket.
-6. Select **Log out**. Sign in as `manager.dev` and confirm that only the Manager Dashboard navigation is available.
-7. Open `http://localhost:5176`, register a customer, reserve a visit, and use the branch arrival workflow before calling that remote ticket.
+6. Select **Log out**. Sign in as `manager.dev` and confirm that only live branch operations and reports are available.
+7. Select **Log out**. Sign in as `admin.dev` and confirm that branch, user, service, counter, configuration, security, and audit controls are available—but no Teller or Manager navigation is shown.
+8. Open `http://localhost:5176`, register a customer, reserve a visit, and use the branch arrival workflow before calling that remote ticket.
 
-To verify the role boundary manually, enter `/teller` while signed in as the manager and `/manager` while signed in as a teller. The application returns each user to their own workspace; it does not offer an identity switch.
+To verify the role boundary manually, enter `/admin` while signed in as the manager, `/manager` while signed in as the administrator, and `/teller` while signed in as either. The application returns each user to their own workspace; it does not offer an identity switch.
 
 ## 7. Run the checks
 
@@ -165,7 +168,7 @@ pnpm db:seed
 | Path                          | Source contained there                                                                                              |
 | ----------------------------- | ------------------------------------------------------------------------------------------------------------------- |
 | `apps/api`                    | NestJS REST/Socket.IO API, Prisma schema, migrations, seed, authorization, queue workflow, reports, and audit logic |
-| `apps/staff-web`              | Separate protected teller and manager React routes                                                                  |
+| `apps/staff-web`              | Separate protected administrator, manager, and teller React routes                                                  |
 | `apps/customer-web`           | Customer registration, queue reservation, live ticket, and history React app                                        |
 | `apps/kiosk-web`              | Walk-in kiosk React app                                                                                             |
 | `apps/display-web`            | Public number display React app                                                                                     |

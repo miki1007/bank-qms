@@ -3,6 +3,7 @@ import {
   LayoutDashboard,
   MapPin,
   MonitorUp,
+  ShieldCheck,
   Smartphone,
   Store,
   UsersRound,
@@ -32,6 +33,13 @@ const products = [
     title: "Manager dashboard",
     description: "Monitor your branch, approve priority and review reports.",
     accent: "green",
+  },
+  {
+    href: "/staff/login?next=%2Fadmin",
+    icon: ShieldCheck,
+    title: "Administration",
+    description: "Manage branches, users, services, policy and security.",
+    accent: "amber",
   },
   {
     href: "/display",

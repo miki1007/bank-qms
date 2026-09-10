@@ -1739,7 +1739,7 @@
   font-weight: 750;
 }
 
-/* Manager-only administration */
+/* Administrator-only workspace */
 .admin-view {
   padding: 42px 5vw 70px;
   animation: wl-enter 0.4s ease both;
@@ -1806,6 +1806,35 @@
 }
 .admin-summary-grid strong {
   font-size: 25px;
+}
+.admin-branch-panel {
+  margin-bottom: 18px;
+}
+.admin-branch-list {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(155px, 1fr));
+  gap: 9px;
+}
+.admin-branch-list > div {
+  display: grid;
+  gap: 3px;
+  padding: 13px;
+  border: 1px solid #e1e8ef;
+  border-radius: 12px;
+  background: #fbfcfd;
+}
+.admin-branch-list > div.is-current {
+  border-color: #8fbfae;
+  background: #edf7f3;
+}
+.admin-branch-list span,
+.admin-branch-list small {
+  color: #74869a;
+  font-size: 10px;
+}
+.admin-branch-list strong {
+  color: #27455f;
+  font-size: 13px;
 }
 .admin-grid {
   display: grid;

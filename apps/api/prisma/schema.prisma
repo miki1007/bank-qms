@@ -26,6 +26,7 @@ enum CounterStatus {
 enum StaffRole {
   TELLER
   MANAGER
+  ADMIN
 }
 
 enum StaffStatus {
@@ -377,4 +378,3 @@ model IdempotencyRecord {
   @@index([expiresAt])
   @@map("idempotency_records")
 }
-

@@ -22,7 +22,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 
 type LoginActor = {
-  role: "TELLER" | "MANAGER";
+  role: "TELLER" | "MANAGER" | "ADMIN";
   displayName: string;
 };
 
@@ -34,11 +34,13 @@ type SessionConflict = {
 function requestedRoleFromSearch(search: string): LoginActor["role"] | null {
   const requested = new URLSearchParams(search).get("next");
   if (["/teller", "/staff-app"].includes(requested ?? "")) return "TELLER";
-  if (["/manager", "/admin"].includes(requested ?? "")) return "MANAGER";
+  if (requested === "/manager") return "MANAGER";
+  if (requested === "/admin") return "ADMIN";
   return null;
 }
 
 function roleName(role: LoginActor["role"]) {
+  if (role === "ADMIN") return "Administration";
   return role === "MANAGER" ? "Manager" : "Teller";
 }
 
@@ -54,6 +56,10 @@ export function StaffLoginClient() {
 
   const enterWorkspace = useCallback((actor: LoginActor) => {
     const requested = new URLSearchParams(window.location.search).get("next");
+    if (actor.role === "ADMIN") {
+      window.location.replace("/admin");
+      return;
+    }
     if (actor.role === "MANAGER") {
       window.location.replace("/manager");
       return;
@@ -84,7 +90,7 @@ export function StaffLoginClient() {
     };
   }, [enterWorkspace]);
 
-  async function openShowcase(role: "TELLER" | "MANAGER") {
+  async function openShowcase(role: LoginActor["role"]) {
     setBusy(true);
     setError("");
     setNotice("");
@@ -95,7 +101,12 @@ export function StaffLoginClient() {
         body: JSON.stringify({
           action: "workspace_showcase",
           role,
-          username: role === "TELLER" ? "teller.one" : "manager.dev",
+          username:
+            role === "TELLER"
+              ? "teller.one"
+              : role === "ADMIN"
+                ? "admin.dev"
+                : "manager.dev",
         }),
       });
       const result = (await response.json()) as {
@@ -196,7 +207,7 @@ export function StaffLoginClient() {
             <ShieldCheck />
             <span>
               <strong>Role protected</strong>
-              <small>Manager and teller permissions stay isolated</small>
+              <small>Admin, manager and teller permissions stay isolated</small>
             </span>
           </div>
           <div>
@@ -234,8 +245,8 @@ export function StaffLoginClient() {
                 <strong>{sessionConflict.actor.displayName}</strong>
                 <p>
                   This user is signed in as{" "}
-                  {roleName(sessionConflict.actor.role)}. To keep Manager and
-                  Teller access separate, log out before entering{" "}
+                  {roleName(sessionConflict.actor.role)}. To keep every staff
+                  role separate, log out before entering{" "}
                   {roleName(sessionConflict.requestedRole)}.
                 </p>
               </div>
@@ -291,6 +302,14 @@ export function StaffLoginClient() {
               <div className="showcase-access">
                 <p>Private owner showcase</p>
                 <div>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    disabled={busy}
+                    onClick={() => openShowcase("ADMIN")}
+                  >
+                    Administration
+                  </Button>
                   <Button
                     type="button"
                     variant="outline"

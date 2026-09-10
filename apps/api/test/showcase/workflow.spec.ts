@@ -35,6 +35,15 @@ const manager: ShowcaseActor = {
   assignedServiceCode: null,
   branchCode: "SUMMIT",
 };
+const admin: ShowcaseActor = {
+  id: "showcase-admin",
+  username: "admin.dev",
+  displayName: "Demo Administrator",
+  role: "ADMIN",
+  assignedCounter: null,
+  assignedServiceCode: null,
+  branchCode: "SUMMIT",
+};
 function intent(extra: Record<string, unknown> = {}) {
   return {
     branchCode: "SUMMIT",
@@ -481,7 +490,7 @@ describe("WorldLink hosted workflow on real SQLite with all migrations", () => {
         .get("SUMMIT", "Counter 1")?.status,
     ).toBe("CLOSED");
   });
-  it("denies teller manager APIs and cross-branch access; audits CSV export", async () => {
+  it("isolates teller, manager, and administrator surfaces; audits manager CSV export", async () => {
     const session = await createSession(teller);
     const cookie = session.cookie.split(";")[0];
     const cross = await GET(
@@ -490,12 +499,12 @@ describe("WorldLink hosted workflow on real SQLite with all migrations", () => {
       }),
     );
     expect(cross.status).toBe(403);
-    const admin = await GET(
+    const tellerAtAdmin = await GET(
       new Request("https://qms.test/api/showcase?surface=admin", {
         headers: { cookie },
       }),
     );
-    expect(admin.status).toBe(403);
+    expect(tellerAtAdmin.status).toBe(403);
     for (const operation of ["audit", "set_priority_limit", "export_csv"]) {
       const response = await POST(
         new Request("https://qms.test/api/showcase", {
@@ -514,6 +523,12 @@ describe("WorldLink hosted workflow on real SQLite with all migrations", () => {
       }),
     );
     expect(tellerSurface.status).toBe(403);
+    const adminSurface = await GET(
+      new Request("https://qms.test/api/showcase?surface=admin", {
+        headers: { cookie: managerCookie },
+      }),
+    );
+    expect(adminSurface.status).toBe(403);
     const tellerAction = await POST(
       new Request("https://qms.test/api/showcase", {
         method: "POST",
@@ -544,9 +559,38 @@ describe("WorldLink hosted workflow on real SQLite with all migrations", () => {
         )
         .get()?.count,
     ).toBe(1);
+
+    for (const operation of ["audit", "set_priority_limit"]) {
+      const response = await POST(
+        new Request("https://qms.test/api/showcase", {
+          method: "POST",
+          headers: {
+            cookie: managerCookie,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({ operation, limit: 3 }),
+        }),
+      );
+      expect(response.status).toBe(403);
+    }
+
+    const administrator = await createSession(admin);
+    const adminCookie = administrator.cookie.split(";")[0];
+    const administratorSurface = await GET(
+      new Request("https://qms.test/api/showcase?surface=admin", {
+        headers: { cookie: adminCookie },
+      }),
+    );
+    expect(administratorSurface.status).toBe(200);
+    const managerSurface = await GET(
+      new Request("https://qms.test/api/showcase?surface=manager", {
+        headers: { cookie: adminCookie },
+      }),
+    );
+    expect(managerSurface.status).toBe(403);
   });
-  it("lets managers administer teller assignments and service policy with an audit trail", async () => {
-    const session = await createSession(manager);
+  it("lets administrators govern teller assignments and service policy with an audit trail", async () => {
+    const session = await createSession(admin);
     const cookie = session.cookie.split(";")[0];
     const headers = { cookie, "Content-Type": "application/json" };
 

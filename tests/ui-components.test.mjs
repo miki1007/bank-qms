@@ -4,7 +4,7 @@ import test from "node:test";
 
 const read = (path) => readFile(new URL(path, import.meta.url), "utf8");
 
-test("exposes all four working Bank QMS interfaces", async () => {
+test("exposes all five working Bank QMS interfaces", async () => {
   const client = await read("../app/qms-client.tsx");
 
   for (const surface of [
@@ -12,18 +12,17 @@ test("exposes all four working Bank QMS interfaces", async () => {
     "Teller workspace",
     "Now serving",
     "Operations overview",
+    "System administration",
   ]) {
     assert.match(client, new RegExp(surface, "i"));
   }
 });
 
 test("separates operational surfaces into dedicated routes", async () => {
-  for (const route of ["kiosk", "display", "teller", "manager"]) {
+  for (const route of ["kiosk", "display", "teller", "manager", "admin"]) {
     const page = await read(`../app/${route}/page.tsx`);
     assert.match(page, new RegExp(`surface=["']${route}["']`));
   }
-  const retiredAdmin = await read("../app/admin/page.tsx");
-  assert.match(retiredAdmin, /redirect\("\/manager"\)/);
   const login = await read("../app/staff/login/page.tsx");
   assert.match(login, /StaffLoginClient/);
 });
@@ -52,7 +51,7 @@ test("reinforces active-counter and queue ordering rules in storage", async () =
   assert.match(migration, /qms_demo_queue_idx/);
 });
 
-test("enforces staff sessions, manager roles, and private cancellation proof", async () => {
+test("enforces staff sessions, separate staff roles, and private cancellation proof", async () => {
   const auth = await read("../lib/showcase-auth.ts");
   const authRoute = await read("../app/api/showcase/auth/route.ts");
   const queueRoute = await read("../app/api/showcase/route.ts");
@@ -69,13 +68,14 @@ test("enforces staff sessions, manager roles, and private cancellation proof", a
   assert.match(authRoute, /workspace_showcase/);
   assert.match(authRoute, /sign-in service is temporarily unavailable/i);
   assert.match(auth, /FROM qms_demo_staff WHERE username = \?/);
-  assert.match(queueRoute, /requiredRole === "MANAGER"/);
+  assert.match(queueRoute, /role === "ADMIN"/);
   assert.match(queueRoute, /surface === "teller"\s*\? "TELLER"/);
+  assert.match(queueRoute, /surface === "admin"\s*\? "ADMIN"/);
   assert.match(authRoute, /LOGOUT_REQUIRED/);
   assert.match(workflow, /lookup_token_hash/);
 });
 
-test("routes managers to the full dashboard and keeps daily ticket identities", async () => {
+test("routes each staff actor to its own workspace and keeps daily ticket identities", async () => {
   const login = await read("../app/staff-login-client.tsx");
   const staffApp = await read("../app/mobile-staff-client.tsx");
   const schema = await read("../db/schema.ts");
@@ -86,6 +86,8 @@ test("routes managers to the full dashboard and keeps daily ticket identities", 
 
   assert.match(login, /actor\.role === "MANAGER"/);
   assert.match(login, /window\.location\.replace\("\/manager"\)/);
+  assert.match(login, /actor\.role === "ADMIN"/);
+  assert.match(login, /window\.location\.replace\("\/admin"\)/);
   assert.match(login, /\["\/teller", "\/staff-app"\]/);
   assert.match(staffApp, /data\.actor\?\.role === "MANAGER"/);
   assert.match(schema, /qms_demo_ticket_number_per_branch_day_unique/);
@@ -141,7 +143,7 @@ test("provides two installable mobile apps on the shared queue backend", async (
   assert.equal(staffManifest.start_url, "/staff-app");
 });
 
-test("launches each actor-owned product surface and exposes audited manager controls", async () => {
+test("launches each actor-owned product surface and separates manager reports from admin policy", async () => {
   const home = await read("../app/page.tsx");
   const client = await read("../app/qms-client.tsx");
   const route = await read("../app/api/showcase/route.ts");
@@ -153,11 +155,11 @@ test("launches each actor-owned product surface and exposes audited manager cont
     "/display",
     "next=%2Fteller",
     "next=%2Fmanager",
+    "next=%2Fadmin",
   ]) {
     assert.ok(home.includes(path));
   }
-  assert.ok(!home.includes("next=%2Fadmin"));
-  assert.ok(!home.includes("Administration"));
+  assert.ok(home.includes("Administration"));
   assert.match(client, /operation: "set_priority_limit"/);
   assert.match(client, /operation: "export_csv"/);
   assert.match(route, /Priority limit must be between 1 and 5/);
@@ -165,7 +167,7 @@ test("launches each actor-owned product surface and exposes audited manager cont
   assert.match(route, /Content-Disposition/);
 });
 
-test("adds real manager analytics, retires the separate admin surface, and keeps customer data safe", async () => {
+test("adds manager analytics, restores the protected admin surface, and keeps customer data safe", async () => {
   const manager = await read("../app/qms-client.tsx");
   const customer = await read("../app/mobile-customer-client.tsx");
   const route = await read("../app/api/showcase/route.ts");
@@ -175,27 +177,31 @@ test("adds real manager analytics, retires the separate admin surface, and keeps
   assert.match(manager, /Seven-day throughput/);
   assert.match(manager, /Hourly demand/);
   assert.match(manager, /Live customer flow/);
-  assert.match(manager, /Manager-only administration/);
+  assert.match(manager, /System administration/);
   assert.match(manager, /admin_staff_update/);
   assert.match(manager, /admin_service_update/);
   assert.match(customer, /Total available balance/);
   assert.match(customer, /Recent transactions/);
   assert.match(customer, /customer-banking/);
   assert.match(customer, /customer_statement/);
-  assert.match(adminRoute, /redirect\("\/manager"\)/);
-  assert.match(route, /requireActor\(request, "MANAGER"\)/);
+  assert.match(adminRoute, /surface="admin"/);
+  assert.match(route, /requireActor\(request, "ADMIN"\)/);
   assert.match(schema, /qms_customer_accounts/);
   assert.match(schema, /qms_customer_transactions/);
 });
 
-test("keeps manager and teller workspaces isolated with visible logout controls", async () => {
+test("keeps admin, manager, and teller workspaces isolated with visible logout controls", async () => {
   const hosted = await read("../app/qms-client.tsx");
   const staffLogin = await read("../app/staff-login-client.tsx");
   const hostedAuth = await read("../app/api/showcase/auth/route.ts");
   const productionTeller = await read("../apps/api/src/modules/teller.ts");
+  const productionAdministration = await read(
+    "../apps/api/src/modules/manager.ts",
+  );
   const staffWeb = await read("../apps/staff-web/src/main.tsx");
 
-  assert.doesNotMatch(hosted, /Switch staff|Open teller login|href="\/admin"/);
+  assert.doesNotMatch(hosted, /Switch staff|Open teller login/);
+  assert.match(hosted, /Administration/);
   assert.match(hosted, /Manager dashboard/);
   assert.match(hosted, /Teller console/);
   assert.match(hosted, /"Log out"/);
@@ -205,12 +211,15 @@ test("keeps manager and teller workspaces isolated with visible logout controls"
   assert.match(staffLogin, /setSessionConflict/);
   assert.match(staffLogin, /action: "logout"/);
   assert.match(staffLogin, /Staff identity is never switched silently/);
+  assert.match(staffLogin, /requested === "\/admin"/);
   assert.match(
     productionTeller,
     /@Roles\("TELLER"\)\s*@Controller\("teller"\)/,
   );
   assert.match(staffWeb, /className="logout-control"/);
   assert.match(staffWeb, /Logging out…/);
+  assert.match(productionAdministration, /@Roles\("ADMIN"\)/);
+  assert.match(productionAdministration, /@Controller\("admin"\)/);
 });
 
 test("ships full native Android customer and teller applications", async () => {
@@ -322,7 +331,7 @@ test("makes canonical Call Next retries idempotent inside PostgreSQL", async () 
   assert.match(staff, /crypto\.randomUUID\(\)/);
 });
 
-test("locks teller accounts to manager-controlled counters and scopes fairness per service", async () => {
+test("locks teller accounts to administrator-controlled counters and scopes fairness per service", async () => {
   const prisma = await read("../apps/api/prisma/schema.prisma");
   const seed = await read("../apps/api/prisma/seed.ts");
   const teller = await read("../apps/api/src/modules/teller.ts");

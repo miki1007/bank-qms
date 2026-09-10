@@ -50,7 +50,7 @@ class StaffViewModel(private val repository: StaffRepository) : ViewModel() {
         val user = repository.login(username, password)
         if (user.role != "TELLER") {
             repository.logout()
-            throw IllegalStateException("Manager accounts use the full manager web dashboard. Sign in here with an independently assigned teller account.")
+            throw IllegalStateException("Manager and administrator accounts use their protected web workspaces. Sign in here with an independently assigned teller account.")
         }
         authenticate(user)
     }
@@ -58,7 +58,7 @@ class StaffViewModel(private val repository: StaffRepository) : ViewModel() {
     private suspend fun authenticate(user: StaffUser) {
         if (user.role != "TELLER") {
             repository.clearSession()
-            mutableState.update { it.copy(loading = false, error = "This Android app is for tellers. Managers use the web dashboard.") }
+            mutableState.update { it.copy(loading = false, error = "This Android app is for tellers. Managers and administrators use their protected web workspaces.") }
             return
         }
         mutableState.update { it.copy(user = user, loading = false, busy = false, error = null) }
@@ -176,4 +176,3 @@ class StaffViewModel(private val repository: StaffRepository) : ViewModel() {
         pollJob?.cancel()
     }
 }
-

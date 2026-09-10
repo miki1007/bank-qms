@@ -25,6 +25,11 @@ const json = (value: unknown, status = 200) =>
 const error = (message: string, status = 400, code = "VALIDATION_ERROR") =>
   json({ error: message, code }, status);
 
+function roleName(role: ShowcaseActor["role"]) {
+  if (role === "ADMIN") return "Administrator";
+  return role === "MANAGER" ? "Manager" : "Teller";
+}
+
 async function requireActor(
   request: Request,
   requiredRole?: ShowcaseActor["role"],
@@ -38,7 +43,21 @@ async function requireActor(
     );
   if (requiredRole && actor.role !== requiredRole)
     throw new QueueError(
-      `${requiredRole === "MANAGER" ? "Manager" : "Teller"} permission required.`,
+      `${roleName(requiredRole)} permission required.`,
+      403,
+      "FORBIDDEN",
+    );
+  return actor;
+}
+
+async function requireAnyActor(
+  request: Request,
+  allowedRoles: Array<ShowcaseActor["role"]>,
+) {
+  const actor = await requireActor(request);
+  if (!allowedRoles.includes(actor.role))
+    throw new QueueError(
+      `${allowedRoles.map(roleName).join(" or ")} permission required.`,
       403,
       "FORBIDDEN",
     );
@@ -52,7 +71,7 @@ async function protectedSnapshot(actor: ShowcaseActor) {
     actor,
     actorMetrics: actorPerformance(snapshot, actor.assignedCounter),
     staff:
-      actor.role === "MANAGER"
+      actor.role === "ADMIN"
         ? await readStaffDirectory(getShowcaseDb(), actor.branchCode)
         : undefined,
   };
@@ -125,9 +144,11 @@ export async function GET(request: Request) {
     const requiredRole =
       surface === "teller"
         ? "TELLER"
-        : surface === "manager" || surface === "admin"
+        : surface === "manager"
           ? "MANAGER"
-          : undefined;
+          : surface === "admin"
+            ? "ADMIN"
+            : undefined;
     const actor = await requireActor(request, requiredRole);
     if (requested && requested !== actor.branchCode)
       throw new QueueError(
@@ -511,18 +532,18 @@ export async function POST(request: Request) {
           ),
         );
       case "arrival_code": {
-        const actor = await requireActor(request, "TELLER");
+        const actor = await requireAnyActor(request, ["TELLER", "MANAGER"]);
         return json(await workflow.arrivalCode(actor.branchCode, actor));
       }
       case "approve_priority":
         return json(
           await workflow.approvePriority(
             String(payload.ticketId ?? ""),
-            await requireActor(request),
+            await requireAnyActor(request, ["TELLER", "MANAGER"]),
           ),
         );
       case "set_priority_limit": {
-        const actor = await requireActor(request, "MANAGER"),
+        const actor = await requireActor(request, "ADMIN"),
           limit = Number(payload.limit);
         if (!Number.isInteger(limit) || limit < 1 || limit > 5)
           throw new QueueError("Priority limit must be between 1 and 5.", 400);
@@ -538,17 +559,17 @@ export async function POST(request: Request) {
         return json({ snapshot: await protectedSnapshot(actor) });
       }
       case "admin_staff_update": {
-        const actor = await requireActor(request, "MANAGER");
+        const actor = await requireActor(request, "ADMIN");
         return json({ snapshot: await updateStaffAssignment(payload, actor) });
       }
       case "admin_service_update": {
-        const actor = await requireActor(request, "MANAGER");
+        const actor = await requireActor(request, "ADMIN");
         return json({
           snapshot: await updateServiceConfiguration(payload, actor),
         });
       }
       case "admin_revoke_teller_sessions": {
-        const actor = await requireActor(request, "MANAGER");
+        const actor = await requireActor(request, "ADMIN");
         const now = new Date().toISOString();
         await getShowcaseDb()
           .prepare(
@@ -570,7 +591,7 @@ export async function POST(request: Request) {
           await requireActor(request, "MANAGER"),
         );
       case "audit": {
-        const actor = await requireActor(request, "MANAGER");
+        const actor = await requireActor(request, "ADMIN");
         const rows = await getShowcaseDb()
           .prepare(
             "SELECT id,action,detail,created_at FROM qms_demo_audit WHERE branch_code=? ORDER BY created_at DESC LIMIT 100",
@@ -580,7 +601,7 @@ export async function POST(request: Request) {
         return json({ entries: rows.results ?? [] });
       }
       case "reset": {
-        await requireActor(request, "MANAGER");
+        await requireActor(request, "ADMIN");
         throw new QueueError(
           "Operational records are retained. Use the documented local demo reset procedure.",
           409,

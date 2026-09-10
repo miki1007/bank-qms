@@ -1,7 +1,7 @@
-import { redirect } from "next/navigation";
+import { QmsClient } from "../qms-client";
 
 export const dynamic = "force-dynamic";
 
 export default function AdminPage() {
-  redirect("/manager");
+  return <QmsClient surface="admin" />;
 }
