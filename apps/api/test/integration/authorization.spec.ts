@@ -17,6 +17,8 @@ describe.skipIf(!run)("authorization integration with PostgreSQL", () => {
   let app: INestApplication;
   let prisma: PrismaService;
   let tellerOneAccessToken = "";
+  let tellerThreeAccessToken = "";
+  let managerAccessToken = "";
   let browserTellerBody: Record<string, unknown> = {};
 
   beforeAll(async () => {
@@ -66,9 +68,10 @@ describe.skipIf(!run)("authorization integration with PostgreSQL", () => {
   it("returns 403 when a manager tries to use the teller API", async () => {
     const manager = await login("manager.dev", managerPassword);
     expect(manager.status).toBe(201);
+    managerAccessToken = manager.body.accessToken as string;
     const response = await request(app.getHttpServer())
       .get("/api/v1/teller/counter-session/current")
-      .set("Authorization", `Bearer ${manager.body.accessToken}`);
+      .set("Authorization", `Bearer ${managerAccessToken}`);
     expect(response.status).toBe(403);
     expect(response.body.error.code).toBe("FORBIDDEN");
   });
@@ -82,6 +85,7 @@ describe.skipIf(!run)("authorization integration with PostgreSQL", () => {
       .send({ username: "teller.three", password: tellerPassword });
     expect(mobile.status).toBe(201);
     expect(mobile.body.refreshToken).toEqual(expect.any(String));
+    tellerThreeAccessToken = mobile.body.accessToken as string;
 
     const rotated = await request(app.getHttpServer())
       .post("/api/v1/auth/refresh")
@@ -134,23 +138,20 @@ describe.skipIf(!run)("authorization integration with PostgreSQL", () => {
   });
 
   it("closes an idle teller counter session during logout", async () => {
-    const teller = await login("teller.four", tellerPassword);
-    expect(teller.status).toBe(201);
-    const token = teller.body.accessToken as string;
     const account = await prisma.staff.findUniqueOrThrow({
-      where: { username: "teller.four" },
+      where: { username: "teller.three" },
     });
     expect(account.assignedCounterId).not.toBeNull();
 
     const opened = await request(app.getHttpServer())
       .post("/api/v1/teller/counter-sessions")
-      .set("Authorization", `Bearer ${token}`)
+      .set("Authorization", `Bearer ${tellerThreeAccessToken}`)
       .send({ counterId: account.assignedCounterId });
     expect(opened.status).toBe(201);
 
     const loggedOut = await request(app.getHttpServer())
       .post("/api/v1/auth/logout")
-      .set("Authorization", `Bearer ${token}`);
+      .set("Authorization", `Bearer ${tellerThreeAccessToken}`);
     expect(loggedOut.status).toBe(201);
     expect(loggedOut.body.success).toBe(true);
     expect(
@@ -184,16 +185,20 @@ describe.skipIf(!run)("authorization integration with PostgreSQL", () => {
   });
 
   it("prevents a manager from mutating another branch resource", async () => {
-    const branchTwo = await login("manager.branch2", managerPassword);
-    const foreign = await request(app.getHttpServer())
-      .post("/api/v1/manager/services")
-      .set("Authorization", `Bearer ${branchTwo.body.accessToken}`)
-      .send({ code: "B2T", name: "Branch Two Test", averageServiceMinutes: 5 });
-    expect(foreign.status).toBe(201);
-    const mainManager = await login("manager.dev", managerPassword);
+    const branchTwo = await prisma.branch.findUniqueOrThrow({
+      where: { code: "TEST-B2" },
+    });
+    const foreign = await prisma.serviceType.create({
+      data: {
+        branchId: branchTwo.id,
+        code: `B2${randomUUID().slice(0, 6)}`,
+        name: "Branch Two Test",
+        averageServiceMinutes: 5,
+      },
+    });
     const attack = await request(app.getHttpServer())
-      .patch(`/api/v1/manager/services/${foreign.body.id}`)
-      .set("Authorization", `Bearer ${mainManager.body.accessToken}`)
+      .patch(`/api/v1/manager/services/${foreign.id}`)
+      .set("Authorization", `Bearer ${managerAccessToken}`)
       .send({ name: "Cross branch mutation" });
     expect(attack.status).toBe(404);
   });
