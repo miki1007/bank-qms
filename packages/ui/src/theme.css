@@ -1,20 +1,18 @@
-@import url("https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Manrope:wght@500;600;700;800&display=swap");
-
 :root {
-  font-family: "DM Sans", system-ui, sans-serif;
-  color: #12231e;
-  background: #eef3ef;
+  font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  color: #152b45;
+  background: #f3f7fb;
   font-synthesis: none;
-  --ink: #12231e;
-  --muted: #64736d;
-  --green: #0f5c45;
-  --green-dark: #083d2e;
-  --mint: #cfe8dc;
-  --gold: #d9b768;
-  --cream: #f7f4eb;
+  --ink: #152b45;
+  --muted: #647991;
+  --green: #1e4f7d;
+  --green-dark: #102d4d;
+  --mint: #dcebf7;
+  --gold: #79add5;
+  --cream: #f5f8fb;
   --white: #fff;
   --danger: #b42318;
-  --shadow: 0 18px 45px rgba(16, 55, 43, 0.11);
+  --shadow: 0 18px 45px rgba(22, 53, 86, 0.11);
 }
 * {
   box-sizing: border-box;
@@ -41,7 +39,7 @@ button:focus-visible,
 input:focus-visible,
 select:focus-visible,
 a:focus-visible {
-  outline: 3px solid #e4bb57;
+  outline: 3px solid #4d90ca;
   outline-offset: 3px;
 }
 .shell {
@@ -52,7 +50,7 @@ a:focus-visible {
       rgba(217, 183, 104, 0.18),
       transparent 26%
     ),
-    #eef3ef;
+    #f3f7fb;
 }
 .topbar {
   display: flex;
@@ -60,13 +58,13 @@ a:focus-visible {
   justify-content: space-between;
   padding: 18px clamp(20px, 4vw, 56px);
   background: #fff;
-  border-bottom: 1px solid #dce5df;
+  border-bottom: 1px solid #dce6f0;
 }
 .brand {
   display: flex;
   align-items: center;
   gap: 12px;
-  font-family: Manrope, sans-serif;
+  font-family: inherit;
   font-weight: 800;
 }
 .brand-mark {
@@ -92,7 +90,7 @@ a:focus-visible {
   padding: 36px 0 64px;
 }
 .title {
-  font-family: Manrope, sans-serif;
+  font-family: inherit;
   font-size: clamp(2rem, 4vw, 3.5rem);
   line-height: 1.04;
   margin: 0.35rem 0 1rem;
@@ -111,7 +109,7 @@ a:focus-visible {
 }
 .card {
   background: white;
-  border: 1px solid #dce5df;
+  border: 1px solid #dce6f0;
   border-radius: 22px;
   padding: 22px;
   box-shadow: var(--shadow);
@@ -121,7 +119,7 @@ a:focus-visible {
 }
 .card h2,
 .card h3 {
-  font-family: Manrope, sans-serif;
+  font-family: inherit;
   margin: 0 0 8px;
 }
 .action-button,
@@ -136,7 +134,7 @@ a:focus-visible {
 }
 .secondary {
   min-height: 48px;
-  border: 1px solid #b9cbc2;
+  border: 1px solid #bdccdc;
   border-radius: 14px;
   padding: 0 20px;
   background: #fff;
@@ -172,7 +170,7 @@ a:focus-visible {
   width: 100%;
   min-height: 48px;
   padding: 0 14px;
-  border: 1px solid #b9cbc2;
+  border: 1px solid #bdccdc;
   border-radius: 12px;
   background: white;
   color: var(--ink);
@@ -199,7 +197,7 @@ a:focus-visible {
   color: #a81d12;
 }
 .metric {
-  font-family: Manrope, sans-serif;
+  font-family: inherit;
   font-size: 2.1rem;
   font-weight: 800;
   letter-spacing: -0.04em;
@@ -234,7 +232,7 @@ a:focus-visible {
 .table-wrap {
   overflow: auto;
   border-radius: 16px;
-  border: 1px solid #dce5df;
+  border: 1px solid #dce6f0;
 }
 table {
   width: 100%;
@@ -263,10 +261,10 @@ th {
 }
 .service-button:hover {
   transform: translateY(-2px);
-  border-color: #8db3a3;
+  border-color: #789fbe;
 }
 .ticket-number {
-  font-family: Manrope, sans-serif;
+  font-family: inherit;
   font-weight: 800;
   font-size: clamp(3rem, 11vw, 7rem);
   letter-spacing: -0.06em;
@@ -284,4 +282,45 @@ th {
     border-radius: 18px;
     padding: 18px;
   }
+}
+
+.worldlink-brand {
+  display: inline-flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+  color: var(--ink);
+}
+.worldlink-brand img {
+  width: 48px;
+  height: 48px;
+  flex: 0 0 auto;
+  border-radius: 50%;
+  object-fit: cover;
+  border: 1px solid #d5e0eb;
+  box-shadow: 0 5px 16px rgba(17, 48, 79, 0.12);
+}
+.worldlink-brand > div {
+  display: grid;
+  min-width: 0;
+  gap: 2px;
+}
+.worldlink-brand strong {
+  font-size: 1.05rem;
+  line-height: 1.1;
+  letter-spacing: -0.02em;
+  white-space: nowrap;
+}
+.worldlink-brand span {
+  color: #71849a;
+  font-size: 0.78rem;
+  font-weight: 500;
+  white-space: nowrap;
+}
+.worldlink-brand.light,
+.worldlink-brand.light span {
+  color: #fff;
+}
+.worldlink-brand.light span {
+  opacity: 0.72;
 }

@@ -86,13 +86,18 @@ pnpm dev
 
 Leave that terminal open. The command starts all five application processes and labels each log line by service.
 
+All four browser clients use the unified WorldLink design. They are not visual
+mock-ups: authentication, balances, transaction statements, queue state,
+staff actions, kiosk tickets, and display updates call the NestJS/PostgreSQL
+backend started by this same command.
+
 | Application       | Local URL                            | How to enter                                                  |
 | ----------------- | ------------------------------------ | ------------------------------------------------------------- |
 | Staff login       | `http://localhost:5173/login`        | Use an administrator, manager, or teller account              |
 | Admin console     | `http://localhost:5173/admin`        | `admin.dev` plus `DEV_ADMIN_PASSWORD`                         |
 | Manager dashboard | `http://localhost:5173/manager`      | `manager.dev` plus `DEV_MANAGER_PASSWORD`                     |
 | Teller console    | `http://localhost:5173/teller`       | `teller.one` through `teller.four` plus `DEV_TELLER_PASSWORD` |
-| Customer app      | `http://localhost:5176`              | Register a new local customer account                         |
+| Customer app      | `http://localhost:5176`              | Register or sign in; accounts and queue data are private      |
 | Walk-in kiosk     | `http://localhost:5174`              | Uses the seeded kiosk device credentials from `.env`          |
 | Public display    | `http://localhost:5175`              | Uses the seeded display device credentials from `.env`        |
 | API documentation | `http://localhost:3000/docs`         | Swagger/OpenAPI                                               |
@@ -169,7 +174,7 @@ pnpm db:seed
 | ----------------------------- | ------------------------------------------------------------------------------------------------------------------- |
 | `apps/api`                    | NestJS REST/Socket.IO API, Prisma schema, migrations, seed, authorization, queue workflow, reports, and audit logic |
 | `apps/staff-web`              | Separate protected administrator, manager, and teller React routes                                                  |
-| `apps/customer-web`           | Customer registration, queue reservation, live ticket, and history React app                                        |
+| `apps/customer-web`           | Customer registration, demo banking overview, CSV statement, queue reservation, live ticket, and history React app                                        |
 | `apps/kiosk-web`              | Walk-in kiosk React app                                                                                             |
 | `apps/display-web`            | Public number display React app                                                                                     |
 | `apps/android`                | Native Jetpack Compose customer and teller applications plus the shared secure API client                           |

@@ -3,6 +3,7 @@ import { createRoot } from "react-dom/client";
 import { io } from "socket.io-client";
 import { Clock3, Radio, Volume2, WifiOff } from "lucide-react";
 import type { RealtimeEnvelope } from "@qms/shared-types";
+import { WorldLinkBrand } from "../../../packages/ui/src/index";
 import "../../../packages/ui/src/theme.css";
 import "./display.css";
 
@@ -109,13 +110,10 @@ function App() {
   return (
     <main className="display-shell">
       <header className="display-header">
-        <div className="brand">
-          <div className="brand-mark">BQ</div>
-          <div>
-            {branch.name}
-            <div className="display-sub">Queue calling display</div>
-          </div>
-        </div>
+        <WorldLinkBrand
+          className="light"
+          subtitle={`${branch.name} · Queue calling display`}
+        />
         <div className="row">
           <div className={`connection ${connected ? "online" : "offline"}`}>
             {connected ? <Radio size={17} /> : <WifiOff size={17} />}{" "}

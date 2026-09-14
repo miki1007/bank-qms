@@ -84,6 +84,29 @@ test("customer creates, looks up, and cancels a ticket", async ({
   expect(registered.ok()).toBeTruthy();
   const customerToken = (await registered.json()).accessToken as string;
   const customerHeaders = { Authorization: `Bearer ${customerToken}` };
+
+  const portfolioResponse = await request.get(
+    `${apiUrl}/customers/me/portfolio`,
+    { headers: customerHeaders },
+  );
+  expect(portfolioResponse.ok()).toBeTruthy();
+  const portfolio = (await portfolioResponse.json()) as {
+    totalAvailableMinor: number;
+    accounts: unknown[];
+    transactions: unknown[];
+  };
+  expect(portfolio.totalAvailableMinor).toBeGreaterThan(0);
+  expect(portfolio.accounts).toHaveLength(2);
+  expect(portfolio.transactions.length).toBeGreaterThan(0);
+
+  const statement = await request.get(
+    `${apiUrl}/customers/me/statement.csv`,
+    { headers: customerHeaders },
+  );
+  expect(statement.ok()).toBeTruthy();
+  expect(statement.headers()["content-type"]).toContain("text/csv");
+  expect(await statement.text()).toContain("Amount ETB");
+
   const services = await request.get(
     `${apiUrl}/customers/branches/MAIN/services`,
     { headers: customerHeaders },

@@ -30,6 +30,10 @@ import {
   CustomerAuthService,
   CustomerJwtAuthGuard,
 } from "./modules/customer-auth";
+import {
+  CustomerBankingController,
+  CustomerBankingService,
+} from "./modules/customer-banking";
 
 @Module({
   imports: [
@@ -45,6 +49,7 @@ import {
   controllers: [
     AuthController,
     CustomerAuthController,
+    CustomerBankingController,
     CustomerQueueController,
     PublicController,
     TellerController,
@@ -56,6 +61,7 @@ import {
     PrismaService,
     AuthService,
     CustomerAuthService,
+    CustomerBankingService,
     TicketWorkflowService,
     CounterSessionService,
     QueueSelectionService,

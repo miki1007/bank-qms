@@ -7,21 +7,29 @@ import {
   useQueryClient,
 } from "@tanstack/react-query";
 import {
+  ArrowDownLeft,
   ArrowLeft,
+  ArrowUpRight,
   BellRing,
   Building2,
   Check,
   ChevronRight,
   Clock3,
+  Download,
+  Eye,
+  EyeOff,
+  Headphones,
   History,
   Landmark,
   ListChecks,
   LogOut,
   MapPin,
+  ReceiptText,
   ShieldCheck,
   Sparkles,
   TicketCheck,
   UserRound,
+  WalletCards,
   Wifi,
   WifiOff,
 } from "lucide-react";
@@ -31,6 +39,7 @@ import {
   Navigate,
   Route,
   Routes,
+  useLocation,
   useNavigate,
   useParams,
 } from "react-router-dom";
@@ -41,6 +50,7 @@ import type {
   PublicService,
   TicketView,
 } from "@qms/shared-types";
+import { WorldLinkBrand } from "../../../packages/ui/src/index";
 import "../../../packages/ui/src/theme.css";
 import "./customer.css";
 
@@ -66,6 +76,59 @@ type TicketHistoryItem = {
   version: number;
   branch: PublicBranch;
 };
+
+type CustomerBankAccount = {
+  id: string;
+  accountType: string;
+  name: string;
+  maskedNumber: string;
+  currency: string;
+  ledgerBalanceMinor: number;
+  availableBalanceMinor: number;
+  status: string;
+};
+
+type CustomerBankTransaction = {
+  id: string;
+  accountId: string;
+  accountName: string;
+  maskedNumber: string;
+  postedAt: string;
+  description: string;
+  category: string;
+  amountMinor: number;
+  balanceMinor: number;
+  status: string;
+};
+
+type CustomerPortfolio = {
+  currency: string;
+  totalAvailableMinor: number;
+  accounts: CustomerBankAccount[];
+  transactions: CustomerBankTransaction[];
+};
+
+function money(minor: number, currency = "ETB") {
+  return new Intl.NumberFormat("en-ET", {
+    style: "currency",
+    currency,
+    currencyDisplay: "code",
+    minimumFractionDigits: 2,
+  }).format(minor / 100);
+}
+
+function greeting() {
+  const hour = Number(
+    new Intl.DateTimeFormat("en", {
+      hour: "numeric",
+      hour12: false,
+      timeZone: "Africa/Addis_Ababa",
+    }).format(new Date()),
+  );
+  if (hour < 12) return "Good morning";
+  if (hour < 18) return "Good afternoon";
+  return "Good evening";
+}
 
 async function parseResponse<T>(response: Response): Promise<T> {
   const payload = await response.json().catch(() => ({}));
@@ -161,16 +224,15 @@ function AuthScreen({
   return (
     <main className="auth-screen">
       <section className="auth-hero">
-        <div className="app-badge">
-          <Landmark size={22} /> Bank QMS
-        </div>
+        <WorldLinkBrand className="light" subtitle="Customer banking and queue portal" />
         <div className="hero-orbit orbit-one" />
         <div className="hero-orbit orbit-two" />
         <div className="auth-copy">
-          <p className="eyebrow">Skip the uncertainty</p>
-          <h1>Your bank visit, timed around your day.</h1>
+          <p className="eyebrow">Banking, without the guesswork</p>
+          <h1>Your money and branch visits, clearly in one place.</h1>
           <p>
-            Join a branch queue, follow your position live, and arrive prepared.
+            Review your demonstration accounts, download a statement, join a
+            branch queue, and follow your position live.
           </p>
           <div className="trust-row">
             <ShieldCheck size={18} /> Your queue history is private to your
@@ -197,8 +259,8 @@ function AuthScreen({
           <h2>{mode === "login" ? "Welcome back" : "Create your account"}</h2>
           <p>
             {mode === "login"
-              ? "Continue to your live tickets."
-              : "One account keeps all your branch tickets together."}
+              ? "Continue to your accounts and live tickets."
+              : "One secure account keeps your banking demo and branch tickets together."}
           </p>
         </div>
         <form onSubmit={submit} className="auth-form">
@@ -279,7 +341,284 @@ function StatusPill({ status }: { status: TicketView["status"] }) {
   );
 }
 
-function Home({ user, connected }: { user: CustomerUser; connected: boolean }) {
+function BankingHome({
+  user,
+  connected,
+}: {
+  user: CustomerUser;
+  connected: boolean;
+}) {
+  const portfolio = useQuery<CustomerPortfolio>({
+    queryKey: ["customer-portfolio"],
+    queryFn: () => api("/customers/me/portfolio"),
+  });
+  const [balancesHidden, setBalancesHidden] = useState(false);
+  const [activityFilter, setActivityFilter] = useState<
+    "ALL" | "INCOME" | "SPENDING"
+  >("ALL");
+  const [downloadBusy, setDownloadBusy] = useState(false);
+  const [downloadError, setDownloadError] = useState("");
+
+  const transactions =
+    portfolio.data?.transactions.filter((transaction) => {
+      if (activityFilter === "INCOME") return transaction.amountMinor > 0;
+      if (activityFilter === "SPENDING") return transaction.amountMinor < 0;
+      return true;
+    }) ?? [];
+
+  const downloadStatement = async () => {
+    setDownloadBusy(true);
+    setDownloadError("");
+    try {
+      const request = () =>
+        fetch(`${API}/customers/me/statement.csv`, {
+          credentials: "include",
+          headers: accessToken
+            ? { Authorization: `Bearer ${accessToken}` }
+            : {},
+        });
+      let response = await request();
+      if (response.status === 401) {
+        await refreshSession();
+        response = await request();
+      }
+      if (!response.ok) {
+        const payload = await response.json().catch(() => ({}));
+        throw new Error(
+          payload.error?.message ?? "The statement could not be downloaded.",
+        );
+      }
+      const url = URL.createObjectURL(await response.blob());
+      const anchor = document.createElement("a");
+      anchor.href = url;
+      anchor.download = `worldlink-statement-${new Date()
+        .toISOString()
+        .slice(0, 10)}.csv`;
+      document.body.appendChild(anchor);
+      anchor.click();
+      anchor.remove();
+      URL.revokeObjectURL(url);
+    } catch (caught) {
+      setDownloadError(
+        caught instanceof Error
+          ? caught.message
+          : "The statement could not be downloaded.",
+      );
+    } finally {
+      setDownloadBusy(false);
+    }
+  };
+
+  return (
+    <div className="banking-home page-enter">
+      <aside className="banking-intro">
+        <p className="eyebrow">Personal banking overview</p>
+        <h1>
+          {greeting()}.
+          <span>Your money, clearly.</span>
+        </h1>
+        <p>
+          Review your demonstration accounts and recent activity, then reserve
+          a branch visit when you need in-person service.
+        </p>
+        <ul>
+          <li>
+            <WalletCards /> Account balances
+          </li>
+          <li>
+            <ReceiptText /> Transaction history
+          </li>
+          <li>
+            <TicketCheck /> Branch queue booking
+          </li>
+        </ul>
+      </aside>
+
+      <div className="banking-dashboard">
+        <div className="banking-status-row">
+          <span className={connected ? "portal-online" : "portal-offline"}>
+            {connected ? <Wifi /> : <WifiOff />}
+            {connected ? "Live services connected" : "Reconnecting"}
+          </span>
+          <span>Welcome, {user.name.split(" ")[0]}</span>
+        </div>
+
+        {portfolio.isError && (
+          <div className="inline-error" role="alert">
+            Your account overview is temporarily unavailable. You can safely
+            retry.
+            <button onClick={() => portfolio.refetch()}>Retry</button>
+          </div>
+        )}
+
+        <section className="balance-hero" aria-live="polite">
+          <div>
+            <p>Total available balance</p>
+            <h2>
+              {portfolio.isLoading
+                ? "Loading…"
+                : balancesHidden
+                  ? "••••••••"
+                  : money(
+                      portfolio.data?.totalAvailableMinor ?? 0,
+                      portfolio.data?.currency,
+                    )}
+            </h2>
+            <span>
+              Across {portfolio.data?.accounts.length ?? 0} demonstration
+              accounts
+            </span>
+          </div>
+          <button
+            className="balance-visibility"
+            aria-label={balancesHidden ? "Show balances" : "Hide balances"}
+            onClick={() => setBalancesHidden((value) => !value)}
+          >
+            {balancesHidden ? <Eye /> : <EyeOff />}
+          </button>
+          <span className="demo-funds">Demo funds</span>
+        </section>
+
+        <section className="quick-actions" aria-label="Quick actions">
+          <Link to="/new">
+            <TicketCheck />
+            <span>
+              <strong>Reserve a visit</strong>
+              <small>Join a branch queue</small>
+            </span>
+            <ChevronRight />
+          </Link>
+          <button onClick={downloadStatement} disabled={downloadBusy}>
+            <Download />
+            <span>
+              <strong>{downloadBusy ? "Preparing…" : "Get statement"}</strong>
+              <small>Download secure CSV</small>
+            </span>
+            <ChevronRight />
+          </button>
+          <Link to="/new">
+            <Landmark />
+            <span>
+              <strong>Loan consultation</strong>
+              <small>Book an adviser</small>
+            </span>
+            <ChevronRight />
+          </Link>
+          <Link to="/new">
+            <Headphones />
+            <span>
+              <strong>Customer support</strong>
+              <small>Visit account services</small>
+            </span>
+            <ChevronRight />
+          </Link>
+        </section>
+        {downloadError && (
+          <div className="inline-error" role="alert">
+            {downloadError}
+          </div>
+        )}
+
+        <section className="accounts-section">
+          <div className="banking-section-heading">
+            <div>
+              <p className="eyebrow">Your accounts</p>
+              <h2>Balances at a glance</h2>
+            </div>
+            <button onClick={() => portfolio.refetch()}>Refresh</button>
+          </div>
+          <div className="account-card-grid">
+            {portfolio.isLoading &&
+              [0, 1].map((item) => (
+                <div className="account-card account-skeleton" key={item} />
+              ))}
+            {portfolio.data?.accounts.map((account) => (
+              <article className="account-card" key={account.id}>
+                <div className="account-card-top">
+                  <span className="account-icon">
+                    <WalletCards />
+                  </span>
+                  <span className="account-state">Active</span>
+                </div>
+                <div>
+                  <p>{account.name}</p>
+                  <span>{account.maskedNumber}</span>
+                </div>
+                <strong>
+                  {balancesHidden
+                    ? "••••••"
+                    : money(account.availableBalanceMinor, account.currency)}
+                </strong>
+                <small>Available balance</small>
+              </article>
+            ))}
+          </div>
+        </section>
+
+        <section className="activity-section">
+          <div className="banking-section-heading">
+            <div>
+              <p className="eyebrow">Recent activity</p>
+              <h2>Transactions</h2>
+            </div>
+            <div className="activity-filters" aria-label="Filter transactions">
+              {(["ALL", "INCOME", "SPENDING"] as const).map((filter) => (
+                <button
+                  key={filter}
+                  className={activityFilter === filter ? "active" : ""}
+                  onClick={() => setActivityFilter(filter)}
+                >
+                  {filter === "ALL"
+                    ? "All"
+                    : filter === "INCOME"
+                      ? "Money in"
+                      : "Money out"}
+                </button>
+              ))}
+            </div>
+          </div>
+          <div className="transaction-list">
+            {transactions.map((transaction) => {
+              const incoming = transaction.amountMinor > 0;
+              return (
+                <article key={transaction.id}>
+                  <span className={incoming ? "money-in" : "money-out"}>
+                    {incoming ? <ArrowDownLeft /> : <ArrowUpRight />}
+                  </span>
+                  <div>
+                    <strong>{transaction.description}</strong>
+                    <small>
+                      {transaction.accountName} ·{" "}
+                      {new Date(transaction.postedAt).toLocaleDateString(
+                        "en-ET",
+                        { month: "short", day: "numeric" },
+                      )}
+                    </small>
+                  </div>
+                  <div className={incoming ? "amount-in" : "amount-out"}>
+                    <strong>
+                      {incoming ? "+" : ""}
+                      {money(transaction.amountMinor, portfolio.data?.currency)}
+                    </strong>
+                    <small>{transaction.category}</small>
+                  </div>
+                </article>
+              );
+            })}
+            {!portfolio.isLoading && transactions.length === 0 && (
+              <div className="empty-card">
+                <ReceiptText />
+                <h3>No matching transactions</h3>
+              </div>
+            )}
+          </div>
+        </section>
+      </div>
+    </div>
+  );
+}
+
+function QueueHome({ user, connected }: { user: CustomerUser; connected: boolean }) {
   const history = useQuery<{ tickets: TicketHistoryItem[] }>({
     queryKey: ["customer-tickets"],
     queryFn: () => api("/customers/me/tickets"),
@@ -421,7 +760,7 @@ function NewTicket() {
       <header className="detail-header">
         <button
           aria-label="Go back"
-          onClick={() => (step === 1 ? navigate("/") : setStep(step - 1))}
+          onClick={() => (step === 1 ? navigate("/queue") : setStep(step - 1))}
         >
           <ArrowLeft />
         </button>
@@ -606,7 +945,7 @@ function TicketDetails() {
       <div className="screen-stack">
         <div className="empty-card">
           <h3>Ticket unavailable</h3>
-          <button onClick={() => navigate("/")}>Return home</button>
+          <button onClick={() => navigate("/queue")}>Return to queue</button>
         </div>
       </div>
     );
@@ -615,7 +954,7 @@ function TicketDetails() {
   return (
     <div className="screen-stack page-enter">
       <header className="detail-header">
-        <button aria-label="Go home" onClick={() => navigate("/")}>
+        <button aria-label="Go home" onClick={() => navigate("/queue")}>
           <ArrowLeft />
         </button>
         <div>
@@ -712,7 +1051,7 @@ function HistoryScreen() {
   return (
     <div className="screen-stack page-enter">
       <header className="detail-header">
-        <Link to="/" aria-label="Go home">
+        <Link to="/queue" aria-label="Go to queue">
           <ArrowLeft />
         </Link>
         <div>
@@ -745,6 +1084,7 @@ function AppShell({
 }) {
   const [connected, setConnected] = useState(false);
   const client = useQueryClient();
+  const location = useLocation();
   useEffect(() => {
     const socket = io(`${SOCKET}/realtime`, {
       transports: ["websocket"],
@@ -764,11 +1104,35 @@ function AppShell({
   }, [client]);
   return (
     <div className="mobile-shell">
-      <header className="app-header">
-        <Link to="/" className="mini-brand">
-          <span>BQ</span>
-          <strong>Bank QMS</strong>
+      <header className="app-header worldlink-app-header">
+        <Link to="/" className="worldlink-home-link">
+          <WorldLinkBrand subtitle="Customer portal" />
         </Link>
+        <nav className="portal-switcher" aria-label="Customer portal">
+          <Link
+            to="/"
+            className={
+              location.pathname === "/" || location.pathname === "/customer"
+                ? "active"
+                : ""
+            }
+          >
+            <WalletCards /> Accounts
+          </Link>
+          <Link
+            to="/queue"
+            className={
+              location.pathname.startsWith("/queue") ||
+              location.pathname.startsWith("/new") ||
+              location.pathname.startsWith("/tickets") ||
+              location.pathname.startsWith("/history")
+                ? "active"
+                : ""
+            }
+          >
+            <TicketCheck /> Queue
+          </Link>
+        </nav>
         <div className="account-menu">
           <UserRound size={17} />
           <span>{user.name.split(" ")[0]}</span>
@@ -782,7 +1146,15 @@ function AppShell({
         <Routes>
           <Route
             path="/"
-            element={<Home user={user} connected={connected} />}
+            element={<BankingHome user={user} connected={connected} />}
+          />
+          <Route
+            path="/customer"
+            element={<BankingHome user={user} connected={connected} />}
+          />
+          <Route
+            path="/queue"
+            element={<QueueHome user={user} connected={connected} />}
           />
           <Route path="/new" element={<NewTicket />} />
           <Route path="/tickets/:id" element={<TicketDetails />} />
@@ -792,12 +1164,12 @@ function AppShell({
       </main>
       <nav className="bottom-nav">
         <Link to="/">
-          <Landmark />
-          <span>Home</span>
+          <WalletCards />
+          <span>Accounts</span>
         </Link>
-        <Link to="/new" className="nav-primary">
+        <Link to="/queue" className="nav-primary">
           <TicketCheck />
-          <span>Join queue</span>
+          <span>Queue</span>
         </Link>
         <Link to="/history">
           <History />

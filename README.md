@@ -59,9 +59,18 @@ pnpm db:seed
 pnpm dev
 ```
 
+The customer, staff, kiosk, and display clients now use the same polished
+WorldLink interface as the hosted showcase while calling the real NestJS API
+and PostgreSQL database. Customer registration and sign-in are app-owned; each
+customer's synthetic demonstration accounts, transactions, statement export,
+and queue history are private to that authenticated customer.
+
 The hosted showcase exposes independent queues for Summit, CMC, Ayat, Piyassa, 4 Killo, Stadium, Megenagna, Mexico, Bole, Shola, and Lideta. Summit demo staff use `admin.dev`, `manager.dev`, and `teller.one` through `teller.four`; other hosted branch usernames append the branch code (for example, `admin.dev.cmc`). Each teller has an administrator-controlled counter assignment and cannot switch identities or counters from the teller console. Passwords and device secrets for the canonical PostgreSQL deployment come only from your `.env` values.
 
-The customer web/PWA uses a virtual-queue reservation model: one active remote ticket per customer per branch, three remote reservations per day, a ten-minute cancellation cooldown, expiry/no-show abuse controls, and branch arrival-code check-in. A customer who checks in on time keeps the original booking timestamp; unconfirmed reservations cannot be called. Priority is only requested remotely and becomes active after staff verification. While standard customers wait, the configured fairness rule calls at most two priority tickets consecutively by default.
+The customer web/PWA opens on an authenticated banking overview. Its two
+clearly labelled demonstration accounts and transaction history are persisted
+in PostgreSQL and scoped to the signed-in customer; statement CSV downloads are
+also authorization checked. The Queue tab uses a virtual-queue reservation model: one active remote ticket per customer per branch, three remote reservations per day, a ten-minute cancellation cooldown, expiry/no-show abuse controls, and branch arrival-code check-in. A customer who checks in on time keeps the original booking timestamp; unconfirmed reservations cannot be called. Priority is only requested remotely and becomes active after staff verification. While standard customers wait, the configured fairness rule calls at most two priority tickets consecutively by default.
 
 ## Mobile builds
 

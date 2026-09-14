@@ -4,7 +4,7 @@
   grid-template-columns: 1.05fr 0.95fr;
 }
 .login-art {
-  background: #083d2e;
+  background: #102d4d;
   color: #fff;
   padding: clamp(28px, 6vw, 78px);
   display: flex;
@@ -15,11 +15,11 @@
   color: #fff;
 }
 .brand-mark.gold {
-  background: #d9b768;
-  color: #12392e;
+  background: #82b3d8;
+  color: #173653;
 }
 .gold-text {
-  color: #d9b768;
+  color: #82b3d8;
 }
 .login-art h1 {
   font:
@@ -29,7 +29,7 @@
   margin: 12px 0 24px;
 }
 .login-art p {
-  color: #c3d5cd;
+  color: #c7d7e7;
   max-width: 540px;
   font-size: 1.08rem;
   line-height: 1.7;
@@ -38,13 +38,13 @@
   display: flex;
   gap: 12px;
   align-items: center;
-  color: #d8e5df;
+  color: #dbe7f2;
 }
 .login-panel {
   display: grid;
   place-items: center;
   padding: 30px;
-  background: #edf3ef;
+  background: #f2f6fa;
 }
 .login-panel form {
   width: min(480px, 100%);
@@ -56,7 +56,7 @@
 }
 .staff-shell {
   min-height: 100vh;
-  background: #edf3ef;
+  background: #f2f6fa;
   display: grid;
   grid-template-columns: 260px 1fr;
 }
@@ -64,7 +64,7 @@
   position: sticky;
   top: 0;
   height: 100vh;
-  background: #0a3428;
+  background: #112d4b;
   color: #fff;
   padding: 24px 18px;
   display: flex;
@@ -79,7 +79,7 @@
   display: flex;
   align-items: center;
   gap: 12px;
-  color: #bad0c7;
+  color: #bed0e1;
   text-decoration: none;
   padding: 12px 14px;
   border-radius: 12px;
@@ -92,7 +92,7 @@
 }
 .sidebar-caption {
   font-size: 0.76rem;
-  color: #9cb7ac;
+  color: #94abc0;
   font-weight: 500;
   margin-top: 2px;
 }
@@ -110,8 +110,8 @@
   width: 38px;
   height: 38px;
   border-radius: 12px;
-  background: #d9b768;
-  color: #173d31;
+  background: #82b3d8;
+  color: #183854;
   display: grid;
   place-items: center;
   font-weight: 800;
@@ -126,7 +126,7 @@
   display: flex;
   justify-content: space-between;
   align-items: center;
-  border-bottom: 1px solid #dce5df;
+  border-bottom: 1px solid #dce6f0;
 }
 .session-actions {
   display: grid;
@@ -139,9 +139,9 @@
   gap: 7px;
   min-height: 38px;
   padding: 0 12px;
-  border: 1px solid #d8e2dd;
+  border: 1px solid #d6e2ed;
   border-radius: 11px;
-  color: #173d31;
+  color: #183854;
   background: #fff;
   font-weight: 750;
   cursor: pointer;
@@ -189,8 +189,8 @@
   width: 72px;
   height: 72px;
   border-radius: 24px;
-  background: #e0efe7;
-  color: #0f5c45;
+  background: #e4eff8;
+  color: #245d8b;
   display: grid;
   place-items: center;
   margin: 0 auto 16px;
@@ -200,7 +200,7 @@
   border-radius: 20px;
   min-height: 76px;
   padding: 0 42px;
-  background: #0f5c45;
+  background: #245d8b;
   color: #fff;
   font-size: 1.2rem;
   font-weight: 800;
@@ -211,7 +211,7 @@
     800 clamp(4.5rem, 10vw, 8rem)/1 Manrope,
     sans-serif;
   letter-spacing: -0.07em;
-  color: #0b4b38;
+  color: #163d61;
   margin-top: 25px;
 }
 .actions {
@@ -222,12 +222,12 @@
   display: flex;
   gap: 10px;
   padding: 10px;
-  background: #f2f5f3;
+  background: #f0f4f8;
   border-radius: 12px;
 }
 .transfer-box select {
   min-height: 48px;
-  border: 1px solid #b9cbc2;
+  border: 1px solid #bdccdc;
   border-radius: 10px;
   padding: 0 12px;
 }
@@ -283,7 +283,7 @@
   }
 }
 @media (max-width: 620px) {
-  .sidebar .brand {
+  .sidebar .worldlink-brand {
     display: none;
   }
   .sidebar nav a {

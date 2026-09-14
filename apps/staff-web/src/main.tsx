@@ -45,6 +45,7 @@ import {
   YAxis,
 } from "recharts";
 import type { AuthUser } from "@qms/shared-types";
+import { WorldLinkBrand } from "../../../packages/ui/src/index";
 import "../../../packages/ui/src/theme.css";
 import "./staff.css";
 
@@ -271,9 +272,7 @@ function Login() {
   return (
     <main className="login-shell">
       <section className="login-art">
-        <div className="brand light">
-          <div className="brand-mark gold">BQ</div>Bank QMS
-        </div>
+        <WorldLinkBrand className="light" subtitle="Secure branch operations" />
         <div>
           <p className="eyebrow gold-text">Branch operations</p>
           <h1>
@@ -403,20 +402,16 @@ function Shell({
   return (
     <div className="staff-shell">
       <aside className="sidebar">
-        <div className="brand light">
-          <div className="brand-mark gold">BQ</div>
-          <div>
-            Bank QMS
-            <div className="sidebar-caption">
-              {mode === "admin"
-                ? "Administrator"
-                : mode === "manager"
-                  ? "Manager"
-                  : "Teller"}{" "}
-              workspace
-            </div>
-          </div>
-        </div>
+        <WorldLinkBrand
+          className="light"
+          subtitle={`${
+            mode === "admin"
+              ? "Administrator"
+              : mode === "manager"
+                ? "Manager"
+                : "Teller"
+          } workspace`}
+        />
         <nav>
           {mode === "manager" || mode === "admin" ? (
             links.map(([path, label, Icon]) => (

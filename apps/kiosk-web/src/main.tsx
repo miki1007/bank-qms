@@ -17,6 +17,7 @@ import {
   Users,
 } from "lucide-react";
 import type { PublicService, TicketView } from "@qms/shared-types";
+import { WorldLinkBrand } from "../../../packages/ui/src/index";
 import "../../../packages/ui/src/theme.css";
 
 const API = import.meta.env.VITE_API_URL ?? "http://localhost:3000/api/v1";
@@ -79,7 +80,7 @@ function App() {
   const words =
     language === "en"
       ? {
-          welcome: "Welcome to Bank QMS",
+          welcome: "Welcome to WorldLink Bank",
           choose: "Choose the service you need",
           get: "Get a ticket",
           check: "Check or cancel ticket",
@@ -213,13 +214,7 @@ function App() {
   return (
     <div className="shell">
       <header className="topbar">
-        <div className="brand">
-          <div className="brand-mark">BQ</div>
-          <div>
-            Bank QMS
-            <div className="small muted">Main branch · Queue service</div>
-          </div>
-        </div>
+        <WorldLinkBrand subtitle="Main branch · Queue service" />
         <button
           className="secondary row"
           onClick={() => setLanguage(language === "en" ? "am" : "en")}
@@ -264,7 +259,7 @@ function App() {
                 className="card service-button"
                 onClick={() => setView("services")}
               >
-                <Banknote size={36} color="#0f5c45" />
+                <Banknote size={36} color="#245d8b" />
                 <h2 style={{ marginTop: 20 }}>{words.get}</h2>
                 <p className="muted">
                   Choose a banking service and receive your number.

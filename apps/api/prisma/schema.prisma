@@ -117,9 +117,47 @@ model Customer {
   updatedAt        DateTime                 @updatedAt @map("updated_at") @db.Timestamptz(6)
   tickets          Ticket[]
   refreshSessions  CustomerRefreshSession[]
+  bankAccounts     CustomerBankAccount[]
 
   @@index([status, createdAt])
   @@map("customers")
+}
+
+model CustomerBankAccount {
+  id                    String                    @id @default(uuid()) @db.Uuid
+  customerId            String                    @map("customer_id") @db.Uuid
+  accountType           String                    @map("account_type") @db.VarChar(24)
+  name                  String                    @db.VarChar(80)
+  maskedNumber          String                    @map("masked_number") @db.VarChar(24)
+  currency              String                    @default("ETB") @db.VarChar(3)
+  ledgerBalanceMinor    BigInt                    @map("ledger_balance_minor")
+  availableBalanceMinor BigInt                    @map("available_balance_minor")
+  status                String                    @default("ACTIVE") @db.VarChar(16)
+  createdAt             DateTime                  @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt             DateTime                  @updatedAt @map("updated_at") @db.Timestamptz(6)
+  customer              Customer                  @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  transactions          CustomerBankTransaction[]
+
+  @@unique([customerId, accountType])
+  @@index([customerId, status])
+  @@map("customer_bank_accounts")
+}
+
+model CustomerBankTransaction {
+  id           String              @id @default(uuid()) @db.Uuid
+  accountId    String              @map("account_id") @db.Uuid
+  postedAt     DateTime            @map("posted_at") @db.Timestamptz(6)
+  description  String              @db.VarChar(160)
+  category     String              @db.VarChar(60)
+  amountMinor  BigInt              @map("amount_minor")
+  balanceMinor BigInt              @map("balance_minor")
+  status       String              @default("POSTED") @db.VarChar(16)
+  reference    String              @unique @db.VarChar(80)
+  createdAt    DateTime            @default(now()) @map("created_at") @db.Timestamptz(6)
+  account      CustomerBankAccount @relation(fields: [accountId], references: [id], onDelete: Cascade)
+
+  @@index([accountId, postedAt])
+  @@map("customer_bank_transactions")
 }
 
 model ServiceType {

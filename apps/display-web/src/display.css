@@ -1,6 +1,6 @@
 .display-shell {
   min-height: 100vh;
-  background: #071f18;
+  background: #0b2038;
   color: #fff;
   display: grid;
   grid-template-rows: auto 1fr auto;
@@ -13,11 +13,11 @@
   border-bottom: 1px solid rgba(255, 255, 255, 0.13);
 }
 .display-header .brand-mark {
-  background: #d9b768;
-  color: #163c30;
+  background: #82b3d8;
+  color: #183854;
 }
 .display-sub {
-  color: #a8beb5;
+  color: #a8bdd1;
   font-size: 0.9rem;
 }
 .connection,
@@ -31,10 +31,10 @@
   font-weight: 700;
 }
 .online {
-  color: #8ee5bc;
+  color: #8edbbd;
 }
 .offline {
-  color: #ffd783;
+  color: #ffd08a;
 }
 .current-call {
   display: grid;
@@ -45,12 +45,12 @@
   transition: background 0.25s;
 }
 .current-call.highlight {
-  background: #124d3b;
+  background: #173f63;
 }
 .call-label {
   text-transform: uppercase;
   letter-spacing: 0.18em;
-  color: #d9b768;
+  color: #82b3d8;
   font-weight: 800;
 }
 .display-ticket {
@@ -62,7 +62,7 @@
 }
 .service-line {
   font-size: clamp(1.2rem, 2vw, 2rem);
-  color: #c9dbd3;
+  color: #c9d8e7;
   margin-top: 24px;
 }
 .counter-panel {
@@ -71,8 +71,8 @@
   display: grid;
   place-content: center;
   text-align: center;
-  background: #f4f1e7;
-  color: #0b3125;
+  background: #f1f5f9;
+  color: #132f4b;
   border-radius: 36px;
 }
 .display-counter {
@@ -80,7 +80,7 @@
   font-size: clamp(7rem, 16vw, 13rem);
   line-height: 1;
   font-weight: 800;
-  color: #0f5c45;
+  color: #245d8b;
 }
 .counter-word {
   font-size: 1.5rem;
@@ -88,7 +88,7 @@
 }
 .recent {
   padding: 24px 36px 34px;
-  background: #0a2a20;
+  background: #102b46;
   border-top: 1px solid rgba(255, 255, 255, 0.12);
 }
 .recent h2 {
@@ -114,17 +114,17 @@
   font-size: 1.4rem;
 }
 .recent article span {
-  color: #d9b768;
+  color: #82b3d8;
   font-weight: 700;
 }
 .recent article small {
   grid-column: 1/-1;
-  color: #a8beb5;
+  color: #a8bdd1;
 }
 .waiting-empty {
   text-align: center;
   grid-column: 1/-1;
-  color: #c9dbd3;
+  color: #c9d8e7;
 }
 .waiting-empty h1 {
   font-size: 3rem;
