@@ -89,8 +89,12 @@ test("customer creates, looks up, and cancels a ticket", async ({
     `${apiUrl}/customers/me/portfolio`,
     { headers: customerHeaders },
   );
-  expect(portfolioResponse.ok()).toBeTruthy();
-  const portfolio = (await portfolioResponse.json()) as {
+  const portfolioBody = await portfolioResponse.text();
+  expect(
+    portfolioResponse.ok(),
+    `Portfolio request failed with ${portfolioResponse.status()}: ${portfolioBody}`,
+  ).toBeTruthy();
+  const portfolio = JSON.parse(portfolioBody) as {
     totalAvailableMinor: number;
     accounts: unknown[];
     transactions: unknown[];
