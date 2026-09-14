@@ -26,8 +26,6 @@ jobs:
           pnpm exec prettier --write \
             README.md \
             docs/operations/local-development.md \
-            apps/api/prisma/schema.prisma \
-            apps/api/prisma/migrations/202609140001_customer_banking_portfolio/migration.sql \
             apps/api/src/app.module.ts \
             apps/api/src/modules/customer-banking.ts \
             apps/customer-web/index.html \
