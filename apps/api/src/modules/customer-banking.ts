@@ -58,9 +58,7 @@ const csvCell = (value: string | number) => {
 
 @Injectable()
 export class CustomerBankingService {
-  constructor(
-    @Inject(PrismaService) private readonly prisma: PrismaService,
-  ) {}
+  constructor(@Inject(PrismaService) private readonly prisma: PrismaService) {}
 
   private async ensurePortfolio(customerId: string) {
     await this.prisma.$transaction(async (tx) => {
