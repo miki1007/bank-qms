@@ -5,17 +5,29 @@ const tellerPassword = process.env.DEV_TELLER_PASSWORD ?? "";
 const managerPassword = process.env.DEV_MANAGER_PASSWORD ?? "";
 const adminPassword = process.env.DEV_ADMIN_PASSWORD ?? "";
 const displayDeviceSecret = process.env.DISPLAY_DEVICE_SECRET ?? "";
+const staffTokens = new Map<string, Promise<string>>();
 
 async function login(
   request: APIRequestContext,
   username: string,
   password: string,
 ) {
-  const response = await request.post(`${apiUrl}/auth/login`, {
-    data: { username, password },
-  });
-  expect(response.ok()).toBeTruthy();
-  return (await response.json()).accessToken as string;
+  const cached = staffTokens.get(username);
+  if (cached) return cached;
+
+  const token = (async () => {
+    const response = await request.post(`${apiUrl}/auth/login`, {
+      data: { username, password },
+    });
+    const body = await response.text();
+    expect(
+      response.ok(),
+      `Login for ${username} failed with ${response.status()}: ${body}`,
+    ).toBeTruthy();
+    return (JSON.parse(body) as { accessToken: string }).accessToken;
+  })();
+  staffTokens.set(username, token);
+  return token;
 }
 
 test("teller login is isolated from manager and admin endpoints", async ({
@@ -145,15 +157,31 @@ test("customer creates, looks up, and cancels a ticket", async ({
   expect((await cancelled.json()).ticket.status).toBe("CANCELLED");
 });
 
-test("manager report export creates an audit record", async ({ request }) => {
-  const token = await login(request, "manager.dev", managerPassword);
-  const headers = { Authorization: `Bearer ${token}` };
-  const exportResponse = await request.get(
-    `${apiUrl}/manager/reports/tickets.csv`,
-    { headers },
+test("manager dashboard exports a report and creates an audit record", async ({
+  page,
+  request,
+}) => {
+  await page.goto("http://localhost:5173/login");
+  await page.getByLabel("Username").fill("manager.dev");
+  await page.getByLabel("Password").fill(managerPassword);
+  await page.getByRole("button", { name: "Sign in securely" }).click();
+  await expect(
+    page.getByRole("heading", { name: "Live branch overview" }),
+  ).toBeVisible();
+  await expect(page.getByText("Live demand by service")).toBeVisible();
+  await expect(page.getByRole("link", { name: "Administration" })).toHaveCount(
+    0,
   );
-  expect(exportResponse.ok()).toBeTruthy();
-  expect(exportResponse.headers()["content-type"]).toContain("text/csv");
+  await expect(
+    page.getByRole("link", { name: /Queue workspace/i }),
+  ).toHaveCount(0);
+
+  await page.getByRole("link", { name: "Reports" }).click();
+  const downloadPromise = page.waitForEvent("download");
+  await page.getByRole("button", { name: "Export filtered CSV" }).click();
+  const download = await downloadPromise;
+  expect(download.suggestedFilename()).toBe("bank-qms-report.csv");
+
   const adminToken = await login(request, "admin.dev", adminPassword);
   const audit = await request.get(
     `${apiUrl}/admin/audit-logs?action=REPORT_EXPORT`,
@@ -213,9 +241,7 @@ test("administrator configures the Amharic display announcement policy", async (
   expect(restore.ok()).toBeTruthy();
 });
 
-test("polished kiosk, display, and manager workspaces render", async ({
-  page,
-}) => {
+test("polished kiosk and display workspaces render", async ({ page }) => {
   await page.goto("http://localhost:5174");
   await expect(
     page.getByRole("heading", { name: /Welcome to WorldLink Bank/i }),
@@ -229,21 +255,6 @@ test("polished kiosk, display, and manager workspaces render", async ({
   await expect(
     page.getByRole("button", { name: /Enable voice|Voice on/i }),
   ).toBeVisible();
-
-  await page.goto("http://localhost:5173/login");
-  await page.getByLabel("Username").fill("manager.dev");
-  await page.getByLabel("Password").fill(managerPassword);
-  await page.getByRole("button", { name: "Sign in securely" }).click();
-  await expect(
-    page.getByRole("heading", { name: "Live branch overview" }),
-  ).toBeVisible();
-  await expect(page.getByText("Live demand by service")).toBeVisible();
-  await expect(page.getByRole("link", { name: "Administration" })).toHaveCount(
-    0,
-  );
-  await expect(
-    page.getByRole("link", { name: /Queue workspace/i }),
-  ).toHaveCount(0);
 });
 
 test("administrator and teller remain in their own polished workspaces", async ({
