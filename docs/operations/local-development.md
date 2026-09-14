@@ -174,7 +174,7 @@ pnpm db:seed
 | ----------------------------- | ------------------------------------------------------------------------------------------------------------------- |
 | `apps/api`                    | NestJS REST/Socket.IO API, Prisma schema, migrations, seed, authorization, queue workflow, reports, and audit logic |
 | `apps/staff-web`              | Separate protected administrator, manager, and teller React routes                                                  |
-| `apps/customer-web`           | Customer registration, demo banking overview, CSV statement, queue reservation, live ticket, and history React app                                        |
+| `apps/customer-web`           | Customer registration, demo banking overview, CSV statement, queue reservation, live ticket, and history React app  |
 | `apps/kiosk-web`              | Walk-in kiosk React app                                                                                             |
 | `apps/display-web`            | Public number display React app                                                                                     |
 | `apps/android`                | Native Jetpack Compose customer and teller applications plus the shared secure API client                           |

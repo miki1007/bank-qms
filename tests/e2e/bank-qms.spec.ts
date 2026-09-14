@@ -99,10 +99,9 @@ test("customer creates, looks up, and cancels a ticket", async ({
   expect(portfolio.accounts).toHaveLength(2);
   expect(portfolio.transactions.length).toBeGreaterThan(0);
 
-  const statement = await request.get(
-    `${apiUrl}/customers/me/statement.csv`,
-    { headers: customerHeaders },
-  );
+  const statement = await request.get(`${apiUrl}/customers/me/statement.csv`, {
+    headers: customerHeaders,
+  });
   expect(statement.ok()).toBeTruthy();
   expect(statement.headers()["content-type"]).toContain("text/csv");
   expect(await statement.text()).toContain("Amount ETB");

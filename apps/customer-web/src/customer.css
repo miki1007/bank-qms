@@ -1126,8 +1126,18 @@ select:focus-visible {
   padding: clamp(30px, 4vw, 50px);
   color: #fff;
   background:
-    radial-gradient(circle at 96% 85%, transparent 0 18%, #ffffff10 18.4% 31%, transparent 31.4%),
-    radial-gradient(circle at 96% 85%, transparent 0 34%, #ffffff0b 34.4% 50%, transparent 50.4%),
+    radial-gradient(
+      circle at 96% 85%,
+      transparent 0 18%,
+      #ffffff10 18.4% 31%,
+      transparent 31.4%
+    ),
+    radial-gradient(
+      circle at 96% 85%,
+      transparent 0 34%,
+      #ffffff0b 34.4% 50%,
+      transparent 50.4%
+    ),
     linear-gradient(125deg, #112d4c, #234b72 68%, #426d93);
   box-shadow: 0 25px 65px rgba(20, 49, 79, 0.24);
 }

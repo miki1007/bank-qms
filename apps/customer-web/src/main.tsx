@@ -224,7 +224,10 @@ function AuthScreen({
   return (
     <main className="auth-screen">
       <section className="auth-hero">
-        <WorldLinkBrand className="light" subtitle="Customer banking and queue portal" />
+        <WorldLinkBrand
+          className="light"
+          subtitle="Customer banking and queue portal"
+        />
         <div className="hero-orbit orbit-one" />
         <div className="hero-orbit orbit-two" />
         <div className="auth-copy">
@@ -414,12 +417,11 @@ function BankingHome({
       <aside className="banking-intro">
         <p className="eyebrow">Personal banking overview</p>
         <h1>
-          {greeting()}.
-          <span>Your money, clearly.</span>
+          {greeting()}.<span>Your money, clearly.</span>
         </h1>
         <p>
-          Review your demonstration accounts and recent activity, then reserve
-          a branch visit when you need in-person service.
+          Review your demonstration accounts and recent activity, then reserve a
+          branch visit when you need in-person service.
         </p>
         <ul>
           <li>
@@ -618,7 +620,13 @@ function BankingHome({
   );
 }
 
-function QueueHome({ user, connected }: { user: CustomerUser; connected: boolean }) {
+function QueueHome({
+  user,
+  connected,
+}: {
+  user: CustomerUser;
+  connected: boolean;
+}) {
   const history = useQuery<{ tickets: TicketHistoryItem[] }>({
     queryKey: ["customer-tickets"],
     queryFn: () => api("/customers/me/tickets"),

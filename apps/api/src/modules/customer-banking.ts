@@ -9,10 +9,7 @@ import {
 import type { CustomerBankAccount } from "@prisma/client";
 import type { Response } from "express";
 import { PrismaService } from "../prisma.service";
-import {
-  CurrentCustomer,
-  CustomerJwtAuthGuard,
-} from "./customer-auth";
+import { CurrentCustomer, CustomerJwtAuthGuard } from "./customer-auth";
 
 type CustomerIdentity = {
   sub: string;
