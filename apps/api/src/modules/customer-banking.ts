@@ -1,6 +1,7 @@
 import {
   Controller,
   Get,
+  Inject,
   Injectable,
   Query,
   Res,
@@ -57,7 +58,9 @@ const csvCell = (value: string | number) => {
 
 @Injectable()
 export class CustomerBankingService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    @Inject(PrismaService) private readonly prisma: PrismaService,
+  ) {}
 
   private async ensurePortfolio(customerId: string) {
     await this.prisma.$transaction(async (tx) => {
@@ -277,7 +280,10 @@ export class CustomerBankingService {
 @Controller("customers/me")
 @UseGuards(CustomerJwtAuthGuard)
 export class CustomerBankingController {
-  constructor(private readonly banking: CustomerBankingService) {}
+  constructor(
+    @Inject(CustomerBankingService)
+    private readonly banking: CustomerBankingService,
+  ) {}
 
   @Get("portfolio")
   portfolio(@CurrentCustomer() customer: CustomerIdentity) {
