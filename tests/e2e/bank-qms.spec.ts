@@ -4,6 +4,7 @@ const apiUrl = process.env.E2E_API_URL ?? "http://localhost:3000/api/v1";
 const tellerPassword = process.env.DEV_TELLER_PASSWORD ?? "";
 const managerPassword = process.env.DEV_MANAGER_PASSWORD ?? "";
 const adminPassword = process.env.DEV_ADMIN_PASSWORD ?? "";
+const displayDeviceSecret = process.env.DISPLAY_DEVICE_SECRET ?? "";
 
 async function login(
   request: APIRequestContext,
@@ -163,4 +164,113 @@ test("manager report export creates an audit record", async ({ request }) => {
       (entry: { action: string }) => entry.action === "REPORT_EXPORT",
     ),
   ).toBeTruthy();
+});
+
+test("administrator configures the Amharic display announcement policy", async ({
+  request,
+}) => {
+  const token = await login(request, "admin.dev", adminPassword);
+  const headers = { Authorization: "Bearer " + token };
+  const currentResponse = await request.get(apiUrl + "/admin/settings", {
+    headers,
+  });
+  expect(currentResponse.ok()).toBeTruthy();
+  const current = (await currentResponse.json()) as {
+    timezone: string;
+    settings: Record<string, unknown>;
+  };
+
+  const update = await request.patch(apiUrl + "/admin/settings", {
+    headers,
+    data: {
+      ...current.settings,
+      timezone: current.timezone,
+      soundEnabled: true,
+      announcementRepeatCount: 2,
+    },
+  });
+  expect(update.ok()).toBeTruthy();
+
+  const bootstrap = await request.get(
+    apiUrl + "/public/devices/MAIN-DISPLAY-01/bootstrap",
+    { headers: { "x-device-secret": displayDeviceSecret } },
+  );
+  expect(bootstrap.ok()).toBeTruthy();
+  expect((await bootstrap.json()).displaySettings).toMatchObject({
+    soundEnabled: true,
+    announcementRepeatCount: 2,
+  });
+
+  const restore = await request.patch(apiUrl + "/admin/settings", {
+    headers,
+    data: {
+      ...current.settings,
+      timezone: current.timezone,
+      soundEnabled: true,
+      announcementRepeatCount: 3,
+    },
+  });
+  expect(restore.ok()).toBeTruthy();
+});
+
+test("polished kiosk, display, and manager workspaces render", async ({
+  page,
+}) => {
+  await page.goto("http://localhost:5174");
+  await expect(
+    page.getByRole("heading", { name: /Welcome to WorldLink Bank/i }),
+  ).toBeVisible();
+  await expect(
+    page.getByRole("button", { name: /Get a ticket/i }),
+  ).toBeVisible();
+
+  await page.goto("http://localhost:5175");
+  await expect(page.getByText("Current & recent calls")).toBeVisible();
+  await expect(
+    page.getByRole("button", { name: /Enable voice|Voice on/i }),
+  ).toBeVisible();
+
+  await page.goto("http://localhost:5173/login");
+  await page.getByLabel("Username").fill("manager.dev");
+  await page.getByLabel("Password").fill(managerPassword);
+  await page.getByRole("button", { name: "Sign in securely" }).click();
+  await expect(
+    page.getByRole("heading", { name: "Live branch overview" }),
+  ).toBeVisible();
+  await expect(page.getByText("Live demand by service")).toBeVisible();
+  await expect(page.getByRole("link", { name: "Administration" })).toHaveCount(
+    0,
+  );
+  await expect(
+    page.getByRole("link", { name: /Queue workspace/i }),
+  ).toHaveCount(0);
+});
+
+test("administrator and teller remain in their own polished workspaces", async ({
+  page,
+}) => {
+  await page.goto("http://localhost:5173/login");
+  await page.getByLabel("Username").fill("admin.dev");
+  await page.getByLabel("Password").fill(adminPassword);
+  await page.getByRole("button", { name: "Sign in securely" }).click();
+  await expect(
+    page.getByRole("heading", { name: "Administration overview" }),
+  ).toBeVisible();
+  await expect(page.getByText("Administrator protected")).toBeVisible();
+  await expect(
+    page.getByRole("link", { name: /Queue workspace/i }),
+  ).toHaveCount(0);
+
+  await page.getByRole("button", { name: "Log out" }).click();
+  await expect(page).toHaveURL(/\/login$/);
+  await page.getByLabel("Username").fill("teller.one");
+  await page.getByLabel("Password").fill(tellerPassword);
+  await page.getByRole("button", { name: "Sign in securely" }).click();
+  await expect(
+    page.getByRole("heading", { name: "Open your assigned counter" }),
+  ).toBeVisible();
+  await expect(page.getByText("No teller or counter switching")).toBeVisible();
+  await expect(page.getByRole("link", { name: "Administration" })).toHaveCount(
+    0,
+  );
 });

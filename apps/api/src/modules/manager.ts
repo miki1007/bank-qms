@@ -477,6 +477,7 @@ export class ManagerService {
       displayHistoryCount: 5,
       slaWaitMinutes: 20,
       soundEnabled: true,
+      announcementRepeatCount: 3,
     };
   }
 
@@ -1061,6 +1062,8 @@ export class ManagerService {
     const kioskIdleTimeoutSeconds = Number(body.kioskIdleTimeoutSeconds);
     const displayHistoryCount = Number(body.displayHistoryCount);
     const slaWaitMinutes = Number(body.slaWaitMinutes);
+    const announcementRepeatCount = Number(body.announcementRepeatCount ?? 3);
+    const soundEnabled = body.soundEnabled !== false;
     if (
       priorityFairnessLimit < 1 ||
       priorityFairnessLimit > 5 ||
@@ -1071,7 +1074,8 @@ export class ManagerService {
       displayHistoryCount < 1 ||
       displayHistoryCount > 20 ||
       slaWaitMinutes < 1 ||
-      slaWaitMinutes > 240
+      slaWaitMinutes > 240 ||
+      ![2, 3].includes(announcementRepeatCount)
     )
       throw new DomainError(
         "VALIDATION_ERROR",
@@ -1084,6 +1088,8 @@ export class ManagerService {
       kioskIdleTimeoutSeconds,
       displayHistoryCount,
       slaWaitMinutes,
+      soundEnabled,
+      announcementRepeatCount,
     };
     await this.prisma.branch.update({
       where: { id: user.branchId },

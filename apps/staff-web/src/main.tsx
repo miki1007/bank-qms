@@ -217,7 +217,9 @@ type AuditItem = {
   targetType: string | null;
   outcome: string;
 };
-type SettingsForm = Record<string, string | number> & { timezone: string };
+type SettingsForm = Record<string, string | number | boolean> & {
+  timezone: string;
+};
 type SettingsResponse = {
   timezone: string;
   settings: Record<string, number>;
@@ -412,7 +414,18 @@ function Shell({
                 : "Teller"
           } workspace`}
         />
-        <nav>
+        <div className="sidebar-role">
+          <span>Secure workspace</span>
+          <strong>
+            {mode === "admin"
+              ? "System control"
+              : mode === "manager"
+                ? "Branch operations"
+                : "Counter service"}
+          </strong>
+        </div>
+        <nav aria-label={mode + " workspace navigation"}>
+          <span className="sidebar-nav-label">Workspace</span>
           {mode === "manager" || mode === "admin" ? (
             links.map(([path, label, Icon]) => (
               <NavLink key={label} end={label === "Overview"} to={path}>
@@ -442,12 +455,14 @@ function Shell({
       </aside>
       <div className="workspace">
         <header className="workspace-header">
-          <div>
-            <strong>{activeBranch?.name ?? user?.branchName}</strong>
-            <span className="muted small">
-              {" "}
-              · {activeBranch?.code ?? user?.branchCode}
-            </span>
+          <div className="workspace-branch">
+            <span className="branch-live-dot" />
+            <div>
+              <strong>{activeBranch?.name ?? user?.branchName}</strong>
+              <span>
+                {activeBranch?.code ?? user?.branchCode} · Addis Ababa
+              </span>
+            </div>
             {mode === "admin" && branches.data && (
               <select
                 aria-label="Administration branch scope"
@@ -559,12 +574,23 @@ function TellerWorkspace() {
     return (
       <Shell mode="teller">
         <main className="workspace-page">
-          <p className="eyebrow">Start shift</p>
-          <h1 className="section-title">Open your assigned counter</h1>
-          <p className="muted">
-            Counter ownership is assigned by an administrator and cannot be
-            changed from the teller workspace.
-          </p>
+          <section className="workspace-hero teller-shift-hero">
+            <div>
+              <p className="eyebrow">Secure teller workspace</p>
+              <h1>Open your assigned counter</h1>
+              <p>
+                Your identity and counter assignment are locked by the
+                administrator. Start the shift to serve your assigned queue.
+              </p>
+            </div>
+            <div className="hero-security">
+              <ShieldCheck size={28} />
+              <span>
+                <strong>Identity protected</strong>
+                <small>No teller or counter switching</small>
+              </span>
+            </div>
+          </section>
           {error && <div className="error">{error}</div>}
           <div className="grid">
             {counters.data?.length ? (
@@ -615,14 +641,14 @@ function TellerWorkspace() {
       <main className="workspace-page">
         {error && <div className="error">{error}</div>}
         {notice && <div className="success">{notice}</div>}
-        <div className="row between">
+        <div className="row between teller-heading">
           <div>
             <p className="eyebrow">
               {s.counter.label} · {s.service.name}
             </p>
             <h1 className="section-title">Queue workspace</h1>
           </div>
-          <div className="row">
+          <div className="row teller-session-actions">
             {s.status === "OPEN" ? (
               <button
                 className="secondary row"
@@ -659,15 +685,39 @@ function TellerWorkspace() {
           </div>
         </div>
         <div className="grid kpi-grid">
-          <Metric label="Waiting" value={s.queue.waiting} />
-          <Metric label="Standard" value={s.queue.standardWaiting} />
-          <Metric label="Priority" value={s.queue.priorityWaiting} />
+          <Metric
+            label="Waiting"
+            value={s.queue.waiting}
+            icon={BellRing}
+            note="Assigned queue"
+          />
+          <Metric
+            label="Standard"
+            value={s.queue.standardWaiting}
+            icon={Ticket}
+            note="FIFO lane"
+            tone="slate"
+          />
+          <Metric
+            label="Priority"
+            value={s.queue.priorityWaiting}
+            icon={ShieldCheck}
+            note="Verified"
+            tone="amber"
+          />
           <Metric
             label="Oldest wait"
             value={`${Math.floor(s.queue.oldestWaitSeconds / 60)}m`}
+            icon={FileClock}
+            note="Queue age"
+            tone="green"
           />
         </div>
-        <section className="active-ticket card">
+        <section
+          className={
+            "active-ticket card " + (ticket ? "has-ticket" : "is-empty")
+          }
+        >
           {!ticket ? (
             <>
               <div className="empty-icon">
@@ -678,6 +728,14 @@ function TellerWorkspace() {
                 The server will apply FIFO order and the configured priority
                 fairness limit.
               </p>
+              <span className="queue-ready-note">
+                {s.queue.waiting
+                  ? s.queue.waiting +
+                    " customer" +
+                    (s.queue.waiting === 1 ? "" : "s") +
+                    " ready in this service queue"
+                  : "The assigned queue is currently clear"}
+              </span>
               <button
                 className="call-next"
                 disabled={s.status !== "OPEN" || perform.isPending}
@@ -829,12 +887,30 @@ function TransferButton({
     </>
   );
 }
-function Metric({ label, value }: { label: string; value: React.ReactNode }) {
+function Metric({
+  label,
+  value,
+  icon: Icon = Activity,
+  note = "Live data",
+  tone = "blue",
+}: {
+  label: string;
+  value: React.ReactNode;
+  icon?: React.ElementType;
+  note?: string;
+  tone?: "blue" | "green" | "amber" | "slate";
+}) {
   return (
-    <div className="card flat">
-      <div className="small muted">{label}</div>
+    <article className={"card flat metric-card metric-" + tone}>
+      <div className="metric-card-head">
+        <span className="metric-icon">
+          <Icon size={20} />
+        </span>
+        <span className="metric-note">{note}</span>
+      </div>
+      <div className="metric-label">{label}</div>
       <div className="metric">{value}</div>
-    </div>
+    </article>
   );
 }
 
@@ -857,17 +933,78 @@ function ManagerOverview() {
       subtitle="Authoritative queue and counter state refreshes every five seconds."
     >
       <div className="grid kpi-grid">
-        <Metric label="Issued today" value={d.kpis.issued} />
-        <Metric label="Waiting now" value={d.kpis.waiting} />
-        <Metric label="Called / serving" value={d.kpis.active} />
-        <Metric label="Completed today" value={d.kpis.completed} />
+        <Metric
+          label="Issued today"
+          value={d.kpis.issued}
+          icon={Ticket}
+          note="Since opening"
+        />
+        <Metric
+          label="Waiting now"
+          value={d.kpis.waiting}
+          icon={BellRing}
+          note="Live queue"
+          tone="amber"
+        />
+        <Metric
+          label="Called / serving"
+          value={d.kpis.active}
+          icon={Activity}
+          note="At counters"
+          tone="green"
+        />
+        <Metric
+          label="Completed today"
+          value={d.kpis.completed}
+          icon={CheckCircle2}
+          note="Service output"
+          tone="slate"
+        />
       </div>
+      <section className="card dashboard-chart">
+        <div className="panel-heading">
+          <div>
+            <p className="eyebrow">Queue distribution</p>
+            <h2>Live demand by service</h2>
+          </div>
+          <span className="status-pill status-success">● Live</span>
+        </div>
+        <div className="live-chart">
+          <ResponsiveContainer width="100%" height="100%">
+            <BarChart data={d.queues}>
+              <CartesianGrid stroke="#e5edf4" vertical={false} />
+              <XAxis dataKey="code" axisLine={false} tickLine={false} />
+              <YAxis allowDecimals={false} axisLine={false} tickLine={false} />
+              <Tooltip
+                cursor={{ fill: "#edf4f9" }}
+                contentStyle={{
+                  border: "1px solid #dce6f0",
+                  borderRadius: 14,
+                  boxShadow: "0 14px 34px rgba(20, 54, 86, 0.12)",
+                }}
+              />
+              <Bar
+                dataKey="waiting"
+                name="Waiting"
+                fill="#245d8b"
+                radius={[7, 7, 0, 0]}
+              />
+              <Bar
+                dataKey="priorityWaiting"
+                name="Priority"
+                fill="#e0a94a"
+                radius={[7, 7, 0, 0]}
+              />
+            </BarChart>
+          </ResponsiveContainer>
+        </div>
+      </section>
       <div className="split">
         <section>
           <h2>Queues by service</h2>
           <div className="stack">
             {d.queues.map((q) => (
-              <article className="card flat row between" key={q.id}>
+              <article className="card flat queue-summary-card" key={q.id}>
                 <div>
                   <strong>
                     {q.code} · {q.name}
@@ -878,6 +1015,13 @@ function ManagerOverview() {
                   </div>
                 </div>
                 <div className="metric small-metric">{q.waiting}</div>
+                <div className="queue-load-bar" aria-hidden="true">
+                  <span
+                    style={{
+                      width: Math.min(100, Math.max(7, q.waiting * 10)) + "%",
+                    }}
+                  />
+                </div>
               </article>
             ))}
           </div>
@@ -886,7 +1030,7 @@ function ManagerOverview() {
           <h2>Counter state</h2>
           <div className="stack">
             {d.counters.map((c) => (
-              <article className="card flat" key={c.id}>
+              <article className="card flat counter-state-card" key={c.id}>
                 <div className="row between">
                   <strong>{c.label}</strong>
                   <span
@@ -920,9 +1064,20 @@ function ManagerPage({
   return (
     <Shell mode="manager">
       <main className="workspace-page">
-        <p className="eyebrow">Branch operations</p>
-        <h1 className="section-title">{title}</h1>
-        {subtitle && <p className="muted">{subtitle}</p>}
+        <section className="workspace-hero manager-page-hero">
+          <div>
+            <p className="eyebrow">Branch operations</p>
+            <h1>{title}</h1>
+            {subtitle && <p>{subtitle}</p>}
+          </div>
+          <div className="hero-status">
+            <span className="branch-live-dot" />
+            <div>
+              <strong>Live operations</strong>
+              <small>Automatic five-second refresh</small>
+            </div>
+          </div>
+        </section>
         {children}
       </main>
     </Shell>
@@ -937,9 +1092,20 @@ function AdminPage({
   return (
     <Shell mode="admin">
       <main className="workspace-page">
-        <p className="eyebrow">System administration</p>
-        <h1 className="section-title">{title}</h1>
-        {subtitle && <p className="muted">{subtitle}</p>}
+        <section className="workspace-hero admin-page-hero">
+          <div>
+            <p className="eyebrow">System administration</p>
+            <h1>{title}</h1>
+            {subtitle && <p>{subtitle}</p>}
+          </div>
+          <div className="hero-status admin-guard">
+            <ShieldCheck size={24} />
+            <div>
+              <strong>Administrator protected</strong>
+              <small>Configuration and security only</small>
+            </div>
+          </div>
+        </section>
         {children}
       </main>
     </Shell>
@@ -966,14 +1132,38 @@ function AdminOverview() {
       <div className="grid kpi-grid">
         <Metric
           label="Active branches"
-          value={`${data.activeBranches}/${data.totalBranches}`}
+          value={data.activeBranches + "/" + data.totalBranches}
+          icon={Building2}
+          note="Network coverage"
         />
-        <Metric label="Staff identities" value={data.totalStaff} />
-        <Metric label="Administrators" value={data.administrators} />
-        <Metric label="Locked accounts" value={data.lockedStaff} />
+        <Metric
+          label="Staff identities"
+          value={data.totalStaff}
+          icon={UserCog}
+          note="All roles"
+          tone="green"
+        />
+        <Metric
+          label="Administrators"
+          value={data.administrators}
+          icon={ShieldCheck}
+          note="Privileged users"
+          tone="slate"
+        />
+        <Metric
+          label="Locked accounts"
+          value={data.lockedStaff}
+          icon={FileClock}
+          note="Security review"
+          tone="amber"
+        />
       </div>
-      <div className="split">
-        <section className="card stack">
+      <div className="split admin-overview-grid">
+        <section className="card stack admin-overview-panel">
+          <div className="admin-panel-icon">
+            <Settings size={24} />
+          </div>
+          <p className="eyebrow">Branch controls</p>
           <h2>Configuration scope</h2>
           <p className="muted">
             Use the branch selector above to administer that branch’s users,
@@ -984,7 +1174,11 @@ function AdminOverview() {
             <strong>{data.activeServices}</strong>
           </div>
         </section>
-        <section className="card stack">
+        <section className="card stack admin-overview-panel security-panel">
+          <div className="admin-panel-icon">
+            <ShieldCheck size={24} />
+          </div>
+          <p className="eyebrow">Access protection</p>
           <h2>Security posture</h2>
           <p className="muted">
             Administrative changes are role-protected and written to the audit
@@ -1631,7 +1825,12 @@ function SettingsPage() {
   const values =
     form ??
     (settings.data
-      ? { timezone: settings.data.timezone, ...settings.data.settings }
+      ? {
+          announcementRepeatCount: 3,
+          soundEnabled: true,
+          timezone: settings.data.timezone,
+          ...settings.data.settings,
+        }
       : null);
   if (!values)
     return (
@@ -1653,13 +1852,14 @@ function SettingsPage() {
           ["priorityFairnessLimit", "Maximum consecutive priority calls"],
           ["kioskIdleTimeoutSeconds", "Kiosk idle timeout (seconds)"],
           ["displayHistoryCount", "Recent calls on display"],
+          ["announcementRepeatCount", "Amharic announcement repeats (2 or 3)"],
           ["slaWaitMinutes", "Long-wait alert (minutes)"],
         ].map(([key, label]) => (
           <label className="field" key={key}>
             <span>{label}</span>
             <input
               type={key === "timezone" ? "text" : "number"}
-              value={values[key]}
+              value={String(values[key] ?? "")}
               onChange={(e) =>
                 setForm({
                   ...values,
@@ -1672,6 +1872,21 @@ function SettingsPage() {
             />
           </label>
         ))}
+        <label className="settings-toggle">
+          <span>
+            <strong>Amharic voice announcements</strong>
+            <small>
+              Announce each new or recalled ticket on the public display.
+            </small>
+          </span>
+          <input
+            type="checkbox"
+            checked={values.soundEnabled !== false}
+            onChange={(event) =>
+              setForm({ ...values, soundEnabled: event.target.checked })
+            }
+          />
+        </label>
         <button className="primary" onClick={save}>
           Save audited settings
         </button>

@@ -34,6 +34,7 @@ async function main() {
         displayHistoryCount: 5,
         slaWaitMinutes: 20,
         soundEnabled: true,
+        announcementRepeatCount: 3,
       },
     },
   });
@@ -224,6 +225,8 @@ async function main() {
         kioskIdleTimeoutSeconds: 45,
         displayHistoryCount: 5,
         slaWaitMinutes: 20,
+        soundEnabled: true,
+        announcementRepeatCount: 3,
       },
     },
   });

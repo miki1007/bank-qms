@@ -7,6 +7,7 @@ import {
 } from "@tanstack/react-query";
 import {
   ArrowLeft,
+  ArrowRight,
   Banknote,
   CheckCircle2,
   Clock3,
@@ -19,6 +20,7 @@ import {
 import type { PublicService, TicketView } from "@qms/shared-types";
 import { WorldLinkBrand } from "../../../packages/ui/src/index";
 import "../../../packages/ui/src/theme.css";
+import "./kiosk.css";
 
 const API = import.meta.env.VITE_API_URL ?? "http://localhost:3000/api/v1";
 const BRANCH = import.meta.env.VITE_BRANCH_CODE ?? "MAIN";
@@ -71,6 +73,7 @@ function App() {
   const [error, setError] = useState("");
   const [lookup, setLookup] = useState({ publicNumber: "", lookupCode: "" });
   const [countdown, setCountdown] = useState(45);
+  const [clock, setClock] = useState(new Date());
   const services = useQuery<PublicService[]>({
     queryKey: ["services"],
     queryFn: () => api(`/public/branches/${BRANCH}/services`),
@@ -105,6 +108,10 @@ function App() {
     setLookup({ publicNumber: "", lookupCode: "" });
     setCountdown(45);
   };
+  useEffect(() => {
+    const timer = window.setInterval(() => setClock(new Date()), 1000);
+    return () => window.clearInterval(timer);
+  }, []);
   useEffect(() => {
     if (view === "welcome") return;
     const timer = window.setInterval(
@@ -212,22 +219,35 @@ function App() {
   );
 
   return (
-    <div className="shell">
-      <header className="topbar">
-        <WorldLinkBrand subtitle="Main branch · Queue service" />
-        <button
-          className="secondary row"
-          onClick={() => setLanguage(language === "en" ? "am" : "en")}
-        >
-          <Languages size={18} />
-          {language === "en" ? "አማ" : "EN"}
-        </button>
+    <div className="kiosk-shell">
+      <header className="kiosk-header">
+        <WorldLinkBrand subtitle="Customer self-service · Queue ticketing" />
+        <div className="kiosk-header-actions">
+          <span className="kiosk-branch">
+            <i />
+            {BRANCH} branch
+          </span>
+          <span className="kiosk-clock">
+            <Clock3 size={17} />
+            {clock.toLocaleTimeString("en-ET", {
+              hour: "2-digit",
+              minute: "2-digit",
+            })}
+          </span>
+          <button
+            className="kiosk-language"
+            onClick={() => setLanguage(language === "en" ? "am" : "en")}
+          >
+            <Languages size={18} />
+            {language === "en" ? "አማ" : "EN"}
+          </button>
+        </div>
       </header>
-      <main className="page" onClick={() => setCountdown(45)}>
+      <main className="kiosk-main" onClick={() => setCountdown(45)}>
         {view !== "welcome" && (
-          <div className="row between">
+          <div className="kiosk-flowbar">
             <button
-              className="secondary row"
+              className="kiosk-back"
               onClick={() =>
                 view === "services" || view === "lookup"
                   ? reset()
@@ -237,7 +257,28 @@ function App() {
               <ArrowLeft size={18} />
               {words.back}
             </button>
-            <span className="small muted">Resets in {countdown}s</span>
+            {["services", "priority", "confirm"].includes(view) ? (
+              <div
+                className="kiosk-progress"
+                aria-label="Ticket creation steps"
+              >
+                {[1, 2, 3].map((step) => {
+                  const currentStep =
+                    view === "services" ? 1 : view === "priority" ? 2 : 3;
+                  return (
+                    <span
+                      className={step <= currentStep ? "is-active" : ""}
+                      key={step}
+                    >
+                      {step}
+                    </span>
+                  );
+                })}
+              </div>
+            ) : (
+              <span className="kiosk-flow-label">Private ticket access</span>
+            )}
+            <span className="kiosk-reset">Resets in {countdown}s</span>
           </div>
         )}
         {error && (
@@ -247,40 +288,60 @@ function App() {
         )}
 
         {view === "welcome" && (
-          <section style={{ padding: "8vh 0" }}>
-            <p className="eyebrow">Simple. Fair. Private.</p>
-            <h1 className="title">{words.welcome}</h1>
-            <p className="subtitle">
-              Take a service ticket in three quick steps. No account or personal
-              information is required.
-            </p>
-            <div className="grid" style={{ marginTop: 36 }}>
+          <section className="kiosk-welcome">
+            <div className="kiosk-welcome-copy">
+              <p className="eyebrow">Simple · Fair · Private</p>
+              <h1>{words.welcome}</h1>
+              <p>
+                Take a branch service ticket in three clear steps. No bank
+                account or personal information is required.
+              </p>
+              <div className="kiosk-trust">
+                <span>
+                  <ShieldCheck size={18} />
+                  Private by design
+                </span>
+                <span>
+                  <Clock3 size={18} />
+                  Live wait estimates
+                </span>
+              </div>
+            </div>
+            <div className="kiosk-action-grid">
               <button
-                className="card service-button"
+                className="kiosk-action-card primary-choice"
                 onClick={() => setView("services")}
               >
-                <Banknote size={36} color="#245d8b" />
-                <h2 style={{ marginTop: 20 }}>{words.get}</h2>
-                <p className="muted">
-                  Choose a banking service and receive your number.
-                </p>
+                <span className="kiosk-action-icon">
+                  <Banknote size={31} />
+                </span>
+                <span className="kiosk-action-number">01</span>
+                <h2>{words.get}</h2>
+                <p>Choose a banking service and receive your number.</p>
+                <span className="kiosk-action-link">
+                  Start now <ArrowRight size={18} />
+                </span>
               </button>
               <button
-                className="card service-button"
+                className="kiosk-action-card"
                 onClick={() => setView("lookup")}
               >
-                <Search size={36} color="#0f5c45" />
-                <h2 style={{ marginTop: 20 }}>{words.check}</h2>
-                <p className="muted">
-                  Use the number and private six-digit code on your ticket.
-                </p>
+                <span className="kiosk-action-icon">
+                  <Search size={31} />
+                </span>
+                <span className="kiosk-action-number">02</span>
+                <h2>{words.check}</h2>
+                <p>Use the number and private six-digit code on your ticket.</p>
+                <span className="kiosk-action-link">
+                  Find ticket <ArrowRight size={18} />
+                </span>
               </button>
             </div>
           </section>
         )}
 
         {view === "services" && (
-          <section>
+          <section className="kiosk-stage">
             <p className="eyebrow" style={{ marginTop: 36 }}>
               Step 1 of 3
             </p>
@@ -296,7 +357,7 @@ function App() {
                 {services.data?.map((service) => (
                   <button
                     key={service.id}
-                    className="card service-button"
+                    className="card service-button kiosk-service-card"
                     onClick={() => {
                       setSelected(service);
                       setView(service.priorityEnabled ? "priority" : "confirm");
@@ -327,7 +388,7 @@ function App() {
         )}
 
         {view === "priority" && selected && (
-          <section>
+          <section className="kiosk-stage">
             <p className="eyebrow" style={{ marginTop: 36 }}>
               Step 2 of 3
             </p>
@@ -378,12 +439,12 @@ function App() {
         )}
 
         {view === "confirm" && selected && (
-          <section>
+          <section className="kiosk-stage">
             <p className="eyebrow" style={{ marginTop: 36 }}>
               Step 3 of 3
             </p>
             <h1 className="title">Confirm your ticket</h1>
-            <div className="card" style={{ maxWidth: 700 }}>
+            <div className="card kiosk-confirm-card">
               <div className="row between">
                 <div>
                   <span className="status-pill">{selected.code}</span>
@@ -429,7 +490,7 @@ function App() {
         )}
 
         {view === "result" && ticket && (
-          <section style={{ textAlign: "center" }}>
+          <section className="kiosk-result">
             <CheckCircle2 size={48} color="#0f5c45" style={{ marginTop: 34 }} />
             <p className="eyebrow">Your ticket is ready</p>
             <div className="ticket-number">{ticket.publicNumber}</div>
@@ -474,12 +535,12 @@ function App() {
         )}
 
         {view === "lookup" && (
-          <section>
+          <section className="kiosk-stage">
             <p className="eyebrow" style={{ marginTop: 36 }}>
               Private ticket lookup
             </p>
             <h1 className="title">Check your place in line</h1>
-            <div className="card stack" style={{ maxWidth: 620 }}>
+            <div className="card stack kiosk-form-card">
               <label className="field">
                 <span>Ticket number</span>
                 <input
@@ -522,12 +583,12 @@ function App() {
         )}
 
         {view === "status" && ticket && (
-          <section>
+          <section className="kiosk-stage">
             <p className="eyebrow" style={{ marginTop: 36 }}>
               Live ticket status
             </p>
             <h1 className="title">{ticket.publicNumber}</h1>
-            <div className="card" style={{ maxWidth: 700 }}>
+            <div className="card kiosk-status-card">
               <div className="row between">
                 <div>
                   <h2>{ticket.serviceName}</h2>

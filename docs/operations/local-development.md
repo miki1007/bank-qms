@@ -112,13 +112,21 @@ If a teller has an open counter with no active customer, logout closes that coun
 ## 6. Try the complete queue flow
 
 1. Open `http://localhost:5175` in one browser window for the public display.
+   Select **Enable voice** once so Chrome permits Amharic announcements, then
+   optionally enter full screen.
 2. Open `http://localhost:5174` in another window and issue a walk-in ticket.
 3. Open `http://localhost:5173/login`, sign in as `teller.one`, and open the assigned counter.
-4. Select **Call next**. The public display should show the ticket and counter.
+4. Select **Call next**. The public display should show the ticket and counter
+   on the flight-style board and announce “ትኬት ቁጥር … ወደ መስኮት ቁጥር … ይሂዱ”
+   two or three times. Recall repeats the same announcement.
 5. Start service, then complete it. The teller counter is ready for the next ticket.
 6. Select **Log out**. Sign in as `manager.dev` and confirm that only live branch operations and reports are available.
 7. Select **Log out**. Sign in as `admin.dev` and confirm that branch, user, service, counter, configuration, security, and audit controls are available—but no Teller or Manager navigation is shown.
-8. Open `http://localhost:5176`, register a customer, reserve a visit, and use the branch arrival workflow before calling that remote ticket.
+
+The Administrator can set the Amharic announcement repeat count to **2** or
+**3** under **Configuration**. Amharic pronunciation uses the best `am-ET`
+speech voice installed on the display device; install an Amharic system voice
+when the browser reports only a fallback voice. 8. Open `http://localhost:5176`, register a customer, reserve a visit, and use the branch arrival workflow before calling that remote ticket.
 
 To verify the role boundary manually, enter `/admin` while signed in as the manager, `/manager` while signed in as the administrator, and `/teller` while signed in as either. The application returns each user to their own workspace; it does not offer an identity switch.
 

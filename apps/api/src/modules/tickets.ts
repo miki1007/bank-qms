@@ -351,7 +351,8 @@ export class TicketWorkflowService {
         ? await this.prisma.ticket.findMany({
             where: {
               branchId: device.branchId,
-              status: { in: ["CALLED", "IN_SERVICE"] },
+              status: { in: ["CALLED", "IN_SERVICE", "COMPLETED"] },
+              calledAt: { not: null },
             },
             include: { assignedCounter: true, currentService: true },
             orderBy: { calledAt: "desc" },
@@ -369,11 +370,34 @@ export class TicketWorkflowService {
         name: device.branch.name,
         timezone: device.branch.timezone,
       },
+      displaySettings: {
+        historyCount: Number(
+          (device.branch.settings as Record<string, unknown>)
+            .displayHistoryCount ?? 5,
+        ),
+        soundEnabled:
+          (device.branch.settings as Record<string, unknown>).soundEnabled !==
+          false,
+        announcementRepeatCount: [2, 3].includes(
+          Number(
+            (device.branch.settings as Record<string, unknown>)
+              .announcementRepeatCount ?? 3,
+          ),
+        )
+          ? Number(
+              (device.branch.settings as Record<string, unknown>)
+                .announcementRepeatCount ?? 3,
+            )
+          : 3,
+      },
       calls: calls.map((ticket) => ({
+        id: ticket.id,
         publicNumber: ticket.publicNumber,
         counterLabel: ticket.assignedCounter?.label,
         serviceName: ticket.currentService.name,
         calledAt: ticket.calledAt,
+        status: ticket.status,
+        recall: ticket.recallCount > 0,
       })),
     };
   }
@@ -978,10 +1002,12 @@ export class TicketWorkflowService {
     if (result.replay) return { ticket: result.ticket, idempotentReplay: true };
     const ticket = result.ticket;
     const displayData = {
+      id: ticket.id,
       publicNumber: ticket.publicNumber,
       counterLabel: ticket.assignedCounter?.label ?? "Counter",
       serviceName: ticket.currentService.name,
       calledAt: ticket.calledAt?.toISOString(),
+      status: ticket.status,
       recall: false,
     };
     this.realtime.publish(ticket.branchId, "display.call", displayData, [
@@ -1080,10 +1106,12 @@ export class TicketWorkflowService {
       ticket.branchId,
       "display.call",
       {
+        id: ticket.id,
         publicNumber: ticket.publicNumber,
         counterLabel: ticket.assignedCounter?.label,
         serviceName: ticket.currentService.name,
         calledAt: ticket.calledAt,
+        status: ticket.status,
         recall: true,
       },
       ["display", "staff"],

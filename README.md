@@ -11,7 +11,7 @@ The product has eight connected entry points backed by the same domain rules:
 | Admin console     | Branches, users, counters, services, policy, security, and audit                | `http://localhost:5173/admin`   |
 | Manager dashboard | Live branch operations, queue analytics, reports, and CSV                       | `http://localhost:5173/manager` |
 | Teller console    | Assigned-counter queue service only                                             | `http://localhost:5173/teller`  |
-| Public display    | Branch number monitor with large live calls and safe reconnect state            | `http://localhost:5175`         |
+| Public display    | Flight-board calls, Amharic voice, history, and safe reconnect state            | `http://localhost:5175`         |
 | Web kiosk         | Optional branch fallback for walk-in customers without the mobile app           | `http://localhost:5174`         |
 | API and Swagger   | REST, Socket.IO, health, and OpenAPI                                            | `http://localhost:3000/docs`    |
 
@@ -64,6 +64,12 @@ WorldLink interface as the hosted showcase while calling the real NestJS API
 and PostgreSQL database. Customer registration and sign-in are app-owned; each
 customer's synthetic demonstration accounts, transactions, statement export,
 and queue history are private to that authenticated customer.
+
+The public display announces every call or recall in Amharic two or three
+times, according to the Administrator setting. Because browsers protect audio
+autoplay, select **Enable voice** once after opening the display on a new
+screen. The display then remembers that device preference and keeps current and
+recent calls in a flight-board layout.
 
 The hosted showcase exposes independent queues for Summit, CMC, Ayat, Piyassa, 4 Killo, Stadium, Megenagna, Mexico, Bole, Shola, and Lideta. Summit demo staff use `admin.dev`, `manager.dev`, and `teller.one` through `teller.four`; other hosted branch usernames append the branch code (for example, `admin.dev.cmc`). Each teller has an administrator-controlled counter assignment and cannot switch identities or counters from the teller console. Passwords and device secrets for the canonical PostgreSQL deployment come only from your `.env` values.
 
