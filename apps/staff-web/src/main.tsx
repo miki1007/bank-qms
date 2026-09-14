@@ -222,7 +222,7 @@ type SettingsForm = Record<string, string | number | boolean> & {
 };
 type SettingsResponse = {
   timezone: string;
-  settings: Record<string, number>;
+  settings: Record<string, string | number | boolean>;
 };
 type AuthState = { user: User | null; setUser: (user: User | null) => void };
 const AuthContext = React.createContext<AuthState>({

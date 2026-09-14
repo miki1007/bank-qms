@@ -12,6 +12,7 @@ import {
 } from "lucide-react";
 import type { RealtimeEnvelope } from "@qms/shared-types";
 import { WorldLinkBrand } from "../../../packages/ui/src/index";
+import { announcementText } from "./announcement";
 import "../../../packages/ui/src/theme.css";
 import "./display.css";
 
@@ -50,36 +51,6 @@ const DEFAULT_SETTINGS: DisplaySettings = {
   soundEnabled: true,
   announcementRepeatCount: 3,
 };
-
-const AMHARIC_DIGITS: Record<string, string> = {
-  "0": "ዜሮ",
-  "1": "አንድ",
-  "2": "ሁለት",
-  "3": "ሶስት",
-  "4": "አራት",
-  "5": "አምስት",
-  "6": "ስድስት",
-  "7": "ሰባት",
-  "8": "ስምንት",
-  "9": "ዘጠኝ",
-};
-
-function spokenDigits(value: string) {
-  const digits = value.match(/\d/g);
-  return digits?.length
-    ? digits.map((digit) => AMHARIC_DIGITS[digit]).join(" ")
-    : value;
-}
-
-function announcementText(call: Call) {
-  return [
-    "ትኬት ቁጥር",
-    spokenDigits(call.publicNumber),
-    "ወደ መስኮት ቁጥር",
-    spokenDigits(call.counterLabel),
-    "ይሂዱ።",
-  ].join(" ");
-}
 
 function statusLabel(status: CallStatus, isCurrent: boolean) {
   if (status === "COMPLETED") return "Completed";
@@ -171,6 +142,10 @@ function App() {
       window.setTimeout(speakOnce, 650);
     };
     const speakOnce = () => {
+      if (!audioEnabledRef.current || !settingsRef.current.soundEnabled) {
+        announcing.current = false;
+        return;
+      }
       const utterance = new SpeechSynthesisUtterance(announcementText(call));
       const voices = window.speechSynthesis.getVoices();
       const voice = voices.find((candidate) =>
