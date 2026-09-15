@@ -50,6 +50,45 @@ export const refreshTokenTtlDays = () =>
   positiveInteger("REFRESH_TOKEN_TTL_DAYS", 7);
 export const apiPort = () => positiveInteger("PORT", 3000);
 
+const AMHARIC_SPEECH_VOICES = new Set([
+  "am-ET-MekdesNeural",
+  "am-ET-AmehaNeural",
+]);
+
+export type AzureSpeechConfiguration = {
+  key: string;
+  region: string;
+  voice: string;
+};
+
+/**
+ * Cloud speech is optional so the API can still serve visual queue calls while
+ * a branch is being provisioned. Supplying only half of the credentials is a
+ * startup error: that almost always means a deployment secret was missed.
+ */
+export function azureSpeechConfiguration(): AzureSpeechConfiguration | null {
+  const key = process.env.AZURE_SPEECH_KEY?.trim() ?? "";
+  const region = process.env.AZURE_SPEECH_REGION?.trim().toLowerCase() ?? "";
+  const voice = process.env.AZURE_SPEECH_VOICE?.trim() || "am-ET-MekdesNeural";
+
+  if (!key && !region) return null;
+  if (!key || !region) {
+    throw new Error(
+      "AZURE_SPEECH_KEY and AZURE_SPEECH_REGION must be configured together.",
+    );
+  }
+  if (!/^[a-z0-9]+$/.test(region)) {
+    throw new Error("AZURE_SPEECH_REGION is not a valid Azure region name.");
+  }
+  if (!AMHARIC_SPEECH_VOICES.has(voice)) {
+    throw new Error(
+      "AZURE_SPEECH_VOICE must be am-ET-MekdesNeural or am-ET-AmehaNeural.",
+    );
+  }
+
+  return { key, region, voice };
+}
+
 export function allowedOrigins() {
   const values = [
     process.env.APP_ORIGIN,
@@ -80,4 +119,5 @@ export function validateRuntimeEnvironment() {
   accessTokenTtlMinutes();
   refreshTokenTtlDays();
   apiPort();
+  azureSpeechConfiguration();
 }

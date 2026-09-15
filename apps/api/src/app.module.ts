@@ -31,6 +31,11 @@ import {
   CustomerJwtAuthGuard,
 } from "./modules/customer-auth";
 import {
+  AzureSpeechService,
+  DisplaySpeechController,
+  DisplaySpeechService,
+} from "./modules/display-speech";
+import {
   CustomerBankingController,
   CustomerBankingService,
 } from "./modules/customer-banking";
@@ -56,6 +61,7 @@ import {
     AdminController,
     ManagerController,
     HealthController,
+    DisplaySpeechController,
   ],
   providers: [
     PrismaService,
@@ -72,6 +78,8 @@ import {
     JwtAuthGuard,
     RolesGuard,
     CustomerJwtAuthGuard,
+    AzureSpeechService,
+    DisplaySpeechService,
     { provide: APP_GUARD, useClass: ThrottlerGuard },
   ],
 })

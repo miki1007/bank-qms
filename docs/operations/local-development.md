@@ -66,6 +66,35 @@ VITE_DISPLAY_DEVICE_SECRET=your-local-display-secret
 
 The two `VITE_*_DEVICE_SECRET` values must exactly match their non-Vite counterparts. Keep `.env` private; Git ignores it.
 
+### Enable Amharic voice announcements
+
+The display uses Azure Speech so Amharic works even when the Mac or display
+computer has no Amharic system voice. Create an
+[Azure account](https://azure.microsoft.com/free/), then in the
+[Azure portal](https://portal.azure.com/) create a **Speech service** resource.
+Choose the **F0** tier if it is available for your subscription. Open the
+resource's **Keys and Endpoint** page and copy its region name and one key into
+your local `.env`:
+
+```dotenv
+AZURE_SPEECH_KEY=paste-the-key-directly-here
+AZURE_SPEECH_REGION=eastus
+AZURE_SPEECH_VOICE=am-ET-MekdesNeural
+```
+
+Use the actual region shown by Azure; `eastus` above is only an example. The
+other supported Amharic voice is `am-ET-AmehaNeural`. Never paste the speech
+key into a `VITE_*` variable or commit it to GitHub—the browser requests audio
+through the authenticated Bank QMS API, and only that API contacts Azure.
+
+You can leave both `AZURE_SPEECH_KEY` and `AZURE_SPEECH_REGION` blank while
+setting up the rest of the system. Visual queue calls continue to work, but the
+display correctly reports **Voice unavailable** until cloud speech is
+configured. See Microsoft's
+[supported speech voices](https://learn.microsoft.com/azure/ai-services/speech-service/language-support?tabs=tts#text-to-speech-voices)
+and [Speech pricing](https://azure.microsoft.com/pricing/details/speech/) for
+the current availability and allowance.
+
 ## 4. Start and seed PostgreSQL
 
 ```bash
@@ -124,9 +153,13 @@ If a teller has an open counter with no active customer, logout closes that coun
 7. Select **Log out**. Sign in as `admin.dev` and confirm that branch, user, service, counter, configuration, security, and audit controls are available—but no Teller or Manager navigation is shown.
 
 The Administrator can set the Amharic announcement repeat count to **2** or
-**3** under **Configuration**. Amharic pronunciation uses the best `am-ET`
-speech voice installed on the display device; install an Amharic system voice
-when the browser reports only a fallback voice. 8. Open `http://localhost:5176`, register a customer, reserve a visit, and use the branch arrival workflow before calling that remote ticket.
+**3** under **Configuration**. The API generates Amharic audio with the
+configured Azure neural voice and sends one MP3 to the display, which repeats it
+locally without making two or three paid speech requests. An installed
+`am-ET` system voice is used only as a fallback.
+
+8. Open `http://localhost:5176`, register a customer, reserve a visit, and use
+   the branch arrival workflow before calling that remote ticket.
 
 To verify the role boundary manually, enter `/admin` while signed in as the manager, `/manager` while signed in as the administrator, and `/teller` while signed in as either. The application returns each user to their own workspace; it does not offer an identity switch.
 

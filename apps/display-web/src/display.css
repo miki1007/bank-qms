@@ -83,6 +83,12 @@ body {
   color: #fff;
 }
 
+.display-tool.audio-error {
+  border-color: rgba(255, 160, 122, 0.72);
+  background: rgba(170, 63, 48, 0.24);
+  color: #ffd6ca;
+}
+
 .display-tool.icon-tool {
   width: 42px;
   justify-content: center;

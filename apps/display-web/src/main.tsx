@@ -46,6 +46,8 @@ type DisplaySettings = {
   announcementRepeatCount: 2 | 3;
 };
 
+type VoiceMode = "off" | "checking" | "cloud" | "system" | "unavailable";
+
 const DEFAULT_SETTINGS: DisplaySettings = {
   historyCount: 8,
   soundEnabled: true,
@@ -68,18 +70,24 @@ function App() {
   const [connected, setConnected] = useState(false);
   const [highlight, setHighlight] = useState(false);
   const [clock, setClock] = useState(new Date());
-  const [audioEnabled, setAudioEnabled] = useState(
-    () => window.localStorage.getItem("bank-qms-display-audio") === "enabled",
-  );
+  // A fresh click is deliberately required after every page load. It unlocks
+  // the browser audio context and makes later socket-driven calls audible.
+  const [audioEnabled, setAudioEnabled] = useState(false);
+  const [voiceMode, setVoiceMode] = useState<VoiceMode>("off");
   const [amharicVoiceAvailable, setAmharicVoiceAvailable] = useState(false);
   const eventIds = useRef(new Set<string>());
   const settingsRef = useRef(settings);
   const audioEnabledRef = useRef(audioEnabled);
+  const amharicVoiceAvailableRef = useRef(amharicVoiceAvailable);
   const announcementQueue = useRef<Call[]>([]);
   const announcing = useRef(false);
+  const audioGeneration = useRef(0);
+  const audioContext = useRef<AudioContext | null>(null);
+  const activeAudioSource = useRef<AudioBufferSourceNode | null>(null);
 
   settingsRef.current = settings;
   audioEnabledRef.current = audioEnabled;
+  amharicVoiceAvailableRef.current = amharicVoiceAvailable;
 
   const snapshot = async () => {
     const response = await fetch(
@@ -118,90 +126,211 @@ function App() {
     );
   };
 
-  const runNextAnnouncement = () => {
-    if (announcing.current) return;
-    const call = announcementQueue.current.shift();
-    if (!call) return;
-    if (
-      !audioEnabledRef.current ||
-      !settingsRef.current.soundEnabled ||
-      !("speechSynthesis" in window)
-    ) {
-      window.setTimeout(runNextAnnouncement, 0);
-      return;
+  const speechEndpoint = (resource: string) =>
+    API +
+    "/public/devices/" +
+    encodeURIComponent(DEVICE_CODE) +
+    "/announcements/" +
+    resource;
+
+  const getAudioContext = () => {
+    if (!audioContext.current) audioContext.current = new AudioContext();
+    return audioContext.current;
+  };
+
+  const requestCloudAudio = async (resource: string) => {
+    const response = await fetch(speechEndpoint(resource), {
+      headers: { "x-device-secret": DEVICE_SECRET },
+    });
+    if (!response.ok) {
+      throw new Error(`Speech request failed with HTTP ${response.status}.`);
     }
-    announcing.current = true;
-    let completedRepeats = 0;
-    const finish = () => {
-      completedRepeats += 1;
-      if (completedRepeats >= settingsRef.current.announcementRepeatCount) {
-        announcing.current = false;
-        window.setTimeout(runNextAnnouncement, 350);
-        return;
-      }
-      window.setTimeout(speakOnce, 650);
-    };
-    const speakOnce = () => {
+    const encodedAudio = await response.arrayBuffer();
+    if (!encodedAudio.byteLength) throw new Error("Speech response was empty.");
+    const context = getAudioContext();
+    if (context.state !== "running") await context.resume();
+    return context.decodeAudioData(encodedAudio.slice(0));
+  };
+
+  const playAudioBuffer = (buffer: AudioBuffer) =>
+    new Promise<void>((resolve) => {
       if (!audioEnabledRef.current || !settingsRef.current.soundEnabled) {
-        announcing.current = false;
+        resolve();
         return;
       }
-      const utterance = new SpeechSynthesisUtterance(announcementText(call));
-      const voices = window.speechSynthesis.getVoices();
-      const voice = voices.find((candidate) =>
-        candidate.lang.toLowerCase().startsWith("am"),
-      );
-      if (voice) utterance.voice = voice;
+      const source = getAudioContext().createBufferSource();
+      let settled = false;
+      const finish = () => {
+        if (settled) return;
+        settled = true;
+        if (activeAudioSource.current === source)
+          activeAudioSource.current = null;
+        resolve();
+      };
+      source.buffer = buffer;
+      source.connect(getAudioContext().destination);
+      source.onended = finish;
+      activeAudioSource.current = source;
+      try {
+        source.start();
+      } catch {
+        finish();
+      }
+    });
+
+  const systemAmharicVoice = () =>
+    "speechSynthesis" in window
+      ? window.speechSynthesis
+          .getVoices()
+          .find((candidate) => candidate.lang.toLowerCase().startsWith("am"))
+      : undefined;
+
+  const speakWithSystemVoice = (text: string) =>
+    new Promise<void>((resolve, reject) => {
+      const voice = systemAmharicVoice();
+      if (!voice) {
+        reject(new Error("No Amharic system voice is installed."));
+        return;
+      }
+      const utterance = new SpeechSynthesisUtterance(text);
+      utterance.voice = voice;
       utterance.lang = "am-ET";
       utterance.rate = 0.82;
       utterance.pitch = 1;
       utterance.volume = 1;
-      utterance.onend = finish;
-      utterance.onerror = finish;
+      utterance.onend = () => resolve();
+      utterance.onerror = () =>
+        reject(new Error("The Amharic system voice could not play."));
       window.speechSynthesis.speak(utterance);
-    };
-    speakOnce();
+    });
+
+  const pause = (milliseconds: number) =>
+    new Promise<void>((resolve) => window.setTimeout(resolve, milliseconds));
+
+  const runNextAnnouncement = async () => {
+    if (announcing.current) return;
+    const call = announcementQueue.current.shift();
+    if (!call) return;
+    if (!audioEnabledRef.current || !settingsRef.current.soundEnabled) {
+      window.setTimeout(runNextAnnouncement, 0);
+      return;
+    }
+    const generation = audioGeneration.current;
+    announcing.current = true;
+    try {
+      try {
+        const buffer = await requestCloudAudio(
+          "tickets/" + encodeURIComponent(call.id),
+        );
+        if (generation !== audioGeneration.current) return;
+        setVoiceMode("cloud");
+        for (
+          let repeat = 0;
+          repeat < settingsRef.current.announcementRepeatCount;
+          repeat += 1
+        ) {
+          if (
+            generation !== audioGeneration.current ||
+            !audioEnabledRef.current ||
+            !settingsRef.current.soundEnabled
+          )
+            break;
+          await playAudioBuffer(buffer);
+          if (repeat + 1 < settingsRef.current.announcementRepeatCount)
+            await pause(650);
+        }
+      } catch {
+        if (generation !== audioGeneration.current) return;
+        if (!amharicVoiceAvailableRef.current) {
+          setVoiceMode("unavailable");
+          return;
+        }
+        setVoiceMode("system");
+        for (
+          let repeat = 0;
+          repeat < settingsRef.current.announcementRepeatCount;
+          repeat += 1
+        ) {
+          if (
+            generation !== audioGeneration.current ||
+            !audioEnabledRef.current ||
+            !settingsRef.current.soundEnabled
+          )
+            break;
+          await speakWithSystemVoice(announcementText(call));
+          if (repeat + 1 < settingsRef.current.announcementRepeatCount)
+            await pause(650);
+        }
+      }
+    } catch {
+      if (generation === audioGeneration.current) setVoiceMode("unavailable");
+    } finally {
+      if (generation === audioGeneration.current) {
+        announcing.current = false;
+        window.setTimeout(() => void runNextAnnouncement(), 350);
+      }
+    }
   };
 
   const queueAnnouncement = (call: Call) => {
     announcementQueue.current.push(call);
-    runNextAnnouncement();
+    void runNextAnnouncement();
   };
 
-  const setAnnouncements = (enabled: boolean) => {
+  const setAnnouncements = async (enabled: boolean) => {
+    const generation = ++audioGeneration.current;
     audioEnabledRef.current = enabled;
     setAudioEnabled(enabled);
-    window.localStorage.setItem(
-      "bank-qms-display-audio",
-      enabled ? "enabled" : "disabled",
-    );
     if (!enabled) {
       announcementQueue.current = [];
       announcing.current = false;
+      setVoiceMode("off");
+      try {
+        activeAudioSource.current?.stop();
+      } catch {
+        /* the source may already have ended */
+      }
+      activeAudioSource.current = null;
       window.speechSynthesis?.cancel();
+      await audioContext.current?.suspend();
       return;
     }
-    if ("speechSynthesis" in window) {
-      window.speechSynthesis.cancel();
-      const test = new SpeechSynthesisUtterance("የድምፅ ማስታወቂያ ተከፍቷል።");
-      const voice = window.speechSynthesis
-        .getVoices()
-        .find((candidate) => candidate.lang.toLowerCase().startsWith("am"));
-      if (voice) test.voice = voice;
-      test.lang = "am-ET";
-      test.rate = 0.85;
-      window.speechSynthesis.speak(test);
+
+    setVoiceMode("checking");
+    // Creating/resuming the context directly inside this click handler is what
+    // permits future real-time announcements under browser autoplay rules.
+    try {
+      const context = getAudioContext();
+      await context.resume();
+      const ready = await requestCloudAudio("ready");
+      if (generation !== audioGeneration.current || !audioEnabledRef.current)
+        return;
+      setVoiceMode("cloud");
+      await playAudioBuffer(ready);
+    } catch {
+      if (generation !== audioGeneration.current) return;
+      if (systemAmharicVoice()) {
+        try {
+          setVoiceMode("system");
+          await speakWithSystemVoice("የድምፅ ማስታወቂያ ተከፍቷል።");
+          return;
+        } catch {
+          /* show the unavailable state below */
+        }
+      }
+      setVoiceMode("unavailable");
     }
   };
 
   useEffect(() => {
     const syncVoices = () => {
-      setAmharicVoiceAvailable(
+      const available =
         "speechSynthesis" in window &&
-          window.speechSynthesis
-            .getVoices()
-            .some((voice) => voice.lang.toLowerCase().startsWith("am")),
-      );
+        window.speechSynthesis
+          .getVoices()
+          .some((voice) => voice.lang.toLowerCase().startsWith("am"));
+      amharicVoiceAvailableRef.current = available;
+      setAmharicVoiceAvailable(available);
     };
     syncVoices();
     window.speechSynthesis?.addEventListener("voiceschanged", syncVoices);
@@ -258,7 +387,13 @@ function App() {
     });
     return () => {
       socket.close();
+      try {
+        activeAudioSource.current?.stop();
+      } catch {
+        /* the source may already have ended */
+      }
       window.speechSynthesis?.cancel();
+      void audioContext.current?.close();
     };
   }, []);
 
@@ -271,6 +406,16 @@ function App() {
       minute: "2-digit",
       timeZone: branch.timezone,
     });
+  const voiceStatus =
+    voiceMode === "cloud"
+      ? "Cloud Amharic voice ready"
+      : voiceMode === "system"
+        ? "System Amharic voice ready"
+        : voiceMode === "checking"
+          ? "Checking Amharic voice"
+          : voiceMode === "unavailable"
+            ? "Voice service unavailable"
+            : "Voice requires one click";
 
   return (
     <main className="display-shell">
@@ -285,18 +430,34 @@ function App() {
             {connected ? "Live" : "Reconnecting · safe view"}
           </div>
           <button
-            className={"display-tool " + (audioEnabled ? "audio-active" : "")}
-            onClick={() => setAnnouncements(!audioEnabled)}
+            className={
+              "display-tool " +
+              (audioEnabled ? "audio-active " : "") +
+              (voiceMode === "unavailable" ? "audio-error" : "")
+            }
+            onClick={() => void setAnnouncements(!audioEnabled)}
             title={
-              amharicVoiceAvailable
-                ? "Amharic system voice detected"
-                : "Uses the best voice installed on this device"
+              voiceMode === "cloud"
+                ? "Azure Amharic neural voice is connected"
+                : voiceMode === "system"
+                  ? "Using an Amharic voice installed on this device"
+                  : voiceMode === "unavailable"
+                    ? "The API cloud speech credentials are missing or unavailable"
+                    : "Click once to unlock Amharic announcements"
             }
           >
-            {audioEnabled ? <Volume2 size={18} /> : <VolumeX size={18} />}
+            {audioEnabled && voiceMode !== "unavailable" ? (
+              <Volume2 size={18} />
+            ) : (
+              <VolumeX size={18} />
+            )}
             {settings.soundEnabled
               ? audioEnabled
-                ? "Voice on"
+                ? voiceMode === "checking"
+                  ? "Checking voice"
+                  : voiceMode === "unavailable"
+                    ? "Voice unavailable"
+                    : "Voice on"
                 : "Enable voice"
               : "Voice disabled"}
           </button>
@@ -415,8 +576,8 @@ function App() {
         <span>WORLDLINK BANK · {branch.name.toUpperCase()}</span>
         <strong>ትኬት ቁጥርዎ ሲጠራ ወደተጠቀሰው መስኮት ይሂዱ</strong>
         <span>
-          Voice repeats {settings.announcementRepeatCount}×
-          {amharicVoiceAvailable ? " · Amharic voice ready" : ""}
+          Voice repeats {settings.announcementRepeatCount}×{" · "}
+          {voiceStatus}
         </span>
       </footer>
     </main>
