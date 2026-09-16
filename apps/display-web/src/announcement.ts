@@ -3,32 +3,29 @@ export type AnnouncementTarget = {
   counterLabel: string;
 };
 
-const AMHARIC_DIGITS: Record<string, string> = {
-  "0": "ዜሮ",
-  "1": "አንድ",
-  "2": "ሁለት",
-  "3": "ሶስት",
-  "4": "አራት",
-  "5": "አምስት",
-  "6": "ስድስት",
-  "7": "ሰባት",
-  "8": "ስምንት",
-  "9": "ዘጠኝ",
+const ENGLISH_DIGITS: Record<string, string> = {
+  "0": "zero",
+  "1": "one",
+  "2": "two",
+  "3": "three",
+  "4": "four",
+  "5": "five",
+  "6": "six",
+  "7": "seven",
+  "8": "eight",
+  "9": "nine",
 };
 
 export function spokenDigits(value: string) {
   const digits = value.match(/\d/g);
   return digits?.length
-    ? digits.map((digit) => AMHARIC_DIGITS[digit]).join(" ")
+    ? digits.map((digit) => ENGLISH_DIGITS[digit]).join(" ")
     : value;
 }
 
 export function announcementText(call: AnnouncementTarget) {
   return [
-    "ትኬት ቁጥር",
-    spokenDigits(call.publicNumber),
-    "ወደ መስኮት ቁጥር",
-    spokenDigits(call.counterLabel),
-    "ይሂዱ።",
+    `Ticket number ${spokenDigits(call.publicNumber)}.`,
+    `Please proceed to counter number ${spokenDigits(call.counterLabel)}.`,
   ].join(" ");
 }
