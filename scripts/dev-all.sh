@@ -14,9 +14,13 @@ elif [[ -z "${DATABASE_URL:-}" || -z "${JWT_ACCESS_SECRET:-}" || -z "${JWT_REFRE
   exit 64
 fi
 
-exec pnpm concurrently --kill-others-on-fail --names api,customer,kiosk,display,staff \
+export APP_ORIGIN="${APP_ORIGIN:-http://localhost:5173},http://localhost:5177,http://localhost:5178"
+
+exec pnpm concurrently --kill-others-on-fail --names api,customer,kiosk,display,admin,manager,teller \
   "pnpm --filter @qms/api dev" \
   "pnpm --filter @qms/customer-web dev" \
   "pnpm --filter @qms/kiosk-web dev" \
   "pnpm --filter @qms/display-web dev" \
-  "pnpm --filter @qms/staff-web dev"
+  "pnpm --filter @qms/staff-web dev:admin" \
+  "pnpm --filter @qms/staff-web dev:manager" \
+  "pnpm --filter @qms/staff-web dev:teller"

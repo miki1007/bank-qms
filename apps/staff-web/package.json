@@ -4,8 +4,14 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "dev": "vite --host 0.0.0.0 --port 5173",
-    "build": "tsc -b && vite build",
+    "dev": "pnpm run dev:admin",
+    "dev:admin": "VITE_STAFF_ROLE=ADMIN vite --host 0.0.0.0 --port 5173 --strictPort",
+    "dev:manager": "VITE_STAFF_ROLE=MANAGER vite --host 0.0.0.0 --port 5177 --strictPort",
+    "dev:teller": "VITE_STAFF_ROLE=TELLER vite --host 0.0.0.0 --port 5178 --strictPort",
+    "build": "tsc -b && pnpm run build:admin && pnpm run build:manager && pnpm run build:teller",
+    "build:admin": "VITE_STAFF_ROLE=ADMIN vite build --outDir dist/admin",
+    "build:manager": "VITE_STAFF_ROLE=MANAGER vite build --outDir dist/manager",
+    "build:teller": "VITE_STAFF_ROLE=TELLER vite build --outDir dist/teller",
     "typecheck": "tsc --noEmit",
     "test": "vitest run --passWithNoTests"
   },

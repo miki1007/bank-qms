@@ -1707,7 +1707,7 @@ bank-qms/
 │   ├── api/                    # NestJS REST/WebSocket backend
 │   ├── kiosk-web/              # Customer kiosk client
 │   ├── display-web/            # Public display client
-│   └── staff-web/              # Teller + manager client
+│   └── staff-web/              # Role-locked administrator, manager, and teller clients
 ├── packages/
 │   ├── shared-types/           # DTO/domain/event TypeScript types
 │   ├── validation/             # Shared schemas where safe
@@ -1768,7 +1768,7 @@ Expected environment variables:
 NODE_ENV=development
 PORT=3000
 DATABASE_URL=postgresql://qms_user:qms_password@postgres:5432/bank_qms
-APP_ORIGIN=http://localhost:5173
+APP_ORIGIN=http://localhost:5173,http://localhost:5177,http://localhost:5178
 KIOSK_ORIGIN=http://localhost:5174
 DISPLAY_ORIGIN=http://localhost:5175
 JWT_ACCESS_SECRET=replace-with-long-random-secret

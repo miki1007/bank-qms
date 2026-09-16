@@ -134,7 +134,7 @@ test("manager dashboard exports a report and creates an audit record", async ({
   page,
   request,
 }) => {
-  await page.goto("http://localhost:5173/login");
+  await page.goto("http://localhost:5177/login");
   await page.getByLabel("Username").fill("manager.dev");
   await page.getByLabel("Password").fill(managerPassword);
   await page.getByRole("button", { name: "Sign in securely" }).click();
@@ -258,6 +258,7 @@ test("administrator and teller remain in their own polished workspaces", async (
 
   await page.getByRole("button", { name: "Log out" }).click();
   await expect(page).toHaveURL(/\/login$/);
+  await page.goto("http://localhost:5178/login");
   await page.getByLabel("Username").fill("teller.one");
   await page.getByLabel("Password").fill(tellerPassword);
   await page.getByRole("button", { name: "Sign in securely" }).click();

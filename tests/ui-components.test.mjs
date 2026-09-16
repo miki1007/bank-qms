@@ -212,6 +212,8 @@ test("keeps admin, manager, and teller workspaces isolated with visible logout c
     "../apps/api/src/modules/manager.ts",
   );
   const staffWeb = await read("../apps/staff-web/src/main.tsx");
+  const staffPackage = await read("../apps/staff-web/package.json");
+  const localStartup = await read("../scripts/dev-all.sh");
 
   assert.doesNotMatch(hosted, /Switch staff|Open teller login/);
   assert.match(hosted, /Administration/);
@@ -231,6 +233,15 @@ test("keeps admin, manager, and teller workspaces isolated with visible logout c
   );
   assert.match(staffWeb, /className="logout-control"/);
   assert.match(staffWeb, /Logging out…/);
+  assert.match(staffWeb, /import\.meta\.env\.VITE_STAFF_ROLE/);
+  assert.match(staffWeb, /result\.user\.role !== STAFF_ROLE/);
+  assert.match(staffWeb, /WorkspaceMismatch/);
+  assert.match(staffPackage, /VITE_STAFF_ROLE=ADMIN[^\n]*5173/);
+  assert.match(staffPackage, /VITE_STAFF_ROLE=MANAGER[^\n]*5177/);
+  assert.match(staffPackage, /VITE_STAFF_ROLE=TELLER[^\n]*5178/);
+  assert.match(localStartup, /dev:admin/);
+  assert.match(localStartup, /dev:manager/);
+  assert.match(localStartup, /dev:teller/);
   assert.match(productionAdministration, /@Roles\("ADMIN"\)/);
   assert.match(productionAdministration, /@Controller\("admin"\)/);
   for (const removedCopy of [

@@ -234,6 +234,23 @@ function roleHome(role: User["role"]) {
   return "/teller";
 }
 
+type StaffRole = "ADMIN" | "MANAGER" | "TELLER";
+
+const requestedStaffRole = String(
+  import.meta.env.VITE_STAFF_ROLE ?? "ADMIN",
+).toUpperCase();
+const STAFF_ROLE: StaffRole =
+  requestedStaffRole === "MANAGER" || requestedStaffRole === "TELLER"
+    ? requestedStaffRole
+    : "ADMIN";
+const STAFF_HOME = roleHome(STAFF_ROLE);
+const WORKSPACE_NAME =
+  STAFF_ROLE === "ADMIN"
+    ? "Administrator"
+    : STAFF_ROLE === "MANAGER"
+      ? "Manager"
+      : "Teller";
+
 function adminEndpoint(path: string) {
   const branchId =
     typeof window === "undefined"
@@ -243,8 +260,78 @@ function adminEndpoint(path: string) {
   return `${path}${path.includes("?") ? "&" : "?"}branchId=${encodeURIComponent(branchId)}`;
 }
 
-function Login() {
+function WorkspaceMismatch({ user }: { user: User }) {
   const { setUser } = React.useContext(AuthContext);
+  const navigate = useNavigate();
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState("");
+
+  const logout = async () => {
+    setBusy(true);
+    setError("");
+    try {
+      await api("/auth/logout", { method: "POST" });
+      accessToken = "";
+      setUser(null);
+      queryClient.clear();
+      navigate("/login", { replace: true });
+    } catch (caught) {
+      setError(
+        caught instanceof Error ? caught.message : "Unable to log out safely.",
+      );
+      setBusy(false);
+    }
+  };
+
+  return (
+    <main className="login-shell">
+      <section className="login-art">
+        <WorldLinkBrand
+          className="light"
+          subtitle={`${WORKSPACE_NAME} access`}
+        />
+        <div>
+          <p className="eyebrow gold-text">Separate secure workspace</p>
+          <h1>{WORKSPACE_NAME} workspace</h1>
+          <p>
+            This address accepts {WORKSPACE_NAME.toLowerCase()} accounts only.
+          </p>
+        </div>
+        <div className="secure-note">
+          <ShieldCheck />
+          Role and branch scope are enforced by the API.
+        </div>
+      </section>
+      <section className="login-panel">
+        <div className="card stack">
+          <div>
+            <p className="eyebrow">Different account detected</p>
+            <h2>Log out before continuing</h2>
+            <p className="muted">
+              {user.name} is signed in as {user.role.toLowerCase()}. This is the{" "}
+              {WORKSPACE_NAME.toLowerCase()} address.
+            </p>
+          </div>
+          {error && (
+            <div className="error" role="alert">
+              {error}
+            </div>
+          )}
+          <button
+            className="primary"
+            onClick={() => void logout()}
+            disabled={busy}
+          >
+            {busy ? "Logging out…" : "Log out"}
+          </button>
+        </div>
+      </section>
+    </main>
+  );
+}
+
+function Login() {
+  const { user, setUser } = React.useContext(AuthContext);
   const navigate = useNavigate();
   const [form, setForm] = useState({ username: "", password: "" });
   const [error, setError] = useState("");
@@ -259,28 +346,46 @@ function Login() {
         { method: "POST", body: JSON.stringify(form) },
       );
       accessToken = result.accessToken;
+      if (result.user.role !== STAFF_ROLE) {
+        await api("/auth/logout", { method: "POST" }).catch(() => undefined);
+        accessToken = "";
+        queryClient.clear();
+        throw new Error(
+          `This account cannot use the ${WORKSPACE_NAME.toLowerCase()} workspace.`,
+        );
+      }
       setUser(result.user);
-      navigate(roleHome(result.user.role));
+      navigate(STAFF_HOME);
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : "Sign in failed.");
     } finally {
       setBusy(false);
     }
   };
+  if (user) {
+    return user.role === STAFF_ROLE ? (
+      <Navigate to={STAFF_HOME} replace />
+    ) : (
+      <WorkspaceMismatch user={user} />
+    );
+  }
   return (
     <main className="login-shell">
       <section className="login-art">
-        <WorldLinkBrand className="light" subtitle="Secure branch operations" />
+        <WorldLinkBrand
+          className="light"
+          subtitle={`${WORKSPACE_NAME} access`}
+        />
         <div>
-          <p className="eyebrow gold-text">Branch operations</p>
+          <p className="eyebrow gold-text">{WORKSPACE_NAME} workspace</p>
           <h1>
             One queue.
             <br />
             One clear next step.
           </h1>
           <p>
-            Separate administrator, manager and teller access for the branch
-            queue system.
+            This secure address is reserved for {WORKSPACE_NAME.toLowerCase()}{" "}
+            accounts.
           </p>
         </div>
         <div className="secure-note">
@@ -291,8 +396,8 @@ function Login() {
       <section className="login-panel">
         <form className="card stack" onSubmit={login}>
           <div>
-            <p className="eyebrow">Staff access</p>
-            <h2>Sign in to your workspace</h2>
+            <p className="eyebrow">{WORKSPACE_NAME} access</p>
+            <h2>{WORKSPACE_NAME} sign in</h2>
             <p className="muted">
               Use the account issued by your system administrator.
             </p>
@@ -1863,7 +1968,8 @@ function Protected({
 }) {
   const { user } = React.useContext(AuthContext);
   if (!user) return <Navigate to="/login" replace />;
-  if (user.role !== role) return <Navigate to={roleHome(user.role)} replace />;
+  if (user.role !== STAFF_ROLE || role !== STAFF_ROLE)
+    return <WorkspaceMismatch user={user} />;
   return children;
 }
 function Root() {
@@ -1899,90 +2005,103 @@ function Root() {
     <AuthContext.Provider value={{ user, setUser }}>
       <Routes>
         <Route path="/login" element={<Login />} />
-        <Route
-          path="/teller"
-          element={
-            <Protected role="TELLER">
-              <TellerWorkspace />
-            </Protected>
-          }
-        />
-        <Route
-          path="/manager"
-          element={
-            <Protected role="MANAGER">
-              <ManagerOverview />
-            </Protected>
-          }
-        />
-        <Route
-          path="/manager/reports"
-          element={
-            <Protected role="MANAGER">
-              <ReportsPage />
-            </Protected>
-          }
-        />
-        <Route
-          path="/admin"
-          element={
-            <Protected role="ADMIN">
-              <AdminOverview />
-            </Protected>
-          }
-        />
-        <Route
-          path="/admin/branches"
-          element={
-            <Protected role="ADMIN">
-              <BranchesPage />
-            </Protected>
-          }
-        />
-        <Route
-          path="/admin/services"
-          element={
-            <Protected role="ADMIN">
-              <ServicesPage />
-            </Protected>
-          }
-        />
-        <Route
-          path="/admin/counters"
-          element={
-            <Protected role="ADMIN">
-              <CountersPage />
-            </Protected>
-          }
-        />
-        <Route
-          path="/admin/staff"
-          element={
-            <Protected role="ADMIN">
-              <StaffPage />
-            </Protected>
-          }
-        />
-        <Route
-          path="/admin/audit"
-          element={
-            <Protected role="ADMIN">
-              <AuditPage />
-            </Protected>
-          }
-        />
-        <Route
-          path="/admin/settings"
-          element={
-            <Protected role="ADMIN">
-              <SettingsPage />
-            </Protected>
-          }
-        />
+        {STAFF_ROLE === "TELLER" && (
+          <Route
+            path="/teller"
+            element={
+              <Protected role="TELLER">
+                <TellerWorkspace />
+              </Protected>
+            }
+          />
+        )}
+        {STAFF_ROLE === "MANAGER" && (
+          <>
+            <Route
+              path="/manager"
+              element={
+                <Protected role="MANAGER">
+                  <ManagerOverview />
+                </Protected>
+              }
+            />
+            <Route
+              path="/manager/reports"
+              element={
+                <Protected role="MANAGER">
+                  <ReportsPage />
+                </Protected>
+              }
+            />
+          </>
+        )}
+        {STAFF_ROLE === "ADMIN" && (
+          <>
+            <Route
+              path="/admin"
+              element={
+                <Protected role="ADMIN">
+                  <AdminOverview />
+                </Protected>
+              }
+            />
+            <Route
+              path="/admin/branches"
+              element={
+                <Protected role="ADMIN">
+                  <BranchesPage />
+                </Protected>
+              }
+            />
+            <Route
+              path="/admin/services"
+              element={
+                <Protected role="ADMIN">
+                  <ServicesPage />
+                </Protected>
+              }
+            />
+            <Route
+              path="/admin/counters"
+              element={
+                <Protected role="ADMIN">
+                  <CountersPage />
+                </Protected>
+              }
+            />
+            <Route
+              path="/admin/staff"
+              element={
+                <Protected role="ADMIN">
+                  <StaffPage />
+                </Protected>
+              }
+            />
+            <Route
+              path="/admin/audit"
+              element={
+                <Protected role="ADMIN">
+                  <AuditPage />
+                </Protected>
+              }
+            />
+            <Route
+              path="/admin/settings"
+              element={
+                <Protected role="ADMIN">
+                  <SettingsPage />
+                </Protected>
+              }
+            />
+          </>
+        )}
         <Route
           path="*"
           element={
-            <Navigate to={user ? roleHome(user.role) : "/login"} replace />
+            <Navigate
+              to={user?.role === STAFF_ROLE ? STAFF_HOME : "/login"}
+              replace
+            />
           }
         />
       </Routes>

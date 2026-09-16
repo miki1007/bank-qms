@@ -66,19 +66,6 @@ VITE_DISPLAY_DEVICE_SECRET=your-local-display-secret
 
 The two `VITE_*_DEVICE_SECRET` values must exactly match their non-Vite counterparts. Keep `.env` private; Git ignores it.
 
-### Enable English voice announcements
-
-No speech account, API key, card, or subscription is required. The public
-display uses the English speech voice already supplied by macOS through
-Chrome's built-in speech support. Keep the Mac's sound output on and leave the
-public display tab open.
-
-After every display-page load, select **Enable voice** once. You should
-immediately hear “Voice announcements are enabled.” That click gives the
-browser permission to speak later ticket calls. If the test is silent, confirm
-that the Chrome tab is not muted, raise the Mac output volume, and select the
-button again.
-
 ## 4. Start and seed PostgreSQL
 
 ```bash
@@ -97,26 +84,23 @@ pnpm db:seed
 pnpm dev
 ```
 
-Leave that terminal open. The command starts all five application processes and labels each log line by service.
-
-All four browser clients use the unified WorldLink design. They are not visual
-mock-ups: authentication, balances, transaction statements, queue state,
-staff actions, kiosk tickets, and display updates call the NestJS/PostgreSQL
-backend started by this same command.
+Leave that terminal open. The command starts the API and six web processes, including three independent role-locked staff applications, and labels each log line by service.
 
 | Application       | Local URL                            | How to enter                                                  |
 | ----------------- | ------------------------------------ | ------------------------------------------------------------- |
-| Staff login       | `http://localhost:5173/login`        | Use an administrator, manager, or teller account              |
+| Admin login       | `http://localhost:5173/login`        | Accepts the `admin.dev` administrator account only            |
 | Admin console     | `http://localhost:5173/admin`        | `admin.dev` plus `DEV_ADMIN_PASSWORD`                         |
-| Manager dashboard | `http://localhost:5173/manager`      | `manager.dev` plus `DEV_MANAGER_PASSWORD`                     |
-| Teller console    | `http://localhost:5173/teller`       | `teller.one` through `teller.four` plus `DEV_TELLER_PASSWORD` |
-| Customer app      | `http://localhost:5176`              | Register or sign in; accounts and queue data are private      |
+| Manager login     | `http://localhost:5177/login`        | Accepts the `manager.dev` manager account only                |
+| Manager dashboard | `http://localhost:5177/manager`      | `manager.dev` plus `DEV_MANAGER_PASSWORD`                     |
+| Teller login      | `http://localhost:5178/login`        | Accepts teller accounts only                                  |
+| Teller console    | `http://localhost:5178/teller`       | `teller.one` through `teller.four` plus `DEV_TELLER_PASSWORD` |
+| Customer app      | `http://localhost:5176`              | Register a new local customer account                         |
 | Walk-in kiosk     | `http://localhost:5174`              | Uses the seeded kiosk device credentials from `.env`          |
 | Public display    | `http://localhost:5175`              | Uses the seeded display device credentials from `.env`        |
 | API documentation | `http://localhost:3000/docs`         | Swagger/OpenAPI                                               |
 | API readiness     | `http://localhost:3000/health/ready` | Should return a healthy response                              |
 
-Administrator, manager, and teller workspaces are isolated. Admin-only configuration routes reject manager and teller tokens, manager operations reject administrator and teller tokens, and teller operations reject administrator and manager tokens. Each interface returns an authenticated user to the route for their own role. Use **Log out** before signing in as another staff member.
+Administrator, manager, and teller workspaces run on separate localhost origins and accept only their assigned role. Admin-only API routes reject manager and teller tokens, manager operations reject administrator and teller tokens, and teller operations reject administrator and manager tokens. If one browser profile already holds a different staff session, the other workspace requires **Log out** instead of switching roles.
 
 To keep Administrator, Manager, and Teller open at the same time during testing, use separate browser profiles (for example, a normal window and independent private/profile windows). One browser profile intentionally holds only one staff identity, so it cannot silently change one actor into another.
 
@@ -125,26 +109,15 @@ If a teller has an open counter with no active customer, logout closes that coun
 ## 6. Try the complete queue flow
 
 1. Open `http://localhost:5175` in one browser window for the public display.
-   Select **Enable voice** once and confirm that the English test sentence is
-   audible, then
-   optionally enter full screen.
 2. Open `http://localhost:5174` in another window and issue a walk-in ticket.
-3. Open `http://localhost:5173/login`, sign in as `teller.one`, and open the assigned counter.
-4. Select **Call next**. The public display should show the ticket and counter
-   on the flight-style board and announce “Ticket number … Please proceed to
-   counter number …” two or three times. Recall repeats the same announcement.
+3. Open `http://localhost:5178/login`, sign in as `teller.one`, and open the assigned counter.
+4. Select **Call next**. The public display should show the ticket and counter.
 5. Start service, then complete it. The teller counter is ready for the next ticket.
-6. Select **Log out**. Sign in as `manager.dev` and confirm that only live branch operations and reports are available.
-7. Select **Log out**. Sign in as `admin.dev` and confirm that branch, user, service, counter, configuration, security, and audit controls are available—but no Teller or Manager navigation is shown.
+6. Open `http://localhost:5177/login`, sign in as `manager.dev`, and confirm that only live branch operations and reports are available.
+7. Open `http://localhost:5173/login`, sign in as `admin.dev`, and confirm that branch, user, service, counter, configuration, security, and audit controls are available—but no Teller or Manager navigation is shown.
+8. Open `http://localhost:5176`, register a customer, reserve a visit, and use the branch arrival workflow before calling that remote ticket.
 
-The Administrator can set the English announcement repeat count to **2** or
-**3** under **Configuration**. The display uses the computer's built-in English
-voice locally, so announcements do not depend on a paid cloud speech service.
-
-8. Open `http://localhost:5176`, register a customer, reserve a visit, and use
-   the branch arrival workflow before calling that remote ticket.
-
-To verify the role boundary manually, enter `/admin` while signed in as the manager, `/manager` while signed in as the administrator, and `/teller` while signed in as either. The application returns each user to their own workspace; it does not offer an identity switch.
+To verify the role boundary manually, try a manager account at the Admin login or an administrator account at the Teller login. The workspace rejects the account and clears that attempted session; it never offers an identity switch.
 
 ## 7. Run the checks
 
@@ -197,8 +170,8 @@ pnpm db:seed
 | Path                          | Source contained there                                                                                              |
 | ----------------------------- | ------------------------------------------------------------------------------------------------------------------- |
 | `apps/api`                    | NestJS REST/Socket.IO API, Prisma schema, migrations, seed, authorization, queue workflow, reports, and audit logic |
-| `apps/staff-web`              | Separate protected administrator, manager, and teller React routes                                                  |
-| `apps/customer-web`           | Customer registration, demo banking overview, CSV statement, queue reservation, live ticket, and history React app  |
+| `apps/staff-web`              | Shared React implementation launched as separate role-locked administrator, manager, and teller applications        |
+| `apps/customer-web`           | Customer registration, queue reservation, live ticket, and history React app                                        |
 | `apps/kiosk-web`              | Walk-in kiosk React app                                                                                             |
 | `apps/display-web`            | Public number display React app                                                                                     |
 | `apps/android`                | Native Jetpack Compose customer and teller applications plus the shared secure API client                           |
