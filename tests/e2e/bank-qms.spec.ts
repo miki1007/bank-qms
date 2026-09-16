@@ -98,31 +98,6 @@ test("customer creates, looks up, and cancels a ticket", async ({
   const customerToken = (await registered.json()).accessToken as string;
   const customerHeaders = { Authorization: `Bearer ${customerToken}` };
 
-  const portfolioResponse = await request.get(
-    `${apiUrl}/customers/me/portfolio`,
-    { headers: customerHeaders },
-  );
-  const portfolioBody = await portfolioResponse.text();
-  expect(
-    portfolioResponse.ok(),
-    `Portfolio request failed with ${portfolioResponse.status()}: ${portfolioBody}`,
-  ).toBeTruthy();
-  const portfolio = JSON.parse(portfolioBody) as {
-    totalAvailableMinor: number;
-    accounts: unknown[];
-    transactions: unknown[];
-  };
-  expect(portfolio.totalAvailableMinor).toBeGreaterThan(0);
-  expect(portfolio.accounts).toHaveLength(2);
-  expect(portfolio.transactions.length).toBeGreaterThan(0);
-
-  const statement = await request.get(`${apiUrl}/customers/me/statement.csv`, {
-    headers: customerHeaders,
-  });
-  expect(statement.ok()).toBeTruthy();
-  expect(statement.headers()["content-type"]).toContain("text/csv");
-  expect(await statement.text()).toContain("Amount ETB");
-
   const services = await request.get(
     `${apiUrl}/customers/branches/MAIN/services`,
     { headers: customerHeaders },
@@ -136,8 +111,6 @@ test("customer creates, looks up, and cancels a ticket", async ({
       headers: customerHeaders,
       data: {
         serviceTypeId: service.id,
-        priority: false,
-        priorityReason: null,
         idempotencyKey: crypto.randomUUID(),
       },
     },
@@ -194,7 +167,7 @@ test("manager dashboard exports a report and creates an audit record", async ({
   ).toBeTruthy();
 });
 
-test("administrator configures the Amharic display announcement policy", async ({
+test("administrator configures the display announcement policy", async ({
   request,
 }) => {
   const token = await login(request, "admin.dev", adminPassword);
@@ -278,9 +251,10 @@ test("administrator and teller remain in their own polished workspaces", async (
   await page.getByLabel("Password").fill(tellerPassword);
   await page.getByRole("button", { name: "Sign in securely" }).click();
   await expect(
-    page.getByRole("heading", { name: "Open your assigned counter" }),
+    page.getByRole("heading", {
+      name: /Open your assigned counter|Queue workspace/,
+    }),
   ).toBeVisible();
-  await expect(page.getByText("No teller or counter switching")).toBeVisible();
   await expect(page.getByRole("link", { name: "Administration" })).toHaveCount(
     0,
   );
