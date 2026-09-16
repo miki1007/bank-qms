@@ -146,8 +146,6 @@ type TellerSessionResponse = {
     activeTicket: ActiveTicket | null;
     queue: {
       waiting: number;
-      standardWaiting: number;
-      priorityWaiting: number;
       oldestWaitSeconds: number;
     };
   } | null;
@@ -161,7 +159,6 @@ type AvailableCounter = {
 };
 type ManagerService = NamedService & {
   averageServiceMinutes: number;
-  priorityEnabled: boolean;
   status: string;
 };
 type ManagerCounter = {
@@ -187,7 +184,6 @@ type DashboardResponse = {
     code: string;
     name: string;
     oldestWaitMinutes: number;
-    priorityWaiting: number;
     waiting: number;
   }>;
   counters: Array<{
@@ -348,24 +344,20 @@ function Shell({
       ? ""
       : (window.localStorage.getItem(ADMIN_BRANCH_KEY) ?? ""),
   );
+  const effectiveBranchId =
+    mode !== "admin"
+      ? (user?.branchId ?? "")
+      : branches.data?.some((branch) => branch.id === selectedBranchId)
+        ? selectedBranchId
+        : (branches.data?.find((branch) => branch.id === user?.branchId)?.id ??
+          branches.data?.[0]?.id ??
+          user?.branchId ??
+          "");
   useEffect(() => {
-    if (mode !== "admin" || selectedBranchId || !user?.branchId) return;
-    window.localStorage.setItem(ADMIN_BRANCH_KEY, user.branchId);
-    setSelectedBranchId(user.branchId);
-  }, [mode, selectedBranchId, user?.branchId]);
-  useEffect(() => {
-    if (
-      mode !== "admin" ||
-      !branches.data?.length ||
-      branches.data.some((branch) => branch.id === selectedBranchId)
-    )
-      return;
-    const fallback =
-      branches.data.find((branch) => branch.id === user?.branchId)?.id ??
-      branches.data[0].id;
-    window.localStorage.setItem(ADMIN_BRANCH_KEY, fallback);
-    setSelectedBranchId(fallback);
-  }, [branches.data, mode, selectedBranchId, user?.branchId]);
+    if (mode === "admin" && effectiveBranchId) {
+      window.localStorage.setItem(ADMIN_BRANCH_KEY, effectiveBranchId);
+    }
+  }, [effectiveBranchId, mode]);
   const [logoutBusy, setLogoutBusy] = useState(false);
   const [logoutError, setLogoutError] = useState("");
   const logout = async () => {
@@ -399,7 +391,7 @@ function Shell({
   ] as const;
   const links = mode === "admin" ? adminLinks : managerLinks;
   const activeBranch = branches.data?.find(
-    (branch) => branch.id === selectedBranchId,
+    (branch) => branch.id === effectiveBranchId,
   );
   return (
     <div className="staff-shell">
@@ -466,7 +458,7 @@ function Shell({
             {mode === "admin" && branches.data && (
               <select
                 aria-label="Administration branch scope"
-                value={selectedBranchId || user?.branchId || ""}
+                value={effectiveBranchId}
                 onChange={(event) => {
                   window.localStorage.setItem(
                     ADMIN_BRANCH_KEY,
@@ -692,20 +684,6 @@ function TellerWorkspace() {
             note="Assigned queue"
           />
           <Metric
-            label="Standard"
-            value={s.queue.standardWaiting}
-            icon={Ticket}
-            note="FIFO lane"
-            tone="slate"
-          />
-          <Metric
-            label="Priority"
-            value={s.queue.priorityWaiting}
-            icon={ShieldCheck}
-            note="Verified"
-            tone="amber"
-          />
-          <Metric
             label="Oldest wait"
             value={`${Math.floor(s.queue.oldestWaitSeconds / 60)}m`}
             icon={FileClock}
@@ -725,8 +703,7 @@ function TellerWorkspace() {
               </div>
               <h2>Ready for the next customer</h2>
               <p className="muted">
-                The server will apply FIFO order and the configured priority
-                fairness limit.
+                The server calls customers in first-in, first-out order.
               </p>
               <span className="queue-ready-note">
                 {s.queue.waiting
@@ -989,12 +966,6 @@ function ManagerOverview() {
                 fill="#245d8b"
                 radius={[7, 7, 0, 0]}
               />
-              <Bar
-                dataKey="priorityWaiting"
-                name="Priority"
-                fill="#e0a94a"
-                radius={[7, 7, 0, 0]}
-              />
             </BarChart>
           </ResponsiveContainer>
         </div>
@@ -1010,8 +981,7 @@ function ManagerOverview() {
                     {q.code} · {q.name}
                   </strong>
                   <div className="small muted">
-                    Oldest wait {q.oldestWaitMinutes} min · {q.priorityWaiting}{" "}
-                    priority
+                    Oldest wait {q.oldestWaitMinutes} min
                   </div>
                 </div>
                 <div className="metric small-metric">{q.waiting}</div>
@@ -1352,7 +1322,6 @@ function ServicesPage() {
     code: "",
     name: "",
     averageServiceMinutes: 5,
-    priorityEnabled: true,
   });
   const [error, setError] = useState("");
   const save = async () => {
@@ -1365,7 +1334,6 @@ function ServicesPage() {
         code: "",
         name: "",
         averageServiceMinutes: 5,
-        priorityEnabled: true,
       });
       void qc.invalidateQueries({ queryKey: ["services"] });
     } catch (e) {
@@ -1385,7 +1353,6 @@ function ServicesPage() {
               <tr>
                 <th>Service</th>
                 <th>Minutes</th>
-                <th>Priority</th>
                 <th>Status</th>
               </tr>
             </thead>
@@ -1396,7 +1363,6 @@ function ServicesPage() {
                     <strong>{s.code}</strong> · {s.name}
                   </td>
                   <td>{s.averageServiceMinutes}</td>
-                  <td>{s.priorityEnabled ? "Enabled" : "Off"}</td>
                   <td>{s.status}</td>
                 </tr>
               ))}
@@ -1849,10 +1815,9 @@ function SettingsPage() {
         {[
           ["timezone", "Branch timezone"],
           ["noShowTimeoutSeconds", "No-show timeout (seconds)"],
-          ["priorityFairnessLimit", "Maximum consecutive priority calls"],
           ["kioskIdleTimeoutSeconds", "Kiosk idle timeout (seconds)"],
           ["displayHistoryCount", "Recent calls on display"],
-          ["announcementRepeatCount", "Amharic announcement repeats (2 or 3)"],
+          ["announcementRepeatCount", "English announcement repeats (2 or 3)"],
           ["slaWaitMinutes", "Long-wait alert (minutes)"],
         ].map(([key, label]) => (
           <label className="field" key={key}>
@@ -1874,7 +1839,7 @@ function SettingsPage() {
         ))}
         <label className="settings-toggle">
           <span>
-            <strong>Amharic voice announcements</strong>
+            <strong>English voice announcements</strong>
             <small>
               Announce each new or recalled ticket on the public display.
             </small>

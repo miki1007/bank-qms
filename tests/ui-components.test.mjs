@@ -37,7 +37,7 @@ test("connects interface actions to the persisted queue API", async () => {
     assert.match(route, new RegExp(`case ["']${operation}["']`));
   }
   assert.match(workflow, /status IN \('CALLED','IN_SERVICE'\)/);
-  assert.match(workflow, /qms_branch_fairness/);
+  assert.match(workflow, /ORDER BY queue_entered_at ASC/);
   assert.match(workflow, /last_operation_id/);
 });
 
@@ -136,7 +136,7 @@ test("provides two installable mobile apps on the shared queue backend", async (
   assert.match(staff, /role === "MANAGER"/);
   assert.match(workflow, /async lookup\(/);
   assert.match(queueRoute, /case "check_in"/);
-  assert.match(workflow, /qms_branch_fairness/);
+  assert.match(workflow, /PRIORITY_SERVICE_UNAVAILABLE/);
   assert.equal(customerManifest.display, "standalone");
   assert.equal(customerManifest.start_url, "/customer");
   assert.equal(staffManifest.display, "standalone");
@@ -160,9 +160,15 @@ test("launches each actor-owned product surface and separates manager reports fr
     assert.ok(home.includes(path));
   }
   assert.ok(home.includes("Administration"));
-  assert.match(client, /operation: "set_priority_limit"/);
+  assert.doesNotMatch(
+    client,
+    /set_priority_limit|approve_priority|Priority service/,
+  );
   assert.match(client, /operation: "export_csv"/);
-  assert.match(route, /Priority limit must be between 1 and 5/);
+  assert.doesNotMatch(
+    route,
+    /case "set_priority_limit"|case "approve_priority"/,
+  );
   assert.match(route, /report\.export/);
   assert.match(route, /Content-Disposition/);
 });
@@ -338,7 +344,7 @@ test("makes canonical Call Next retries idempotent inside PostgreSQL", async () 
   assert.match(staff, /crypto\.randomUUID\(\)/);
 });
 
-test("locks teller accounts to administrator-controlled counters and scopes fairness per service", async () => {
+test("locks teller accounts to assigned counters and keeps queue selection FIFO", async () => {
   const prisma = await read("../apps/api/prisma/schema.prisma");
   const seed = await read("../apps/api/prisma/seed.ts");
   const teller = await read("../apps/api/src/modules/teller.ts");
@@ -356,10 +362,11 @@ test("locks teller accounts to administrator-controlled counters and scopes fair
   assert.match(staffWeb, /Open your assigned counter/);
   assert.doesNotMatch(showcaseStaff, /setCounter\(/);
   assert.match(showcaseAuth, /assignedCounter: "Counter 4"/);
-  assert.match(workflow, /PRIORITY_FAIRNESS/);
-  assert.match(showcaseWorkflow, /qms_branch_fairness/);
+  assert.doesNotMatch(workflow, /PRIORITY_FAIRNESS/);
+  assert.match(workflow, /ORDER BY queue_entered_at ASC, daily_sequence ASC/);
+  assert.doesNotMatch(showcaseWorkflow, /qms_branch_fairness/);
   assert.match(showcaseWorkflow, /service_code=\?/);
-  assert.match(showcaseWorkflow, /priorityReason/);
+  assert.match(showcaseWorkflow, /PRIORITY_SERVICE_UNAVAILABLE/);
   assert.match(seed, /passwordHash,/);
   assert.match(seed, /authVersion: \{ increment: 1 \}/);
 });

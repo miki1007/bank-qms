@@ -31,7 +31,7 @@ const products = [
     href: "/staff/login?next=%2Fmanager",
     icon: LayoutDashboard,
     title: "Manager dashboard",
-    description: "Monitor your branch, approve priority and review reports.",
+    description: "Monitor your branch queues, counters and reports.",
     accent: "green",
   },
   {

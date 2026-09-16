@@ -3,7 +3,7 @@
 This Gradle project builds two real Android applications. They are not WebView
 launchers and do not download their interface from the website.
 
-- `customer-app`: account access, branch/service selection, priority assistance,
+- `customer-app`: account access and branch/service queue selection,
   ticket creation, live status, ticket history and cancellation.
 - `staff-app`: independent teller authentication, fixed manager-assigned counter,
   queue metrics, Call Next, Recall, Start, Complete, No-show, Transfer and

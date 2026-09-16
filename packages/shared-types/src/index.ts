@@ -29,7 +29,6 @@ export interface PublicService {
   name: string;
   description: string | null;
   averageServiceMinutes: number;
-  priorityEnabled: boolean;
   waitingCount: number;
   estimatedWaitMinutes: number | null;
 }

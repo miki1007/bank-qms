@@ -23,13 +23,6 @@ export class QueueError extends Error {
 const uuid =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const activeStates = "'RESERVED','WAITING','CALLED','IN_SERVICE','NO_SHOW'";
-const reasons = new Set([
-  "ELDERLY",
-  "DISABILITY",
-  "PREGNANCY",
-  "ACCESSIBILITY",
-  "OTHER",
-]);
 
 /** Central workflow for the private hosted compatibility demo. The canonical
  * PostgreSQL implementation lives in apps/api TicketWorkflowService. */
@@ -85,7 +78,7 @@ export class TicketWorkflowService {
     await ensureServiceConfiguration(this.db, branch);
     return this.db
       .prepare(
-        `SELECT code, name, target_minutes AS minutes, priority_enabled
+        `SELECT code, name, target_minutes AS minutes
          FROM qms_service_configuration
          WHERE branch_code=? AND code=? AND active=1 LIMIT 1`,
       )
@@ -94,7 +87,6 @@ export class TicketWorkflowService {
         code: string;
         name: string;
         minutes: number;
-        priority_enabled: number;
       }>();
   }
   private async ticket(id: string) {
@@ -155,25 +147,14 @@ export class TicketWorkflowService {
     const service = await this.configuredService(branch, payload.serviceCode);
     if (!service)
       throw new QueueError("Choose a valid service.", 400, "VALIDATION_ERROR");
+    if (payload.priority === true)
+      throw new QueueError(
+        "Priority service is currently unavailable. Please join the standard queue.",
+        400,
+        "PRIORITY_SERVICE_UNAVAILABLE",
+      );
     const key = this.key(payload.idempotencyKey);
     const channel = payload.channel === "KIOSK" ? "KIOSK" : "REMOTE";
-    const reason =
-      payload.priority === true ? String(payload.priorityReason ?? "") : null;
-    if (
-      (reason && !reasons.has(reason)) ||
-      (payload.priority === true && !reason)
-    )
-      throw new QueueError(
-        "Choose a valid priority eligibility reason.",
-        400,
-        "VALIDATION_ERROR",
-      );
-    if (payload.priority === true && !service.priority_enabled)
-      throw new QueueError(
-        "Priority service is not enabled for this service.",
-        400,
-        "VALIDATION_ERROR",
-      );
     const proof =
       typeof payload.lookupToken === "string" &&
       payload.lookupToken.length >= 32 &&
@@ -187,7 +168,7 @@ export class TicketWorkflowService {
         "VALIDATION_ERROR",
       );
     const hash = await sha256Hex(
-      JSON.stringify({ branch, service: service.code, channel, reason, proof }),
+      JSON.stringify({ branch, service: service.code, channel, proof }),
     );
     const now = this.clock();
     const at = now.toISOString();
@@ -310,8 +291,8 @@ export class TicketWorkflowService {
           date,
           service.code,
           service.name,
-          reason ? 1 : 0,
-          reason,
+          0,
+          null,
           channel === "REMOTE" ? "RESERVED" : "WAITING",
           at,
           at,
@@ -389,29 +370,8 @@ export class TicketWorkflowService {
             Number(b.public_number.split("-")[1]) ||
           a.id.localeCompare(b.id),
       );
-    const fairness = await this.db
-      .prepare(
-        "SELECT streak FROM qms_branch_fairness WHERE branch_code=? AND service_code=?",
-      )
-      .bind(ticket.branch_code, ticket.service_code)
-      .first<{ streak: number }>();
-    let streak = fairness?.streak ?? 0;
-    let position: number | null = null;
-    for (let rank = 1; waiting.length; rank++) {
-      const standard = waiting.find((item) => !item.priority);
-      const priority = waiting.find((item) => item.priority);
-      const selected =
-        standard && streak >= snapshot.settings.priorityLimit
-          ? standard
-          : (priority ?? standard);
-      if (!selected) break;
-      if (selected.id === id) {
-        position = rank;
-        break;
-      }
-      waiting.splice(waiting.indexOf(selected), 1);
-      streak = selected.priority ? streak + 1 : 0;
-    }
+    const index = waiting.findIndex((item) => item.id === id);
+    const position = index >= 0 ? index + 1 : null;
     const service = snapshot.services.find(
       (item) => item.code === ticket.service_code,
     );
@@ -687,20 +647,11 @@ export class TicketWorkflowService {
     let mutation: D1PreparedStatement;
     let type = "ticket.updated";
     if (action === "call_next") {
-      await this.db
-        .prepare(
-          "INSERT INTO qms_branch_fairness (branch_code,service_code,streak) VALUES (?,?,0) ON CONFLICT(branch_code,service_code) DO NOTHING",
-        )
-        .bind(actor.branchCode, actor.assignedServiceCode)
-        .run();
-      // The ordering expression reads the streak inside the same serialized transaction.
       mutation = this.db
         .prepare(
           `UPDATE qms_demo_tickets SET status='CALLED',counter=?,called_at=?,last_operation_id=?
         WHERE id=(SELECT id FROM qms_demo_tickets t WHERE branch_code=? AND service_code=? AND status='WAITING'
-          ORDER BY CASE WHEN (SELECT streak FROM qms_branch_fairness WHERE branch_code=? AND service_code=?) >= COALESCE((SELECT priority_limit FROM qms_branches WHERE code=?),2)
-            AND EXISTS(SELECT 1 FROM qms_demo_tickets WHERE branch_code=? AND service_code=? AND status='WAITING' AND priority=0)
-            THEN priority ELSE -priority END, queue_entered_at ASC, CAST(substr(public_number,instr(public_number,'-')+1) AS INTEGER) ASC,id ASC LIMIT 1)
+          ORDER BY queue_entered_at ASC, CAST(substr(public_number,instr(public_number,'-')+1) AS INTEGER) ASC,id ASC LIMIT 1)
         AND NOT EXISTS(SELECT 1 FROM qms_demo_tickets WHERE branch_code=? AND counter=? AND status IN ('CALLED','IN_SERVICE'))
         AND NOT EXISTS(SELECT 1 FROM qms_operation_replays WHERE actor_id=? AND request_key=?)
         AND EXISTS(SELECT 1 FROM qms_counter_operations WHERE branch_code=? AND counter=? AND staff_id=? AND status='OPEN') RETURNING *`,
@@ -709,11 +660,6 @@ export class TicketWorkflowService {
           actor.assignedCounter,
           now,
           op,
-          actor.branchCode,
-          actor.assignedServiceCode,
-          actor.branchCode,
-          actor.assignedServiceCode,
-          actor.branchCode,
           actor.branchCode,
           actor.assignedServiceCode,
           actor.branchCode,
@@ -837,14 +783,6 @@ export class TicketWorkflowService {
         )
         .bind(actor.id, key, hash, now, op),
     ];
-    if (action === "call_next")
-      statements.push(
-        this.db
-          .prepare(
-            "UPDATE qms_branch_fairness SET streak=CASE WHEN (SELECT priority FROM qms_demo_tickets WHERE last_operation_id=?)=1 THEN streak+1 ELSE 0 END WHERE branch_code=? AND service_code=? AND EXISTS(SELECT 1 FROM qms_demo_tickets WHERE last_operation_id=?)",
-          )
-          .bind(op, actor.branchCode, actor.assignedServiceCode, op),
-      );
     const result = await this.db.batch<StoredTicket>(statements);
     const changed = result[0]?.results?.[0];
     if (!changed) {
@@ -858,44 +796,6 @@ export class TicketWorkflowService {
     }
     return {
       ticket: safeTicket(changed),
-      snapshot: { ...(await readSnapshot(this.db, actor.branchCode)), actor },
-    };
-  }
-  async approvePriority(ticketId: string, actor: ShowcaseActor) {
-    const ticket = await this.ticket(ticketId);
-    if (ticket.branch_code !== actor.branchCode)
-      throw new QueueError(
-        "This ticket belongs to another branch.",
-        403,
-        "FORBIDDEN",
-      );
-    if (
-      !ticket.priority_requested ||
-      !["WAITING", "RESERVED"].includes(ticket.status)
-    )
-      throw new QueueError("No pending priority request for this ticket.");
-    const now = this.clock().toISOString(),
-      op = crypto.randomUUID();
-    await this.db.batch([
-      this.db
-        .prepare(
-          "UPDATE qms_demo_tickets SET priority=1,priority_verified_by=?,last_operation_id=? WHERE id=? AND priority=0 AND status IN ('WAITING','RESERVED')",
-        )
-        .bind(actor.id, op, ticket.id),
-      this.db
-        .prepare(
-          "INSERT INTO qms_demo_events (id,branch_code,ticket_id,type,detail,created_at) SELECT ?,branch_code,id,'ticket.priority_approved',public_number || ': priority approved',? FROM qms_demo_tickets WHERE last_operation_id=?",
-        )
-        .bind(crypto.randomUUID(), now, op),
-      this.audit(
-        actor,
-        "priority.approved",
-        `${ticket.public_number}: staff verified eligibility`,
-        now,
-      ),
-    ]);
-    return {
-      ticket: safeTicket(await this.ticket(ticket.id)),
       snapshot: { ...(await readSnapshot(this.db, actor.branchCode)), actor },
     };
   }

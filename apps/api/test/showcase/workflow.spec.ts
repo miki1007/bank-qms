@@ -51,7 +51,6 @@ function intent(extra: Record<string, unknown> = {}) {
     channel: "REMOTE",
     idempotencyKey: randomUUID(),
     lookupToken: randomUUID() + randomUUID(),
-    priority: false,
     ...extra,
   };
 }
@@ -194,21 +193,21 @@ describe("WorldLink hosted workflow on real SQLite with all migrations", () => {
       code: "DAILY_LIMIT",
     });
   });
-  it("requires staff priority approval and calls standard after two priorities", async () => {
-    const standard = await workflow.issue(
-      intent({ channel: "KIOSK" }),
-      "lobby",
-    );
-    const priorities = [];
-    for (let n = 0; n < 3; n++) {
+  it("rejects disabled priority requests and calls every queue in FIFO order", async () => {
+    await expect(
+      workflow.issue(
+        intent({ channel: "KIOSK", priority: true, priorityReason: "ELDERLY" }),
+        "priority-client",
+      ),
+    ).rejects.toMatchObject({ code: "PRIORITY_SERVICE_UNAVAILABLE" });
+    const issued = [];
+    for (let n = 0; n < 4; n++) {
       vi.advanceTimersByTime(10);
       const item = await workflow.issue(
-        intent({ channel: "KIOSK", priority: true, priorityReason: "ELDERLY" }),
+        intent({ channel: "KIOSK" }),
         `lobby-${n}`,
       );
-      expect(item.ticket.priority).toBe(0);
-      await workflow.approvePriority(item.ticket.id, manager);
-      priorities.push(item);
+      issued.push(item);
     }
     await workflow.counter("open", teller);
     const order = [];
@@ -230,12 +229,7 @@ describe("WorldLink hosted workflow on real SQLite with all migrations", () => {
         teller,
       );
     }
-    expect(order).toEqual([
-      priorities[0].ticket.id,
-      priorities[1].ticket.id,
-      standard.ticket.id,
-      priorities[2].ticket.id,
-    ]);
+    expect(order).toEqual(issued.map((item) => item.ticket.id));
   });
   it("enforces session ownership, terminal states, recall time and safe transfer", async () => {
     const first = await workflow.issue(intent({ channel: "KIOSK" }), "lobby");
@@ -306,10 +300,7 @@ describe("WorldLink hosted workflow on real SQLite with all migrations", () => {
   });
   it("keeps branch data and private fields out of public display payloads", async () => {
     await workflow.issue(intent({ branchCode: "CMC" }), "alice");
-    await workflow.issue(
-      intent({ channel: "KIOSK", priority: true, priorityReason: "PREGNANCY" }),
-      "lobby",
-    );
+    await workflow.issue(intent({ channel: "KIOSK" }), "lobby");
     await workflow.counter("open", teller);
     await workflow.staffAction(staffAction("call_next"), teller);
     const data = publicSnapshot(
@@ -505,7 +496,7 @@ describe("WorldLink hosted workflow on real SQLite with all migrations", () => {
       }),
     );
     expect(tellerAtAdmin.status).toBe(403);
-    for (const operation of ["audit", "set_priority_limit", "export_csv"]) {
+    for (const operation of ["audit", "export_csv"]) {
       const response = await POST(
         new Request("https://qms.test/api/showcase", {
           method: "POST",
@@ -560,7 +551,7 @@ describe("WorldLink hosted workflow on real SQLite with all migrations", () => {
         .get()?.count,
     ).toBe(1);
 
-    for (const operation of ["audit", "set_priority_limit"]) {
+    for (const operation of ["audit"]) {
       const response = await POST(
         new Request("https://qms.test/api/showcase", {
           method: "POST",
@@ -622,7 +613,6 @@ describe("WorldLink hosted workflow on real SQLite with all migrations", () => {
           operation: "admin_service_update",
           serviceCode: "DEP",
           targetMinutes: 6,
-          priorityEnabled: false,
           active: true,
         }),
       }),
@@ -640,7 +630,7 @@ describe("WorldLink hosted workflow on real SQLite with all migrations", () => {
         intent({ priority: true, priorityReason: "ELDERLY" }),
         "customer-policy-test",
       ),
-    ).rejects.toMatchObject({ code: "VALIDATION_ERROR" });
+    ).rejects.toMatchObject({ code: "PRIORITY_SERVICE_UNAVAILABLE" });
     expect(
       db.sql
         .prepare(
@@ -708,5 +698,5 @@ describe("WorldLink hosted workflow on real SQLite with all migrations", () => {
         )
         .get()?.count,
     ).toBe(100);
-  });
+  }, 90_000);
 });

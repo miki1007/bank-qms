@@ -54,13 +54,9 @@ class CustomerRepository(private val api: QmsApiClient) {
     suspend fun createTicket(
         branchCode: String,
         serviceId: String,
-        priority: Boolean,
-        priorityReason: String?,
     ): CustomerTicket {
         val body = JSONObject()
             .put("serviceTypeId", serviceId)
-            .put("priority", priority)
-            .put("priorityReason", if (priority) priorityReason else JSONObject.NULL)
             .put("idempotencyKey", UUID.randomUUID().toString())
         return api.post("/customers/branches/$branchCode/tickets", body)
             .asObject()
@@ -77,4 +73,3 @@ class CustomerRepository(private val api: QmsApiClient) {
     suspend fun logout() = api.logout()
     fun clearSession() = api.clearSession()
 }
-

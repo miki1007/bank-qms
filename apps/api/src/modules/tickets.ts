@@ -24,7 +24,6 @@ import {
   CustomerJwtAuthGuard,
   CustomerRequestUser,
 } from "./customer-auth";
-import { QueueSelectionService } from "./queue-selection.service";
 import { RealtimePublisher } from "./realtime";
 
 const createTicketSchema = z.object({
@@ -109,19 +108,8 @@ export class TicketWorkflowService {
   constructor(
     @Inject(PrismaService) private readonly prisma: PrismaService,
     @Inject(JwtService) private readonly jwt: JwtService,
-    @Inject(QueueSelectionService)
-    private readonly selector: QueueSelectionService,
     @Inject(RealtimePublisher) private readonly realtime: RealtimePublisher,
   ) {}
-
-  private settings(value: Prisma.JsonValue) {
-    const settings = (value ?? {}) as Record<string, unknown>;
-    return {
-      priorityFairnessLimit: Number(settings.priorityFairnessLimit ?? 2),
-      noShowTimeoutSeconds: Number(settings.noShowTimeoutSeconds ?? 120),
-      slaWaitMinutes: Number(settings.slaWaitMinutes ?? 20),
-    };
-  }
 
   private requireIdempotencyKey(idempotencyKey: string) {
     const parsed = z.string().uuid().safeParse(idempotencyKey);
@@ -250,11 +238,11 @@ export class TicketWorkflowService {
           currentServiceTypeId: ticket.currentServiceTypeId,
           status: "WAITING",
           OR: [
+            { queueEnteredAt: { lt: ticket.queueEnteredAt } },
             {
-              priority: ticket.priority,
-              queueEnteredAt: { lt: ticket.queueEnteredAt },
+              queueEnteredAt: ticket.queueEnteredAt,
+              dailySequence: { lt: ticket.dailySequence },
             },
-            ...(ticket.priority ? [] : [{ priority: true }]),
           ],
         },
       });
@@ -323,7 +311,7 @@ export class TicketWorkflowService {
           name: service.name,
           description: service.description,
           averageServiceMinutes: service.averageServiceMinutes,
-          priorityEnabled: service.priorityEnabled,
+          priorityEnabled: false,
           waitingCount,
           estimatedWaitMinutes: this.waits.estimate(
             waitingCount,
@@ -417,6 +405,12 @@ export class TicketWorkflowService {
         400,
         parsed.error.flatten(),
       );
+    if (parsed.data.priority)
+      throw new DomainError(
+        "PRIORITY_SERVICE_UNAVAILABLE",
+        "Priority service is currently unavailable. Please join the standard queue.",
+        400,
+      );
     const branch = await this.prisma.branch.findUnique({
       where: { code: branchCode.toUpperCase() },
     });
@@ -442,8 +436,8 @@ export class TicketWorkflowService {
       .update(
         JSON.stringify({
           serviceTypeId: parsed.data.serviceTypeId,
-          priority: parsed.data.priority,
-          priorityReason: parsed.data.priorityReason ?? null,
+          priority: false,
+          priorityReason: null,
         }),
       )
       .digest("hex");
@@ -503,18 +497,6 @@ export class TicketWorkflowService {
             "SERVICE_INACTIVE",
             "The selected service is no longer available.",
           );
-        if (parsed.data.priority && !service.priorityEnabled)
-          throw new DomainError(
-            "VALIDATION_ERROR",
-            "Priority service is not enabled for this service.",
-            400,
-          );
-        if (parsed.data.priority && !parsed.data.priorityReason)
-          throw new DomainError(
-            "VALIDATION_ERROR",
-            "A priority eligibility reason is required.",
-            400,
-          );
         const sequenceRows = await tx.$queryRaw<
           Array<{ last_value: number }>
         >(Prisma.sql`
@@ -534,10 +516,8 @@ export class TicketWorkflowService {
             businessDate,
             dailySequence: sequence,
             status: "WAITING",
-            priority: parsed.data.priority,
-            priorityReason: parsed.data.priority
-              ? parsed.data.priorityReason
-              : null,
+            priority: false,
+            priorityReason: null,
             queueEnteredAt: new Date(),
             lookupSecretHash,
             customerId,
@@ -608,7 +588,7 @@ export class TicketWorkflowService {
         id: safe.id,
         publicNumber: safe.publicNumber,
         serviceId: creation.serviceId,
-        priority: parsed.data.priority,
+        priority: false,
         status: safe.status,
         issuedAt: safe.issuedAt,
       },
@@ -663,7 +643,7 @@ export class TicketWorkflowService {
         id: ticket.id,
         publicNumber: ticket.publicNumber,
         status: ticket.status,
-        priority: ticket.priority,
+        priority: false,
         issuedAt: ticket.issuedAt.toISOString(),
         calledAt: ticket.calledAt?.toISOString() ?? null,
         completedAt: ticket.completedAt?.toISOString() ?? null,
@@ -898,61 +878,9 @@ export class TicketWorkflowService {
             "COUNTER_BUSY",
             "Resolve the current ticket before calling another customer.",
           );
-        // Serialize the fairness decision for one branch/service queue. Ticket
-        // row locks prevent duplicate calls; this queue-scoped lock also keeps
-        // the consecutive-priority limit exact when several counters call at
-        // the same instant.
-        await this.acquireAdvisoryLock(
-          tx,
-          `${user.branchId}:PRIORITY_FAIRNESS:${session.service_type_id}`,
+        const candidates = await tx.$queryRaw<Array<LockedTicket>>(
+          Prisma.sql`SELECT * FROM tickets WHERE branch_id = ${user.branchId}::uuid AND current_service_type_id = ${session.service_type_id}::uuid AND status = 'WAITING'::"TicketStatus" ORDER BY queue_entered_at ASC, daily_sequence ASC FOR UPDATE SKIP LOCKED LIMIT 1`,
         );
-        const branch = await tx.branch.findUniqueOrThrow({
-          where: { id: user.branchId },
-        });
-        const [priorityWaiting, standardWaiting, recentRows] =
-          await Promise.all([
-            tx.ticket.count({
-              where: {
-                branchId: user.branchId,
-                currentServiceTypeId: session.service_type_id,
-                status: "WAITING",
-                priority: true,
-              },
-            }),
-            tx.ticket.count({
-              where: {
-                branchId: user.branchId,
-                currentServiceTypeId: session.service_type_id,
-                status: "WAITING",
-                priority: false,
-              },
-            }),
-            tx.$queryRaw<Array<{ priority: boolean }>>(
-              Prisma.sql`SELECT t.priority FROM ticket_events e JOIN tickets t ON t.id = e.ticket_id WHERE e.branch_id = ${user.branchId}::uuid AND e.service_type_id = ${session.service_type_id}::uuid AND e.event_type = 'CALLED' ORDER BY e.occurred_at DESC LIMIT 6`,
-            ),
-          ]);
-        const lane = this.selector.chooseLane({
-          priorityWaiting,
-          standardWaiting,
-          consecutivePriorityCalls:
-            this.selector.countConsecutivePriority(recentRows),
-          limit: this.settings(branch.settings).priorityFairnessLimit,
-        });
-        if (!lane)
-          throw new DomainError("QUEUE_EMPTY", "No customers waiting.", 409);
-        let candidates = await tx.$queryRaw<Array<LockedTicket>>(
-          Prisma.sql`SELECT * FROM tickets WHERE branch_id = ${user.branchId}::uuid AND current_service_type_id = ${session.service_type_id}::uuid AND status = 'WAITING'::"TicketStatus" AND priority = ${lane === "priority"} ORDER BY queue_entered_at ASC, daily_sequence ASC FOR UPDATE SKIP LOCKED LIMIT 1`,
-        );
-        // Concurrent tellers can select the same preferred lane just before its
-        // final rows are locked. Keep the operation non-blocking and use the
-        // other eligible lane rather than reporting an empty queue while work
-        // remains. A standard row locked by another teller is already being
-        // served, so this fallback does not starve standard customers.
-        if (!candidates[0]) {
-          candidates = await tx.$queryRaw<Array<LockedTicket>>(
-            Prisma.sql`SELECT * FROM tickets WHERE branch_id = ${user.branchId}::uuid AND current_service_type_id = ${session.service_type_id}::uuid AND status = 'WAITING'::"TicketStatus" AND priority = ${lane !== "priority"} ORDER BY queue_entered_at ASC, daily_sequence ASC FOR UPDATE SKIP LOCKED LIMIT 1`,
-          );
-        }
         const ticket = candidates[0];
         if (!ticket)
           throw new DomainError("QUEUE_EMPTY", "No customers waiting.", 409);
@@ -979,7 +907,7 @@ export class TicketWorkflowService {
             serviceTypeId: updated.currentServiceTypeId,
             counterId: session.counter_id,
             staffId: user.sub,
-            metadata: { priority: updated.priority },
+            metadata: { ordering: "FIFO" },
           },
         });
         await tx.idempotencyRecord.create({

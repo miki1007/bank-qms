@@ -100,11 +100,12 @@ export const SAFE_TICKET_COLUMNS = `id, branch_code, public_number, business_dat
 export function safeTicket(
   ticket: StoredTicket | ShowcaseTicket,
 ): ShowcaseTicket {
-  return Object.fromEntries(
+  const safe = Object.fromEntries(
     SAFE_TICKET_COLUMNS.split(",")
       .map((key) => key.trim())
       .map((key) => [key, ticket[key as keyof ShowcaseTicket]]),
   ) as ShowcaseTicket;
+  return { ...safe, priority: 0, priority_requested: 0 };
 }
 export function getShowcaseDb(): D1Database {
   if (!env.DB) throw new Error("The queue database is unavailable.");
@@ -155,7 +156,7 @@ export async function ensureServiceConfiguration(
         .prepare(
           `INSERT INTO qms_service_configuration
            (branch_code, code, name, target_minutes, priority_enabled, active)
-           VALUES (?, ?, ?, ?, 1, 1) ON CONFLICT(branch_code, code) DO NOTHING`,
+           VALUES (?, ?, ?, ?, 0, 1) ON CONFLICT(branch_code, code) DO NOTHING`,
         )
         .bind(branchCode, service.code, service.name, service.minutes),
     ),
@@ -216,7 +217,6 @@ type ConfiguredService = {
   code: string;
   name: string;
   target_minutes: number;
-  priority_enabled: number;
   active: number;
 };
 
@@ -350,62 +350,45 @@ export async function readSnapshot(
   await ensureBranches(db);
   await ensureServiceConfiguration(db, branchCode);
   await expireReservations(db, branchCode);
-  const [
-    ticketResult,
-    eventResult,
-    settings,
-    counts,
-    counters,
-    fairness,
-    configured,
-  ] = await Promise.all([
-    db
-      .prepare(
-        `SELECT ${SAFE_TICKET_COLUMNS} FROM qms_demo_tickets WHERE branch_code=? ORDER BY created_at DESC LIMIT 500`,
-      )
-      .bind(branchCode)
-      .all<ShowcaseTicket>(),
-    db
-      .prepare(
-        "SELECT * FROM qms_demo_events WHERE branch_code=? ORDER BY created_at DESC, rowid DESC LIMIT 40",
-      )
-      .bind(branchCode)
-      .all<DemoEvent>(),
-    db
-      .prepare("SELECT priority_limit FROM qms_branches WHERE code=?")
-      .bind(branchCode)
-      .first<{ priority_limit: number }>(),
-    db
-      .prepare(
-        `SELECT service_code, SUM(CASE WHEN status='WAITING' THEN 1 ELSE 0 END) AS waiting,
+  const [ticketResult, eventResult, counts, counters, configured] =
+    await Promise.all([
+      db
+        .prepare(
+          `SELECT ${SAFE_TICKET_COLUMNS} FROM qms_demo_tickets WHERE branch_code=? ORDER BY created_at DESC LIMIT 500`,
+        )
+        .bind(branchCode)
+        .all<ShowcaseTicket>(),
+      db
+        .prepare(
+          "SELECT * FROM qms_demo_events WHERE branch_code=? ORDER BY created_at DESC, rowid DESC LIMIT 40",
+        )
+        .bind(branchCode)
+        .all<DemoEvent>(),
+      db
+        .prepare(
+          `SELECT service_code, SUM(CASE WHEN status='WAITING' THEN 1 ELSE 0 END) AS waiting,
       SUM(CASE WHEN status='RESERVED' THEN 1 ELSE 0 END) AS reserved,
       SUM(CASE WHEN business_date=? THEN 1 ELSE 0 END) AS issued,
       SUM(CASE WHEN status='IN_SERVICE' THEN 1 ELSE 0 END) AS serving,
       SUM(CASE WHEN status='COMPLETED' AND business_date=? THEN 1 ELSE 0 END) AS completed
       FROM qms_demo_tickets WHERE branch_code=? GROUP BY service_code`,
-      )
-      .bind(businessDate(), businessDate(), branchCode)
-      .all<Record<string, number | string>>(),
-    db
-      .prepare(
-        "SELECT counter, service_code, status, opened_at, staff_id FROM qms_counter_operations WHERE branch_code=? ORDER BY counter",
-      )
-      .bind(branchCode)
-      .all<CounterState>(),
-    db
-      .prepare(
-        "SELECT COALESCE(MAX(streak), 0) AS streak FROM qms_branch_fairness WHERE branch_code=?",
-      )
-      .bind(branchCode)
-      .first<{ streak: number }>(),
-    db
-      .prepare(
-        `SELECT code, name, target_minutes, priority_enabled, active
+        )
+        .bind(businessDate(), businessDate(), branchCode)
+        .all<Record<string, number | string>>(),
+      db
+        .prepare(
+          "SELECT counter, service_code, status, opened_at, staff_id FROM qms_counter_operations WHERE branch_code=? ORDER BY counter",
+        )
+        .bind(branchCode)
+        .all<CounterState>(),
+      db
+        .prepare(
+          `SELECT code, name, target_minutes, priority_enabled, active
            FROM qms_service_configuration WHERE branch_code=? ORDER BY code`,
-      )
-      .bind(branchCode)
-      .all<ConfiguredService>(),
-  ]);
+        )
+        .bind(branchCode)
+        .all<ConfiguredService>(),
+    ]);
   const tickets = ticketResult.results ?? [];
   const counterStates = counters.results ?? [];
   const configuredServices = configured.results ?? [];
@@ -444,7 +427,6 @@ export async function readSnapshot(
           icon:
             services.find((item) => item.code === service.code)?.icon ??
             "service",
-          priorityEnabled: Boolean(service.priority_enabled),
           waiting,
           reserved: Number(row?.reserved ?? 0),
           activeCounters,
@@ -455,17 +437,12 @@ export async function readSnapshot(
       }),
     serviceConfiguration: configuredServices.map((service) => ({
       ...service,
-      priority_enabled: Boolean(service.priority_enabled),
       active: Boolean(service.active),
     })),
     tickets,
     events: eventResult.results ?? [],
     activeCall,
     counters: counterStates,
-    settings: {
-      priorityStreak: fairness?.streak ?? 0,
-      priorityLimit: settings?.priority_limit ?? 2,
-    },
     metrics: {
       issued: count("issued"),
       waiting: count("waiting"),

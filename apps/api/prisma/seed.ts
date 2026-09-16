@@ -29,7 +29,6 @@ async function main() {
       timezone: "Africa/Addis_Ababa",
       settings: {
         noShowTimeoutSeconds: 120,
-        priorityFairnessLimit: 2,
         kioskIdleTimeoutSeconds: 45,
         displayHistoryCount: 5,
         slaWaitMinutes: 20,
@@ -74,8 +73,8 @@ async function main() {
     services.push(
       await prisma.serviceType.upsert({
         where: { branchId_code: { branchId: branch.id, code: service.code } },
-        update: { ...service, priorityEnabled: true, status: "ACTIVE" },
-        create: { branchId: branch.id, ...service, priorityEnabled: true },
+        update: { ...service, priorityEnabled: false, status: "ACTIVE" },
+        create: { branchId: branch.id, ...service, priorityEnabled: false },
       }),
     );
   }
@@ -221,7 +220,6 @@ async function main() {
       timezone: "Africa/Addis_Ababa",
       settings: {
         noShowTimeoutSeconds: 120,
-        priorityFairnessLimit: 2,
         kioskIdleTimeoutSeconds: 45,
         displayHistoryCount: 5,
         slaWaitMinutes: 20,

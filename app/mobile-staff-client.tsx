@@ -30,7 +30,6 @@ type Ticket = {
   public_number: string;
   service_code: string;
   service_name: string;
-  priority: number;
   status: string;
   counter: string | null;
   called_at: string | null;
@@ -304,10 +303,7 @@ export function MobileStaffClient() {
               {activeTicket ? (
                 <>
                   <strong>{activeTicket.public_number}</strong>
-                  <p>
-                    {activeTicket.service_name} ·{" "}
-                    {activeTicket.priority ? "Priority" : "Standard"}
-                  </p>
+                  <p>{activeTicket.service_name}</p>
                   <div className="mobile-service-clock">
                     <Clock3 />
                     <span>

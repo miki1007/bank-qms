@@ -16,11 +16,10 @@ describe("shared validation", () => {
     ).toBe("DEP-001");
   });
 
-  it("rejects a fairness limit outside the specified range", () => {
+  it("rejects an invalid no-show timeout", () => {
     expect(() =>
       settingsSchema.parse({
-        noShowTimeoutSeconds: 120,
-        priorityFairnessLimit: 6,
+        noShowTimeoutSeconds: 10,
         kioskIdleTimeoutSeconds: 45,
         displayHistoryCount: 5,
         slaWaitMinutes: 20,

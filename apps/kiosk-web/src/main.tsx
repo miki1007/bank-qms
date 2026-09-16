@@ -53,21 +53,12 @@ async function api<T>(path: string, init?: RequestInit): Promise<T> {
 }
 
 type CreatedTicket = TicketView & { lookupCode?: string; lookupToken: string };
-type View =
-  | "welcome"
-  | "services"
-  | "priority"
-  | "confirm"
-  | "result"
-  | "lookup"
-  | "status";
+type View = "welcome" | "services" | "confirm" | "result" | "lookup" | "status";
 
 function App() {
   const [view, setView] = useState<View>("welcome");
   const [language, setLanguage] = useState<"en" | "am">("en");
   const [selected, setSelected] = useState<PublicService | null>(null);
-  const [priority, setPriority] = useState(false);
-  const [priorityReason, setPriorityReason] = useState("ELDERLY");
   const [ticket, setTicket] = useState<CreatedTicket | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
@@ -102,7 +93,6 @@ function App() {
   const reset = () => {
     setView("welcome");
     setSelected(null);
-    setPriority(false);
     setTicket(null);
     setError("");
     setLookup({ publicNumber: "", lookupCode: "" });
@@ -137,8 +127,6 @@ function App() {
           method: "POST",
           body: JSON.stringify({
             serviceTypeId: selected.id,
-            priority,
-            priorityReason: priority ? priorityReason : null,
             idempotencyKey: crypto.randomUUID(),
           }),
         },
@@ -251,20 +239,19 @@ function App() {
               onClick={() =>
                 view === "services" || view === "lookup"
                   ? reset()
-                  : setView(view === "priority" ? "services" : "welcome")
+                  : setView(view === "confirm" ? "services" : "welcome")
               }
             >
               <ArrowLeft size={18} />
               {words.back}
             </button>
-            {["services", "priority", "confirm"].includes(view) ? (
+            {["services", "confirm"].includes(view) ? (
               <div
                 className="kiosk-progress"
                 aria-label="Ticket creation steps"
               >
-                {[1, 2, 3].map((step) => {
-                  const currentStep =
-                    view === "services" ? 1 : view === "priority" ? 2 : 3;
+                {[1, 2].map((step) => {
+                  const currentStep = view === "services" ? 1 : 2;
                   return (
                     <span
                       className={step <= currentStep ? "is-active" : ""}
@@ -360,7 +347,7 @@ function App() {
                     className="card service-button kiosk-service-card"
                     onClick={() => {
                       setSelected(service);
-                      setView(service.priorityEnabled ? "priority" : "confirm");
+                      setView("confirm");
                     }}
                   >
                     <div className="row between">
@@ -387,61 +374,10 @@ function App() {
           </section>
         )}
 
-        {view === "priority" && selected && (
-          <section className="kiosk-stage">
-            <p className="eyebrow" style={{ marginTop: 36 }}>
-              Step 2 of 3
-            </p>
-            <h1 className="title">Choose service lane</h1>
-            <div className="grid">
-              <button
-                className="card service-button"
-                onClick={() => {
-                  setPriority(false);
-                  setView("confirm");
-                }}
-              >
-                <Users size={34} />
-                <h2 style={{ marginTop: 20 }}>Standard service</h2>
-                <p className="muted">Join the regular first-come queue.</p>
-              </button>
-              <div className="card">
-                <ShieldCheck size={34} color="#0f5c45" />
-                <h2 style={{ marginTop: 20 }}>Priority service</h2>
-                <p className="muted">
-                  For eligible customers. Staff may verify eligibility.
-                </p>
-                <label className="field">
-                  <span>Eligibility reason</span>
-                  <select
-                    value={priorityReason}
-                    onChange={(event) => setPriorityReason(event.target.value)}
-                  >
-                    <option value="ELDERLY">Elderly customer</option>
-                    <option value="DISABILITY">Disability</option>
-                    <option value="PREGNANCY">Pregnancy</option>
-                    <option value="OTHER">Other approved reason</option>
-                  </select>
-                </label>
-                <button
-                  className="primary"
-                  style={{ marginTop: 14, width: "100%" }}
-                  onClick={() => {
-                    setPriority(true);
-                    setView("confirm");
-                  }}
-                >
-                  Use priority service
-                </button>
-              </div>
-            </div>
-          </section>
-        )}
-
         {view === "confirm" && selected && (
           <section className="kiosk-stage">
             <p className="eyebrow" style={{ marginTop: 36 }}>
-              Step 3 of 3
+              Step 2 of 2
             </p>
             <h1 className="title">Confirm your ticket</h1>
             <div className="card kiosk-confirm-card">
@@ -452,11 +388,6 @@ function App() {
                     {selected.name}
                   </h2>
                 </div>
-                <span
-                  className={`status-pill ${priority ? "status-warning" : ""}`}
-                >
-                  {priority ? "Priority" : "Standard"}
-                </span>
               </div>
               <hr
                 style={{
@@ -495,7 +426,7 @@ function App() {
             <p className="eyebrow">Your ticket is ready</p>
             <div className="ticket-number">{ticket.publicNumber}</div>
             <p className="subtitle" style={{ margin: "0 auto" }}>
-              {ticket.serviceName} · {priority ? "Priority" : "Standard"}
+              {ticket.serviceName}
             </p>
             <div
               className="grid"

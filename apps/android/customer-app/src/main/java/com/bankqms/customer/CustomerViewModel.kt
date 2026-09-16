@@ -106,10 +106,10 @@ class CustomerViewModel(private val repository: CustomerRepository) : ViewModel(
         }
     }
 
-    fun confirmTicket(priority: Boolean, reason: String?) = runBusy {
+    fun confirmTicket() = runBusy {
         val branch = mutableState.value.selectedBranch ?: return@runBusy
         val service = mutableState.value.selectedService ?: return@runBusy
-        val ticket = repository.createTicket(branch.code, service.id, priority, reason)
+        val ticket = repository.createTicket(branch.code, service.id)
         mutableState.update {
             it.copy(
                 selectedTicket = ticket,
@@ -215,4 +215,3 @@ class CustomerViewModel(private val repository: CustomerRepository) : ViewModel(
         pollJob?.cancel()
     }
 }
-

@@ -11,9 +11,10 @@ describe("English public-display announcement", () => {
       announcementText({
         publicNumber: "DEP-042",
         counterLabel: "Counter 3",
+        serviceName: "Deposit",
       }),
     ).toBe(
-      "Ticket number zero four two. Please proceed to counter number three.",
+      "Deposit. Ticket number zero four two. Please proceed to counter number three.",
     );
   });
 

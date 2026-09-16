@@ -485,8 +485,6 @@ private fun HistoryCard(ticket: CustomerTicket, onClick: () -> Unit) {
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun JoinScreen(state: CustomerUiState, viewModel: CustomerViewModel) {
-    var priority by remember(state.selectedService?.id) { mutableStateOf(false) }
-    var reason by remember(state.selectedService?.id) { mutableStateOf("ELDERLY") }
     Column(Modifier.fillMaxSize().statusBarsPadding().navigationBarsPadding()) {
         TopAppBar(
             title = {
@@ -538,8 +536,8 @@ private fun JoinScreen(state: CustomerUiState, viewModel: CustomerViewModel) {
                         enabled = service.estimatedWaitMinutes != null,
                     ) { viewModel.chooseService(service) }
                 }
-                else -> ReviewTicket(state, priority, reason, { priority = it }, { reason = it }) {
-                    viewModel.confirmTicket(priority, if (priority) reason else null)
+                else -> ReviewTicket(state) {
+                    viewModel.confirmTicket()
                 }
             }
         }
@@ -591,10 +589,6 @@ private fun ChoiceCard(icon: ImageVector, title: String, detail: String, enabled
 @Composable
 private fun ReviewTicket(
     state: CustomerUiState,
-    priority: Boolean,
-    reason: String,
-    setPriority: (Boolean) -> Unit,
-    setReason: (String) -> Unit,
     confirm: () -> Unit,
 ) {
     val service = state.selectedService ?: return
@@ -608,41 +602,6 @@ private fun ReviewTicket(
                 ReviewRow("Branch", state.selectedBranch?.name.orEmpty())
                 ReviewRow("Service", service.name)
                 ReviewRow("Expected wait", service.estimatedWaitMinutes?.let { "About $it minutes" } ?: "Unavailable")
-            }
-        }
-        if (service.priorityEnabled) {
-            Card(
-                shape = QmsCardShape,
-                colors = CardDefaults.cardColors(QmsWarning.copy(alpha = .08f)),
-                border = BorderStroke(1.dp, QmsWarning.copy(alpha = .24f)),
-                modifier = Modifier.padding(top = 16.dp),
-            ) {
-                Column(Modifier.padding(18.dp)) {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Icon(Icons.Rounded.Accessible, null, tint = QmsWarning)
-                        Column(Modifier.weight(1f).padding(horizontal = 12.dp)) {
-                            Text("Priority assistance", fontWeight = FontWeight.Bold)
-                            Text("For eligible accessibility or care needs", color = QmsMuted, fontSize = 12.sp)
-                        }
-                        FilterChip(selected = priority, onClick = { setPriority(!priority) }, label = { Text(if (priority) "On" else "Off") })
-                    }
-                    AnimatedVisibility(priority) {
-                        Column(Modifier.padding(top = 14.dp)) {
-                            Text("Select a private reason", color = QmsMuted, fontSize = 12.sp)
-                            Row(Modifier.padding(top = 8.dp), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                                listOf("ELDERLY" to "Elderly", "DISABILITY" to "Disability").forEach { (value, label) ->
-                                    FilterChip(selected = reason == value, onClick = { setReason(value) }, label = { Text(label) })
-                                }
-                            }
-                            Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                                listOf("PREGNANCY" to "Pregnancy", "OTHER" to "Other").forEach { (value, label) ->
-                                    FilterChip(selected = reason == value, onClick = { setReason(value) }, label = { Text(label) })
-                                }
-                            }
-                            Text("This reason is never sent to the public display.", color = QmsMuted, fontSize = 11.sp)
-                        }
-                    }
-                }
             }
         }
         Button(

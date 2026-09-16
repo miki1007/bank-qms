@@ -47,7 +47,7 @@ describe.skipIf(!run)("real PostgreSQL Call Next concurrency", () => {
         headers: adminHeaders,
         body: JSON.stringify({ serviceTypeId: deposit.id }),
       });
-    const createTicket = (idempotencyKey: string, priority = false) =>
+    const createTicket = (idempotencyKey: string) =>
       fetch(`${apiUrl}/public/branches/MAIN/tickets`, {
         method: "POST",
         headers: {
@@ -57,15 +57,13 @@ describe.skipIf(!run)("real PostgreSQL Call Next concurrency", () => {
         },
         body: JSON.stringify({
           serviceTypeId: deposit.id,
-          priority,
-          priorityReason: priority ? "ELDERLY" : null,
           idempotencyKey,
         }),
       });
 
     const createdResponses = await Promise.all(
       Array.from({ length: 20 }, (_, index) =>
-        createTicket(crypto.randomUUID(), index % 3 === 0),
+        createTicket(crypto.randomUUID()),
       ),
     );
     expect(createdResponses.every((response) => response.ok)).toBe(true);

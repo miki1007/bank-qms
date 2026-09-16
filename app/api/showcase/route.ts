@@ -184,7 +184,7 @@ async function exportDailyCsv(
     throw new QueueError("Select a valid report period of up to 31 days.", 400);
   const rows = await getShowcaseDb()
     .prepare(
-      `SELECT public_number, business_date, service_code, service_name, priority, status, counter, created_at, checked_in_at, called_at, started_at, completed_at, channel, no_show_count
+      `SELECT public_number, business_date, service_code, service_name, status, counter, created_at, checked_in_at, called_at, started_at, completed_at, channel, no_show_count
     FROM qms_demo_tickets WHERE branch_code=? AND business_date BETWEEN ? AND ? ORDER BY created_at ASC`,
     )
     .bind(actor.branchCode, from, to)
@@ -194,7 +194,6 @@ async function exportDailyCsv(
     "business_date",
     "service_code",
     "service_name",
-    "priority",
     "status",
     "counter",
     "created_at",
@@ -396,7 +395,6 @@ async function updateServiceConfiguration(
   const code =
     typeof payload.serviceCode === "string" ? payload.serviceCode : "";
   const targetMinutes = Number(payload.targetMinutes);
-  const priorityEnabled = payload.priorityEnabled !== false;
   const active = payload.active !== false;
   if (
     !code ||
@@ -433,21 +431,15 @@ async function updateServiceConfiguration(
   await db
     .prepare(
       `UPDATE qms_service_configuration
-       SET target_minutes=?, priority_enabled=?, active=?
+       SET target_minutes=?, priority_enabled=0, active=?
        WHERE branch_code=? AND code=?`,
     )
-    .bind(
-      targetMinutes,
-      priorityEnabled ? 1 : 0,
-      active ? 1 : 0,
-      actor.branchCode,
-      code,
-    )
+    .bind(targetMinutes, active ? 1 : 0, actor.branchCode, code)
     .run();
   await appendAudit(
     actor,
     "admin.service_configuration",
-    `${code}: target ${targetMinutes} minutes, priority ${priorityEnabled ? "enabled" : "disabled"}, ${active ? "active" : "inactive"}`,
+    `${code}: target ${targetMinutes} minutes, ${active ? "active" : "inactive"}`,
   );
   return protectedSnapshot(actor);
 }
@@ -534,29 +526,6 @@ export async function POST(request: Request) {
       case "arrival_code": {
         const actor = await requireAnyActor(request, ["TELLER", "MANAGER"]);
         return json(await workflow.arrivalCode(actor.branchCode, actor));
-      }
-      case "approve_priority":
-        return json(
-          await workflow.approvePriority(
-            String(payload.ticketId ?? ""),
-            await requireAnyActor(request, ["TELLER", "MANAGER"]),
-          ),
-        );
-      case "set_priority_limit": {
-        const actor = await requireActor(request, "ADMIN"),
-          limit = Number(payload.limit);
-        if (!Number.isInteger(limit) || limit < 1 || limit > 5)
-          throw new QueueError("Priority limit must be between 1 and 5.", 400);
-        await getShowcaseDb()
-          .prepare("UPDATE qms_branches SET priority_limit=? WHERE code=?")
-          .bind(limit, actor.branchCode)
-          .run();
-        await appendAudit(
-          actor,
-          "settings.priority_limit",
-          `Priority limit set to ${limit}`,
-        );
-        return json({ snapshot: await protectedSnapshot(actor) });
       }
       case "admin_staff_update": {
         const actor = await requireActor(request, "ADMIN");

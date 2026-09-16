@@ -66,7 +66,6 @@ type TicketHistoryItem = {
   id: string;
   publicNumber: string;
   status: TicketView["status"];
-  priority: boolean;
   issuedAt: string;
   calledAt: string | null;
   completedAt: string | null;
@@ -719,8 +718,6 @@ function NewTicket() {
   const [step, setStep] = useState(1);
   const [branch, setBranch] = useState<PublicBranch | null>(null);
   const [service, setService] = useState<PublicService | null>(null);
-  const [priority, setPriority] = useState(false);
-  const [reason, setReason] = useState("ELDERLY");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const branches = useQuery<PublicBranch[]>({
@@ -743,8 +740,6 @@ function NewTicket() {
           method: "POST",
           body: JSON.stringify({
             serviceTypeId: service.id,
-            priority,
-            priorityReason: priority ? reason : null,
             idempotencyKey: crypto.randomUUID(),
           }),
         },
@@ -859,33 +854,6 @@ function NewTicket() {
               </strong>
             </div>
           </div>
-          {service.priorityEnabled && (
-            <div className="priority-card">
-              <label>
-                <input
-                  type="checkbox"
-                  checked={priority}
-                  onChange={(event) => setPriority(event.target.checked)}
-                />
-                <span>
-                  <strong>Priority assistance</strong>
-                  <small>For eligible accessibility or care needs</small>
-                </span>
-              </label>
-              {priority && (
-                <select
-                  value={reason}
-                  onChange={(event) => setReason(event.target.value)}
-                  aria-label="Priority reason"
-                >
-                  <option value="ELDERLY">Elderly customer</option>
-                  <option value="DISABILITY">Disability</option>
-                  <option value="PREGNANCY">Pregnancy</option>
-                  <option value="OTHER">Other eligible need</option>
-                </select>
-              )}
-            </div>
-          )}
           {error && (
             <div className="inline-error" role="alert">
               {error}
@@ -900,8 +868,7 @@ function NewTicket() {
             <Check size={19} />
           </button>
           <p className="privacy-note">
-            <ShieldCheck size={16} /> Priority reasons are never shown on public
-            displays.
+            <ShieldCheck size={16} /> Your ticket details remain private.
           </p>
         </section>
       )}

@@ -17,7 +17,6 @@ data class Service(
     val name: String,
     val description: String?,
     val averageServiceMinutes: Int,
-    val priorityEnabled: Boolean,
     val waitingCount: Int,
     val estimatedWaitMinutes: Int?,
 )
@@ -31,7 +30,6 @@ data class CustomerTicket(
     val peopleAhead: Int?,
     val estimatedWaitMinutes: Int?,
     val counterLabel: String?,
-    val priority: Boolean = false,
     val branch: Branch? = null,
     val version: Int = 0,
 )
@@ -58,7 +56,6 @@ internal fun JSONObject.toService(): Service = Service(
     name = getString("name"),
     description = optionalString("description"),
     averageServiceMinutes = optInt("averageServiceMinutes"),
-    priorityEnabled = optBoolean("priorityEnabled"),
     waitingCount = optInt("waitingCount"),
     estimatedWaitMinutes = if (isNull("estimatedWaitMinutes")) null else optInt("estimatedWaitMinutes"),
 )
@@ -74,9 +71,7 @@ internal fun JSONObject.toTicket(): CustomerTicket {
         peopleAhead = if (isNull("peopleAhead")) null else optInt("peopleAhead"),
         estimatedWaitMinutes = if (isNull("estimatedWaitMinutes")) null else optInt("estimatedWaitMinutes"),
         counterLabel = optionalString("counterLabel"),
-        priority = optBoolean("priority"),
         branch = branchJson?.toBranch(),
         version = optInt("version"),
     )
 }
-

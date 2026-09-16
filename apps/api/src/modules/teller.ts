@@ -74,7 +74,7 @@ export class CounterSessionService {
       include: { counter: true, serviceType: true },
     });
     if (!session) return { session: null };
-    const [activeTicket, waiting, priorityWaiting] = await Promise.all([
+    const [activeTicket, waiting] = await Promise.all([
       this.prisma.ticket.findFirst({
         where: {
           counterSessionId: session.id,
@@ -87,14 +87,6 @@ export class CounterSessionService {
           branchId: user.branchId,
           currentServiceTypeId: session.serviceTypeId,
           status: "WAITING",
-        },
-      }),
-      this.prisma.ticket.count({
-        where: {
-          branchId: user.branchId,
-          currentServiceTypeId: session.serviceTypeId,
-          status: "WAITING",
-          priority: true,
         },
       }),
     ]);
@@ -116,8 +108,6 @@ export class CounterSessionService {
         service: session.serviceType,
         queue: {
           waiting,
-          standardWaiting: waiting - priorityWaiting,
-          priorityWaiting,
           oldestWaitSeconds: oldest
             ? Math.floor((Date.now() - oldest.queueEnteredAt.getTime()) / 1000)
             : 0,

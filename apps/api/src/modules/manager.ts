@@ -224,7 +224,6 @@ export class ReportQueryService {
         publicNumber: ticket.publicNumber,
         service: ticket.currentService.name,
         status: ticket.status,
-        priority: ticket.priority,
         issuedAt: ticket.issuedAt,
         calledAt: ticket.calledAt,
         completedAt: ticket.completedAt,
@@ -252,7 +251,6 @@ export class ReportQueryService {
       ticket.publicNumber,
       ticket.service,
       ticket.status,
-      ticket.priority,
       ticket.issuedAt,
       ticket.calledAt,
       ticket.completedAt,
@@ -267,7 +265,6 @@ export class ReportQueryService {
         "Ticket",
         "Service",
         "Status",
-        "Priority",
         "Issued At",
         "Called At",
         "Completed At",
@@ -345,14 +342,6 @@ export class ManagerService {
             branchId,
             currentServiceTypeId: service.id,
             status: "WAITING",
-          },
-        }),
-        priorityWaiting: await this.prisma.ticket.count({
-          where: {
-            branchId,
-            currentServiceTypeId: service.id,
-            status: "WAITING",
-            priority: true,
           },
         }),
         oldest: await this.prisma.ticket.findFirst({
@@ -472,7 +461,6 @@ export class ManagerService {
   private defaultBranchSettings() {
     return {
       noShowTimeoutSeconds: 120,
-      priorityFairnessLimit: 2,
       kioskIdleTimeoutSeconds: 45,
       displayHistoryCount: 5,
       slaWaitMinutes: 20,
@@ -576,11 +564,12 @@ export class ManagerService {
     return branch;
   }
 
-  services(branchId: string) {
-    return this.prisma.serviceType.findMany({
+  async services(branchId: string) {
+    const services = await this.prisma.serviceType.findMany({
       where: { branchId },
       orderBy: { displayOrder: "asc" },
     });
+    return services.map((service) => ({ ...service, priorityEnabled: false }));
   }
   counters(branchId: string) {
     return this.prisma.counter.findMany({
@@ -623,7 +612,6 @@ export class ManagerService {
       name?: string;
       description?: string;
       averageServiceMinutes?: number;
-      priorityEnabled?: boolean;
       displayOrder?: number;
     },
   ) {
@@ -646,7 +634,7 @@ export class ManagerService {
         name: body.name,
         description: body.description,
         averageServiceMinutes: body.averageServiceMinutes,
-        priorityEnabled: body.priorityEnabled ?? false,
+        priorityEnabled: false,
         displayOrder: body.displayOrder ?? 0,
       },
     });
@@ -695,10 +683,7 @@ export class ManagerService {
           typeof body.averageServiceMinutes === "number"
             ? body.averageServiceMinutes
             : undefined,
-        priorityEnabled:
-          typeof body.priorityEnabled === "boolean"
-            ? body.priorityEnabled
-            : undefined,
+        priorityEnabled: false,
         displayOrder:
           typeof body.displayOrder === "number" ? body.displayOrder : undefined,
         status:
@@ -1057,7 +1042,6 @@ export class ManagerService {
     return { timezone: branch.timezone, settings: branch.settings };
   }
   async updateSettings(user: RequestUser, body: Record<string, unknown>) {
-    const priorityFairnessLimit = Number(body.priorityFairnessLimit);
     const noShowTimeoutSeconds = Number(body.noShowTimeoutSeconds);
     const kioskIdleTimeoutSeconds = Number(body.kioskIdleTimeoutSeconds);
     const displayHistoryCount = Number(body.displayHistoryCount);
@@ -1065,8 +1049,6 @@ export class ManagerService {
     const announcementRepeatCount = Number(body.announcementRepeatCount ?? 3);
     const soundEnabled = body.soundEnabled !== false;
     if (
-      priorityFairnessLimit < 1 ||
-      priorityFairnessLimit > 5 ||
       noShowTimeoutSeconds < 30 ||
       noShowTimeoutSeconds > 600 ||
       kioskIdleTimeoutSeconds < 15 ||
@@ -1083,7 +1065,6 @@ export class ManagerService {
         400,
       );
     const settings = {
-      priorityFairnessLimit,
       noShowTimeoutSeconds,
       kioskIdleTimeoutSeconds,
       displayHistoryCount,

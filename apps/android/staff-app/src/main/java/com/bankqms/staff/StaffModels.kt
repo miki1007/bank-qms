@@ -24,8 +24,6 @@ data class AssignedCounter(
 
 data class QueueSnapshot(
     val waiting: Int,
-    val standardWaiting: Int,
-    val priorityWaiting: Int,
     val oldestWaitSeconds: Int,
 )
 
@@ -99,8 +97,6 @@ internal fun JSONObject.toTellerSession(): TellerSession {
         service = serviceJson.toStaffService(),
         queue = QueueSnapshot(
             waiting = queueJson.optInt("waiting"),
-            standardWaiting = queueJson.optInt("standardWaiting"),
-            priorityWaiting = queueJson.optInt("priorityWaiting"),
             oldestWaitSeconds = queueJson.optInt("oldestWaitSeconds"),
         ),
         activeTicket = activeJson?.let {
@@ -118,4 +114,3 @@ internal fun JSONObject.toTellerSession(): TellerSession {
         },
     )
 }
-

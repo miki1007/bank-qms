@@ -427,10 +427,6 @@ private fun QueueMetrics(queue: QueueSnapshot) {
             QueueMetric("Waiting", queue.waiting.toString(), QmsStaff, Modifier.weight(1f))
             QueueMetric("Oldest", "${queue.oldestWaitSeconds / 60}m", QmsWarning, Modifier.weight(1f))
         }
-        Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-            QueueMetric("Standard", queue.standardWaiting.toString(), Color(0xFF9DB5CE), Modifier.weight(1f))
-            QueueMetric("Priority", queue.priorityWaiting.toString(), QmsWarning, Modifier.weight(1f))
-        }
     }
 }
 
@@ -459,7 +455,7 @@ private fun ReadyCard(open: Boolean, callNext: () -> Unit) {
                 Icon(Icons.Rounded.Call, null, tint = QmsStaff, modifier = Modifier.size(36.dp))
             }
             Text("Ready for the next customer", style = MaterialTheme.typography.titleLarge, modifier = Modifier.padding(top = 20.dp))
-            Text("The server applies FIFO order and starvation-safe priority fairness.", color = QmsMuted, textAlign = TextAlign.Center, fontSize = 13.sp, modifier = Modifier.padding(top = 7.dp))
+            Text("The server calls customers in first-in, first-out order.", color = QmsMuted, textAlign = TextAlign.Center, fontSize = 13.sp, modifier = Modifier.padding(top = 7.dp))
             Button(
                 onClick = callNext,
                 enabled = open,

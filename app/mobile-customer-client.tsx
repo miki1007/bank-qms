@@ -30,7 +30,6 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Switch } from "@/components/ui/switch";
 import { BankLogo } from "./bank-logo";
 import {
   BANK_BRANCHES,
@@ -47,8 +46,6 @@ type Ticket = {
   public_number: string;
   service_code: string;
   service_name: string;
-  priority: number;
-  priority_requested: number;
   status: string;
   counter: string | null;
   created_at: string;
@@ -63,7 +60,6 @@ type Service = {
   reserved: number;
   activeCounters: number;
   estimatedWaitMinutes: number | null;
-  priorityEnabled?: boolean;
 };
 type CustomerAccount = {
   id: string;
@@ -155,8 +151,6 @@ export function MobileCustomerClient() {
   const [step, setStep] = useState(1);
   const [services, setServices] = useState<Service[]>([]);
   const [selectedService, setSelectedService] = useState("DEP");
-  const [priority, setPriority] = useState(false),
-    [priorityReason, setPriorityReason] = useState("ELDERLY");
   const [ticket, setTicket] = useState<Ticket | null>(null),
     [lookupToken, setLookupToken] = useState("");
   const [position, setPosition] = useState<number | null>(null),
@@ -318,8 +312,6 @@ export function MobileCustomerClient() {
     const selection = JSON.stringify({
       branch,
       selectedService,
-      priority,
-      priorityReason,
     });
     if (intent.current?.selection !== selection)
       intent.current = {
@@ -333,8 +325,6 @@ export function MobileCustomerClient() {
         channel: "REMOTE",
         branchCode: branch,
         serviceCode: selectedService,
-        priority,
-        priorityReason: priority ? priorityReason : null,
         idempotencyKey: intent.current.key,
         lookupToken: intent.current.proof,
       });
@@ -950,13 +940,6 @@ export function MobileCustomerClient() {
                     </small>
                   </div>
                 )}
-                {ticket.priority_requested === 1 && (
-                  <p className="wl-priority-status">
-                    {ticket.priority
-                      ? "Priority eligibility approved by staff."
-                      : "Priority requested. Branch staff must verify eligibility before priority ordering applies."}
-                  </p>
-                )}
                 <div className="wl-ticket-actions">
                   <Button
                     variant="outline"
@@ -1110,11 +1093,7 @@ export function MobileCustomerClient() {
                                     ? "is-selected"
                                     : ""
                                 }
-                                onClick={() => {
-                                  setSelectedService(service.code);
-                                  if (!service.priorityEnabled)
-                                    setPriority(false);
-                                }}
+                                onClick={() => setSelectedService(service.code)}
                               >
                                 <span className="wl-service-icon">
                                   <Icon />
@@ -1136,48 +1115,6 @@ export function MobileCustomerClient() {
                             );
                           })}
                         </div>
-                      )}
-                      <label className="wl-priority">
-                        <span>
-                          <strong>Request priority assistance</strong>
-                          <small>
-                            {selected?.priorityEnabled
-                              ? "Staff verify eligibility at the branch."
-                              : "Not enabled for this service."}
-                          </small>
-                        </span>
-                        <Switch
-                          checked={priority}
-                          disabled={!selected?.priorityEnabled}
-                          onCheckedChange={setPriority}
-                        />
-                      </label>
-                      {priority && (
-                        <label className="wl-field">
-                          Eligibility reason
-                          <select
-                            value={priorityReason}
-                            onChange={(event) =>
-                              setPriorityReason(event.target.value)
-                            }
-                          >
-                            <option value="ELDERLY">Elderly customer</option>
-                            <option value="DISABILITY">
-                              Customer with disability
-                            </option>
-                            <option value="PREGNANCY">Pregnancy</option>
-                            <option value="ACCESSIBILITY">
-                              Accessibility need
-                            </option>
-                            <option value="OTHER">
-                              Staff-approved exceptional case
-                            </option>
-                          </select>
-                          <small>
-                            Your reason is private and never appears on the
-                            monitor.
-                          </small>
-                        </label>
                       )}
                       <Button
                         className="wl-primary"
@@ -1204,11 +1141,7 @@ export function MobileCustomerClient() {
                         <BankLogo size={64} />
                         <strong>{branchName} Branch</strong>
                         <span>{selected?.name}</span>
-                        <span>
-                          {priority
-                            ? "Priority requested · staff approval required"
-                            : "Standard service"}
-                        </span>
+                        <span>First-in, first-out queue</span>
                       </div>
                       <div className="wl-policy-note">
                         <Clock3 />

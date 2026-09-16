@@ -40,7 +40,6 @@ import {
 import { clientUuid } from "@/lib/client-id";
 
 import { Button } from "@/components/ui/button";
-import { Switch } from "@/components/ui/switch";
 
 export type QmsSurface = "kiosk" | "display" | "teller" | "manager" | "admin";
 
@@ -49,8 +48,6 @@ type Ticket = {
   public_number: string;
   service_code: string;
   service_name: string;
-  priority: number;
-  priority_requested?: number;
   status: string;
   counter: string | null;
   created_at: string;
@@ -73,14 +70,12 @@ type Service = {
   minutes: number;
   icon: string;
   waiting: number;
-  priorityEnabled?: boolean;
 };
 
 type ServiceConfiguration = {
   code: string;
   name: string;
   target_minutes: number;
-  priority_enabled: boolean;
   active: boolean;
 };
 
@@ -131,7 +126,6 @@ type Snapshot = {
   tickets: Ticket[];
   events: QueueEvent[];
   activeCall: Ticket | null;
-  settings: { priorityStreak: number; priorityLimit: number };
   counters?: Array<{ counter: string; status: string; service_code: string }>;
   serviceConfiguration?: ServiceConfiguration[];
   staff?: StaffDirectoryEntry[];
@@ -169,7 +163,6 @@ const emptySnapshot: Snapshot = {
   tickets: [],
   events: [],
   activeCall: null,
-  settings: { priorityStreak: 0, priorityLimit: 2 },
   metrics: { issued: 0, waiting: 0, serving: 0, completed: 0, noShow: 0 },
 };
 
@@ -215,6 +208,23 @@ function statusLabel(status: string) {
   return status.toLowerCase().replaceAll("_", " ");
 }
 
+function spokenDigits(value: string) {
+  const words: Record<string, string> = {
+    "0": "zero",
+    "1": "one",
+    "2": "two",
+    "3": "three",
+    "4": "four",
+    "5": "five",
+    "6": "six",
+    "7": "seven",
+    "8": "eight",
+    "9": "nine",
+  };
+  const digits = value.match(/\d/g);
+  return digits?.length ? digits.map((digit) => words[digit]).join(" ") : value;
+}
+
 export function QmsClient({ surface }: { surface: QmsSurface }) {
   const [snapshot, setSnapshot] = useState<Snapshot>(emptySnapshot);
   const [loading, setLoading] = useState(true);
@@ -223,8 +233,7 @@ export function QmsClient({ surface }: { surface: QmsSurface }) {
   const [notice, setNotice] = useState("");
   const [busy, setBusy] = useState("");
   const [selectedService, setSelectedService] = useState("DEP");
-  const [priority, setPriority] = useState(false);
-  const [priorityReason, setPriorityReason] = useState("ELDERLY");
+  const [voiceEnabled, setVoiceEnabled] = useState(false);
   const [issuedTicket, setIssuedTicket] = useState<Ticket | null>(null);
   const [lookupToken, setLookupToken] = useState("");
   const [transferService, setTransferService] = useState("WDR");
@@ -252,6 +261,7 @@ export function QmsClient({ surface }: { surface: QmsSurface }) {
   const requestIntents = useRef(
     new Map<string, { key: string; proof: string }>(),
   );
+  const announcedCall = useRef<string | null>(null);
 
   const refresh = useCallback(
     async (quiet = false) => {
@@ -406,6 +416,53 @@ export function QmsClient({ surface }: { surface: QmsSurface }) {
         })),
     [snapshot.events, snapshot.tickets],
   );
+  const latestCall = recentCalls[0];
+  const latestCallId = latestCall?.event.id;
+  const latestCallCounter = latestCall?.ticket?.counter;
+  const latestCallNumber = latestCall?.ticket?.public_number;
+  const latestCallService = latestCall?.ticket?.service_name;
+
+  useEffect(() => {
+    if (
+      surface !== "display" ||
+      !voiceEnabled ||
+      !latestCallId ||
+      !latestCallNumber ||
+      !latestCallService ||
+      announcedCall.current === latestCallId
+    )
+      return;
+    announcedCall.current = latestCallId;
+    const sentence = [
+      `${latestCallService}.`,
+      `Ticket number ${spokenDigits(latestCallNumber)}.`,
+      `Please proceed to counter number ${spokenDigits(latestCallCounter ?? "Counter")}.`,
+    ].join(" ");
+    let remaining = 3;
+    let stopped = false;
+    const speak = () => {
+      if (stopped || remaining <= 0) return;
+      remaining -= 1;
+      const utterance = new SpeechSynthesisUtterance(sentence);
+      utterance.lang = "en-US";
+      utterance.rate = 0.86;
+      utterance.onend = speak;
+      window.speechSynthesis.speak(utterance);
+    };
+    window.speechSynthesis.cancel();
+    speak();
+    return () => {
+      stopped = true;
+      window.speechSynthesis.cancel();
+    };
+  }, [
+    latestCallCounter,
+    latestCallId,
+    latestCallNumber,
+    latestCallService,
+    surface,
+    voiceEnabled,
+  ]);
 
   const displayedIssuedTicket = issuedTicket
     ? (snapshot.tickets.find((ticket) => ticket.id === issuedTicket.id) ??
@@ -463,8 +520,6 @@ export function QmsClient({ surface }: { surface: QmsSurface }) {
       {
         operation: "issue",
         serviceCode: selectedService,
-        priority,
-        priorityReason: priority ? priorityReason : null,
       },
       "Ticket issued successfully.",
     );
@@ -660,59 +715,12 @@ export function QmsClient({ surface }: { surface: QmsSurface }) {
       )}
 
       <div className="route-stage" key={surface}>
-        {(surface === "teller" || surface === "manager") &&
-          snapshot.tickets.some(
-            (ticket) =>
-              ticket.priority_requested &&
-              !ticket.priority &&
-              ["WAITING", "RESERVED"].includes(ticket.status),
-          ) && (
-            <section className="wl-priority-approvals">
-              <h2>Priority requests awaiting verification</h2>
-              <p>
-                Confirm the customer’s eligibility before approving. Reasons
-                stay private.
-              </p>
-              {snapshot.tickets
-                .filter(
-                  (ticket) =>
-                    ticket.priority_requested &&
-                    !ticket.priority &&
-                    ["WAITING", "RESERVED"].includes(ticket.status),
-                )
-                .map((ticket) => (
-                  <div key={ticket.id}>
-                    <strong>{ticket.public_number}</strong>
-                    <span>{ticket.service_name}</span>
-                    <Button
-                      variant="outline"
-                      disabled={!!busy}
-                      onClick={() =>
-                        void mutate(
-                          `priority:${ticket.id}`,
-                          {
-                            operation: "approve_priority",
-                            ticketId: ticket.id,
-                          },
-                          "Priority approved and audited.",
-                        )
-                      }
-                    >
-                      Verify & approve
-                    </Button>
-                  </div>
-                ))}
-            </section>
-          )}
         {surface === "kiosk" && (
           <section className="kiosk-view">
             <div className="view-heading centered-heading">
               <span className="eyebrow">Customer self-service</span>
               <h1>How can we help you today?</h1>
-              <p>
-                Choose a service, confirm your priority option, and collect your
-                ticket.
-              </p>
+              <p>Choose a service and collect your queue ticket.</p>
             </div>
 
             {loading ? (
@@ -750,28 +758,6 @@ export function QmsClient({ surface }: { surface: QmsSurface }) {
             )}
 
             <div className="kiosk-action-bar">
-              <label className="priority-control">
-                <Switch checked={priority} onCheckedChange={setPriority} />
-                <span>
-                  <strong>Priority service</strong>
-                  <small>For eligible customers</small>
-                </span>
-              </label>
-              {priority && (
-                <label className="priority-reason-control">
-                  <span>Eligibility reason</span>
-                  <select
-                    value={priorityReason}
-                    onChange={(event) => setPriorityReason(event.target.value)}
-                  >
-                    <option value="ELDERLY">Elderly customer</option>
-                    <option value="DISABILITY">Customer with disability</option>
-                    <option value="PREGNANCY">Pregnancy</option>
-                    <option value="OTHER">Other eligible need</option>
-                  </select>
-                  <small>Private and never shown on the display.</small>
-                </label>
-              )}
               <Button
                 className="primary-action"
                 size="lg"
@@ -796,10 +782,7 @@ export function QmsClient({ surface }: { surface: QmsSurface }) {
                 <div className="ticket-result-copy">
                   <span className="eyebrow">Your queue ticket</span>
                   <strong>{displayedIssuedTicket.public_number}</strong>
-                  <p>
-                    {displayedIssuedTicket.service_name} ·{" "}
-                    {displayedIssuedTicket.priority ? "Priority" : "Standard"}
-                  </p>
+                  <p>{displayedIssuedTicket.service_name}</p>
                 </div>
                 <div className="ticket-result-side">
                   <span>Keep this number visible</span>
@@ -951,11 +934,6 @@ export function QmsClient({ surface }: { surface: QmsSurface }) {
                     </div>
                     <div className="current-ticket-meta">
                       <span>{activeTicket.service_name}</span>
-                      {activeTicket.priority ? (
-                        <b>Priority</b>
-                      ) : (
-                        <b>Standard</b>
-                      )}
                     </div>
                     <div className="service-timer">
                       <Clock3 />
@@ -1139,10 +1117,10 @@ export function QmsClient({ surface }: { surface: QmsSurface }) {
                 <div className="queue-policy">
                   <ShieldCheck />
                   <p>
-                    <strong>Fair priority active</strong>
+                    <strong>First-in, first-out</strong>
                     <span>
-                      After {snapshot.settings.priorityLimit} consecutive
-                      priority calls, the oldest standard ticket is selected.
+                      Customers are called in the order they join each service
+                      queue.
                     </span>
                   </p>
                 </div>
@@ -1159,6 +1137,24 @@ export function QmsClient({ surface }: { surface: QmsSurface }) {
                 <strong>{BANK_NAME}</strong>
               </div>
               <div>
+                <Button
+                  variant="outline"
+                  onClick={() => {
+                    if (voiceEnabled) {
+                      window.speechSynthesis.cancel();
+                      setVoiceEnabled(false);
+                      return;
+                    }
+                    const test = new SpeechSynthesisUtterance(
+                      "Voice announcements enabled.",
+                    );
+                    test.lang = "en-US";
+                    window.speechSynthesis.speak(test);
+                    setVoiceEnabled(true);
+                  }}
+                >
+                  <Volume2 /> {voiceEnabled ? "Voice on" : "Enable voice"}
+                </Button>
                 <label className="wl-display-branch">
                   Branch
                   <select
@@ -1228,10 +1224,6 @@ export function QmsClient({ surface }: { surface: QmsSurface }) {
                 </p>
               </div>
               <div className="manager-actions">
-                <span className="fairness-setting">
-                  <span>Priority policy</span>
-                  <strong>{snapshot.settings.priorityLimit}:1</strong>
-                </span>
                 <Button
                   variant="outline"
                   onClick={() => void exportCsv()}
@@ -1567,7 +1559,6 @@ export function QmsClient({ surface }: { surface: QmsSurface }) {
                     <tr>
                       <th>Ticket</th>
                       <th>Service</th>
-                      <th>Class</th>
                       <th>Status</th>
                       <th>Counter</th>
                       <th>Issued</th>
@@ -1581,7 +1572,6 @@ export function QmsClient({ surface }: { surface: QmsSurface }) {
                             <strong>{ticket.public_number}</strong>
                           </td>
                           <td>{ticket.service_name}</td>
-                          <td>{ticket.priority ? "Priority" : "Standard"}</td>
                           <td>
                             <span
                               className={`status-pill ${ticket.status.toLowerCase()}`}
@@ -1595,7 +1585,7 @@ export function QmsClient({ surface }: { surface: QmsSurface }) {
                       ))
                     ) : (
                       <tr>
-                        <td colSpan={6} className="empty-table">
+                        <td colSpan={5} className="empty-table">
                           No tickets yet. Issue one from the kiosk.
                         </td>
                       </tr>
@@ -1687,8 +1677,8 @@ export function QmsClient({ surface }: { surface: QmsSurface }) {
               <article>
                 <ShieldCheck />
                 <span>
-                  <small>Priority fairness</small>
-                  <strong>{snapshot.settings.priorityLimit}:1</strong>
+                  <small>Role isolation</small>
+                  <strong>Enabled</strong>
                 </span>
               </article>
             </div>
@@ -1850,7 +1840,7 @@ export function QmsClient({ surface }: { surface: QmsSurface }) {
                 <div className="manager-panel-head">
                   <div>
                     <strong>Service configuration</strong>
-                    <span>Targets and private priority availability</span>
+                    <span>Service targets and branch availability</span>
                   </div>
                   <Settings />
                 </div>
@@ -1879,7 +1869,6 @@ export function QmsClient({ surface }: { surface: QmsSurface }) {
                                 operation: "admin_service_update",
                                 serviceCode: service.code,
                                 targetMinutes: Number(event.target.value),
-                                priorityEnabled: service.priority_enabled,
                                 active: service.active,
                               },
                               `${service.name} target updated.`,
@@ -1893,26 +1882,6 @@ export function QmsClient({ surface }: { surface: QmsSurface }) {
                           ))}
                         </select>
                       </label>
-                      <label className="admin-switch">
-                        <Switch
-                          checked={service.priority_enabled}
-                          disabled={!!busy}
-                          onCheckedChange={(checked) =>
-                            void mutate(
-                              `service-priority:${service.code}`,
-                              {
-                                operation: "admin_service_update",
-                                serviceCode: service.code,
-                                targetMinutes: service.target_minutes,
-                                priorityEnabled: checked,
-                                active: service.active,
-                              },
-                              `${service.name} priority setting updated.`,
-                            )
-                          }
-                        />
-                        <span>Priority</span>
-                      </label>
                       <Button
                         variant="outline"
                         disabled={!!busy}
@@ -1923,7 +1892,6 @@ export function QmsClient({ surface }: { surface: QmsSurface }) {
                               operation: "admin_service_update",
                               serviceCode: service.code,
                               targetMinutes: service.target_minutes,
-                              priorityEnabled: service.priority_enabled,
                               active: !service.active,
                             },
                             `${service.name} is now ${service.active ? "inactive" : "active"}.`,
@@ -1959,31 +1927,6 @@ export function QmsClient({ surface }: { surface: QmsSurface }) {
                   <div>
                     <dt>Cancellation cooldown</dt>
                     <dd>10 minutes</dd>
-                  </div>
-                  <div>
-                    <dt>Priority call limit</dt>
-                    <dd>
-                      <select
-                        value={snapshot.settings.priorityLimit}
-                        disabled={!!busy}
-                        onChange={(event) =>
-                          void mutate(
-                            "priority-limit-admin",
-                            {
-                              operation: "set_priority_limit",
-                              limit: Number(event.target.value),
-                            },
-                            "Priority fairness limit updated.",
-                          )
-                        }
-                      >
-                        {[1, 2, 3, 4, 5].map((limit) => (
-                          <option value={limit} key={limit}>
-                            {limit} consecutive calls
-                          </option>
-                        ))}
-                      </select>
-                    </dd>
                   </div>
                 </dl>
               </article>

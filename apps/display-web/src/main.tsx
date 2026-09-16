@@ -81,8 +81,13 @@ function App() {
   const announcing = useRef(false);
   const audioGeneration = useRef(0);
 
-  settingsRef.current = settings;
-  audioEnabledRef.current = audioEnabled;
+  useEffect(() => {
+    settingsRef.current = settings;
+  }, [settings]);
+
+  useEffect(() => {
+    audioEnabledRef.current = audioEnabled;
+  }, [audioEnabled]);
 
   const snapshot = async () => {
     const response = await fetch(
@@ -285,6 +290,9 @@ function App() {
       socket.close();
       window.speechSynthesis?.cancel();
     };
+    // The socket is intentionally subscribed once. Its handlers read current
+    // display and audio settings from refs.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const current = calls.find(

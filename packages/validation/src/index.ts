@@ -41,11 +41,6 @@ export const customerLoginSchema = z.object({
 
 export const ticketCreateSchema = z.object({
   serviceTypeId: z.string().uuid(),
-  priority: z.boolean().default(false),
-  priorityReason: z
-    .enum(["ELDERLY", "DISABILITY", "PREGNANCY", "OTHER"])
-    .nullable()
-    .optional(),
   idempotencyKey: z.string().uuid(),
 });
 
@@ -67,7 +62,6 @@ export const transferSchema = z.object({
 
 export const settingsSchema = z.object({
   noShowTimeoutSeconds: z.number().int().min(30).max(600),
-  priorityFairnessLimit: z.number().int().min(1).max(5),
   kioskIdleTimeoutSeconds: z.number().int().min(15).max(300),
   displayHistoryCount: z.number().int().min(1).max(20),
   slaWaitMinutes: z.number().int().min(1).max(240),

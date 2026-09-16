@@ -1,6 +1,7 @@
 export type AnnouncementTarget = {
   publicNumber: string;
   counterLabel: string;
+  serviceName: string;
 };
 
 const ENGLISH_DIGITS: Record<string, string> = {
@@ -25,6 +26,7 @@ export function spokenDigits(value: string) {
 
 export function announcementText(call: AnnouncementTarget) {
   return [
+    `${call.serviceName.trim()}.`,
     `Ticket number ${spokenDigits(call.publicNumber)}.`,
     `Please proceed to counter number ${spokenDigits(call.counterLabel)}.`,
   ].join(" ");
