@@ -46,6 +46,8 @@ type DisplaySettings = {
   announcementRepeatCount: 2 | 3;
 };
 
+type VoiceMode = "off" | "ready" | "unavailable";
+
 const DEFAULT_SETTINGS: DisplaySettings = {
   historyCount: 8,
   soundEnabled: true,
@@ -68,15 +70,16 @@ function App() {
   const [connected, setConnected] = useState(false);
   const [highlight, setHighlight] = useState(false);
   const [clock, setClock] = useState(new Date());
-  const [audioEnabled, setAudioEnabled] = useState(
-    () => window.localStorage.getItem("bank-qms-display-audio") === "enabled",
-  );
-  const [amharicVoiceAvailable, setAmharicVoiceAvailable] = useState(false);
+  // A fresh click is deliberately required after every page load so Chrome
+  // permits later socket-driven announcements through the system voice.
+  const [audioEnabled, setAudioEnabled] = useState(false);
+  const [voiceMode, setVoiceMode] = useState<VoiceMode>("off");
   const eventIds = useRef(new Set<string>());
   const settingsRef = useRef(settings);
   const audioEnabledRef = useRef(audioEnabled);
   const announcementQueue = useRef<Call[]>([]);
   const announcing = useRef(false);
+  const audioGeneration = useRef(0);
 
   settingsRef.current = settings;
   audioEnabledRef.current = audioEnabled;
@@ -118,96 +121,118 @@ function App() {
     );
   };
 
-  const runNextAnnouncement = () => {
+  const systemEnglishVoice = () => {
+    if (!("speechSynthesis" in window)) return undefined;
+    const voices = window.speechSynthesis.getVoices();
+    const englishVoices = voices.filter((voice) =>
+      voice.lang.toLowerCase().startsWith("en"),
+    );
+    return (
+      englishVoices.find(
+        (voice) => voice.localService && voice.lang.toLowerCase() === "en-us",
+      ) ??
+      englishVoices.find((voice) => voice.localService && voice.default) ??
+      englishVoices.find((voice) => voice.localService) ??
+      englishVoices.find((voice) => voice.default) ??
+      englishVoices[0]
+    );
+  };
+
+  const speakWithSystemVoice = (text: string) =>
+    new Promise<void>((resolve, reject) => {
+      if (
+        !("speechSynthesis" in window) ||
+        !("SpeechSynthesisUtterance" in window)
+      ) {
+        reject(new Error("Speech synthesis is not available in this browser."));
+        return;
+      }
+      const voice = systemEnglishVoice();
+      const utterance = new SpeechSynthesisUtterance(text);
+      if (voice) utterance.voice = voice;
+      utterance.lang = voice?.lang || "en-US";
+      utterance.rate = 0.84;
+      utterance.pitch = 1;
+      utterance.volume = 1;
+      utterance.onend = () => resolve();
+      utterance.onerror = () =>
+        reject(new Error("The English system voice could not play."));
+      window.speechSynthesis.resume();
+      window.speechSynthesis.speak(utterance);
+    });
+
+  const pause = (milliseconds: number) =>
+    new Promise<void>((resolve) => window.setTimeout(resolve, milliseconds));
+
+  const runNextAnnouncement = async () => {
     if (announcing.current) return;
     const call = announcementQueue.current.shift();
     if (!call) return;
-    if (
-      !audioEnabledRef.current ||
-      !settingsRef.current.soundEnabled ||
-      !("speechSynthesis" in window)
-    ) {
+    if (!audioEnabledRef.current || !settingsRef.current.soundEnabled) {
       window.setTimeout(runNextAnnouncement, 0);
       return;
     }
+    const generation = audioGeneration.current;
     announcing.current = true;
-    let completedRepeats = 0;
-    const finish = () => {
-      completedRepeats += 1;
-      if (completedRepeats >= settingsRef.current.announcementRepeatCount) {
-        announcing.current = false;
-        window.setTimeout(runNextAnnouncement, 350);
-        return;
+    try {
+      setVoiceMode("ready");
+      for (
+        let repeat = 0;
+        repeat < settingsRef.current.announcementRepeatCount;
+        repeat += 1
+      ) {
+        if (
+          generation !== audioGeneration.current ||
+          !audioEnabledRef.current ||
+          !settingsRef.current.soundEnabled
+        )
+          break;
+        await speakWithSystemVoice(announcementText(call));
+        if (repeat + 1 < settingsRef.current.announcementRepeatCount)
+          await pause(650);
       }
-      window.setTimeout(speakOnce, 650);
-    };
-    const speakOnce = () => {
-      if (!audioEnabledRef.current || !settingsRef.current.soundEnabled) {
+    } catch {
+      if (generation === audioGeneration.current) setVoiceMode("unavailable");
+    } finally {
+      if (generation === audioGeneration.current) {
         announcing.current = false;
-        return;
+        window.setTimeout(() => void runNextAnnouncement(), 350);
       }
-      const utterance = new SpeechSynthesisUtterance(announcementText(call));
-      const voices = window.speechSynthesis.getVoices();
-      const voice = voices.find((candidate) =>
-        candidate.lang.toLowerCase().startsWith("am"),
-      );
-      if (voice) utterance.voice = voice;
-      utterance.lang = "am-ET";
-      utterance.rate = 0.82;
-      utterance.pitch = 1;
-      utterance.volume = 1;
-      utterance.onend = finish;
-      utterance.onerror = finish;
-      window.speechSynthesis.speak(utterance);
-    };
-    speakOnce();
+    }
   };
 
   const queueAnnouncement = (call: Call) => {
     announcementQueue.current.push(call);
-    runNextAnnouncement();
+    void runNextAnnouncement();
   };
 
-  const setAnnouncements = (enabled: boolean) => {
+  const setAnnouncements = async (enabled: boolean) => {
+    const generation = ++audioGeneration.current;
     audioEnabledRef.current = enabled;
     setAudioEnabled(enabled);
-    window.localStorage.setItem(
-      "bank-qms-display-audio",
-      enabled ? "enabled" : "disabled",
-    );
     if (!enabled) {
       announcementQueue.current = [];
       announcing.current = false;
+      setVoiceMode("off");
       window.speechSynthesis?.cancel();
       return;
     }
-    if ("speechSynthesis" in window) {
-      window.speechSynthesis.cancel();
-      const test = new SpeechSynthesisUtterance("የድምፅ ማስታወቂያ ተከፍቷል።");
-      const voice = window.speechSynthesis
-        .getVoices()
-        .find((candidate) => candidate.lang.toLowerCase().startsWith("am"));
-      if (voice) test.voice = voice;
-      test.lang = "am-ET";
-      test.rate = 0.85;
-      window.speechSynthesis.speak(test);
+
+    // Speaking directly inside the click handler unlocks later announcements
+    // that arrive from the queue's real-time socket events.
+    try {
+      window.speechSynthesis?.cancel();
+      await speakWithSystemVoice("Voice announcements are enabled.");
+      if (generation !== audioGeneration.current || !audioEnabledRef.current)
+        return;
+      setVoiceMode("ready");
+    } catch {
+      if (generation !== audioGeneration.current) return;
+      audioEnabledRef.current = false;
+      setAudioEnabled(false);
+      setVoiceMode("unavailable");
     }
   };
-
-  useEffect(() => {
-    const syncVoices = () => {
-      setAmharicVoiceAvailable(
-        "speechSynthesis" in window &&
-          window.speechSynthesis
-            .getVoices()
-            .some((voice) => voice.lang.toLowerCase().startsWith("am")),
-      );
-    };
-    syncVoices();
-    window.speechSynthesis?.addEventListener("voiceschanged", syncVoices);
-    return () =>
-      window.speechSynthesis?.removeEventListener("voiceschanged", syncVoices);
-  }, []);
 
   useEffect(() => {
     const initial = window.setTimeout(() => void snapshot(), 0);
@@ -271,6 +296,12 @@ function App() {
       minute: "2-digit",
       timeZone: branch.timezone,
     });
+  const voiceStatus =
+    voiceMode === "ready"
+      ? "English system voice ready"
+      : voiceMode === "unavailable"
+        ? "Voice unavailable"
+        : "Voice requires one click";
 
   return (
     <main className="display-shell">
@@ -286,17 +317,25 @@ function App() {
           </div>
           <button
             className={"display-tool " + (audioEnabled ? "audio-active" : "")}
-            onClick={() => setAnnouncements(!audioEnabled)}
+            onClick={() => void setAnnouncements(!audioEnabled)}
             title={
-              amharicVoiceAvailable
-                ? "Amharic system voice detected"
-                : "Uses the best voice installed on this device"
+              voiceMode === "ready"
+                ? "Using an English voice supplied by this computer"
+                : voiceMode === "unavailable"
+                  ? "This browser could not use the computer's speech service"
+                  : "Click once to enable English announcements"
             }
           >
-            {audioEnabled ? <Volume2 size={18} /> : <VolumeX size={18} />}
+            {audioEnabled && voiceMode !== "unavailable" ? (
+              <Volume2 size={18} />
+            ) : (
+              <VolumeX size={18} />
+            )}
             {settings.soundEnabled
               ? audioEnabled
-                ? "Voice on"
+                ? voiceMode === "unavailable"
+                  ? "Voice unavailable"
+                  : "Voice on"
                 : "Enable voice"
               : "Voice disabled"}
           </button>
@@ -327,7 +366,7 @@ function App() {
         {current ? (
           <>
             <div className="ticket-panel">
-              <div className="call-label">Now calling · አሁን የሚጠራ</div>
+              <div className="call-label">Now calling</div>
               <div className="display-ticket">{current.publicNumber}</div>
               <div className="service-line">
                 {current.serviceName}
@@ -345,7 +384,7 @@ function App() {
                   current.counterLabel}
               </div>
               <div className="counter-word">{current.counterLabel}</div>
-              <p>ወደ {current.counterLabel} ይሂዱ</p>
+              <p>Please proceed to {current.counterLabel}</p>
             </div>
           </>
         ) : (
@@ -354,7 +393,7 @@ function App() {
               <Volume2 size={42} />
             </span>
             <h1>Ready for the next call</h1>
-            <p>ቀጣዩ ትኬት እስኪጠራ ይጠብቁ</p>
+            <p>The next called ticket will appear here.</p>
           </div>
         )}
       </section>
@@ -413,10 +452,12 @@ function App() {
 
       <footer className="display-footer">
         <span>WORLDLINK BANK · {branch.name.toUpperCase()}</span>
-        <strong>ትኬት ቁጥርዎ ሲጠራ ወደተጠቀሰው መስኮት ይሂዱ</strong>
+        <strong>
+          When your ticket is called, proceed to the displayed counter
+        </strong>
         <span>
-          Voice repeats {settings.announcementRepeatCount}×
-          {amharicVoiceAvailable ? " · Amharic voice ready" : ""}
+          Voice repeats {settings.announcementRepeatCount}×{" · "}
+          {voiceStatus}
         </span>
       </footer>
     </main>
