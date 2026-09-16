@@ -223,10 +223,7 @@ function AuthScreen({
   return (
     <main className="auth-screen">
       <section className="auth-hero">
-        <WorldLinkBrand
-          className="light"
-          subtitle="Customer queue portal"
-        />
+        <WorldLinkBrand className="light" subtitle="Customer queue portal" />
         <div className="hero-orbit orbit-one" />
         <div className="hero-orbit orbit-two" />
         <div className="auth-copy">
