@@ -132,8 +132,7 @@ export default function Home() {
         </Link>
       </aside>
       <footer className="wl-footer">
-        WorldLink Bank · Academic demonstration. Account balances and activity
-        are sample data; no real banking transactions are available.
+        WorldLink Bank · Academic queue-management demonstration.
         <Link href="/customer-app">Customer PWA</Link>
         <Link href="/staff-app">Staff companion</Link>
       </footer>

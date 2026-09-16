@@ -39,7 +39,6 @@ import {
   Navigate,
   Route,
   Routes,
-  useLocation,
   useNavigate,
   useParams,
 } from "react-router-dom";
@@ -224,18 +223,15 @@ function AuthScreen({
   return (
     <main className="auth-screen">
       <section className="auth-hero">
-        <WorldLinkBrand
-          className="light"
-          subtitle="Customer banking and queue portal"
-        />
+        <WorldLinkBrand className="light" subtitle="Customer queue portal" />
         <div className="hero-orbit orbit-one" />
         <div className="hero-orbit orbit-two" />
         <div className="auth-copy">
-          <p className="eyebrow">Banking, without the guesswork</p>
-          <h1>Your money and branch visits, clearly in one place.</h1>
+          <p className="eyebrow">Skip the uncertainty</p>
+          <h1>Your branch visit, clearly.</h1>
           <p>
-            Review your demonstration accounts, download a statement, join a
-            branch queue, and follow your position live.
+            Join a branch queue, follow your position live, and arrive prepared
+            without waiting in uncertainty.
           </p>
           <div className="trust-row">
             <ShieldCheck size={18} /> Your queue history is private to your
@@ -262,8 +258,8 @@ function AuthScreen({
           <h2>{mode === "login" ? "Welcome back" : "Create your account"}</h2>
           <p>
             {mode === "login"
-              ? "Continue to your accounts and live tickets."
-              : "One secure account keeps your banking demo and branch tickets together."}
+              ? "Continue to your live tickets."
+              : "One secure account keeps all your branch tickets together."}
           </p>
         </div>
         <form onSubmit={submit} className="auth-form">
@@ -1092,7 +1088,6 @@ function AppShell({
 }) {
   const [connected, setConnected] = useState(false);
   const client = useQueryClient();
-  const location = useLocation();
   useEffect(() => {
     const socket = io(`${SOCKET}/realtime`, {
       transports: ["websocket"],
@@ -1116,31 +1111,6 @@ function AppShell({
         <Link to="/" className="worldlink-home-link">
           <WorldLinkBrand subtitle="Customer portal" />
         </Link>
-        <nav className="portal-switcher" aria-label="Customer portal">
-          <Link
-            to="/"
-            className={
-              location.pathname === "/" || location.pathname === "/customer"
-                ? "active"
-                : ""
-            }
-          >
-            <WalletCards /> Accounts
-          </Link>
-          <Link
-            to="/queue"
-            className={
-              location.pathname.startsWith("/queue") ||
-              location.pathname.startsWith("/new") ||
-              location.pathname.startsWith("/tickets") ||
-              location.pathname.startsWith("/history")
-                ? "active"
-                : ""
-            }
-          >
-            <TicketCheck /> Queue
-          </Link>
-        </nav>
         <div className="account-menu">
           <UserRound size={17} />
           <span>{user.name.split(" ")[0]}</span>
@@ -1154,11 +1124,11 @@ function AppShell({
         <Routes>
           <Route
             path="/"
-            element={<BankingHome user={user} connected={connected} />}
+            element={<QueueHome user={user} connected={connected} />}
           />
           <Route
             path="/customer"
-            element={<BankingHome user={user} connected={connected} />}
+            element={<QueueHome user={user} connected={connected} />}
           />
           <Route
             path="/queue"
@@ -1172,12 +1142,12 @@ function AppShell({
       </main>
       <nav className="bottom-nav">
         <Link to="/">
-          <WalletCards />
-          <span>Accounts</span>
+          <ListChecks />
+          <span>My queue</span>
         </Link>
-        <Link to="/queue" className="nav-primary">
+        <Link to="/new" className="nav-primary">
           <TicketCheck />
-          <span>Queue</span>
+          <span>Join queue</span>
         </Link>
         <Link to="/history">
           <History />

@@ -141,7 +141,7 @@ async function request(payload: Record<string, unknown>) {
 
 export function MobileCustomerClient() {
   const [customerArea, setCustomerArea] = useState<"banking" | "queue">(
-    "banking",
+    "queue",
   );
   const [portfolio, setPortfolio] = useState<CustomerPortfolio | null>(null);
   const [balancesVisible, setBalancesVisible] = useState(true);
@@ -268,12 +268,9 @@ export function MobileCustomerClient() {
   }, []);
 
   useEffect(() => {
-    const initial = window.setTimeout(
-      () => void Promise.all([refreshServices(), refreshPortfolio()]),
-      0,
-    );
+    const initial = window.setTimeout(() => void refreshServices(), 0);
     return () => window.clearTimeout(initial);
-  }, [refreshPortfolio, refreshServices]);
+  }, [refreshServices]);
   useEffect(() => {
     const saved = window.localStorage.getItem(ticketStorageKey);
     const restore = window.setTimeout(() => {
@@ -504,20 +501,6 @@ export function MobileCustomerClient() {
             <small>Customer queue portal</small>
           </span>
         </Link>
-        <nav className="wl-customer-nav" aria-label="Customer portal">
-          <button
-            aria-current={customerArea === "banking" ? "page" : undefined}
-            onClick={() => setCustomerArea("banking")}
-          >
-            <WalletCards /> Accounts
-          </button>
-          <button
-            aria-current={customerArea === "queue" ? "page" : undefined}
-            onClick={() => openQueue()}
-          >
-            <TicketCheck /> Queue
-          </button>
-        </nav>
         <span className={`wl-connection ${online ? "" : "is-offline"}`}>
           <i />
           {online ? "Connected" : "Reconnecting"}
