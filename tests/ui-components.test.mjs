@@ -167,9 +167,10 @@ test("launches each actor-owned product surface and separates manager reports fr
   assert.match(route, /Content-Disposition/);
 });
 
-test("adds manager analytics, restores the protected admin surface, and keeps customer data safe", async () => {
+test("adds manager analytics, restores the protected admin surface, and keeps the customer portal queue-only", async () => {
   const manager = await read("../app/qms-client.tsx");
   const customer = await read("../app/mobile-customer-client.tsx");
+  const customerWeb = await read("../apps/customer-web/src/main.tsx");
   const route = await read("../app/api/showcase/route.ts");
   const adminRoute = await read("../app/admin/page.tsx");
   const schema = await read("../db/schema.ts");
@@ -180,10 +181,16 @@ test("adds manager analytics, restores the protected admin surface, and keeps cu
   assert.match(manager, /System administration/);
   assert.match(manager, /admin_staff_update/);
   assert.match(manager, /admin_service_update/);
-  assert.match(customer, /Total available balance/);
-  assert.match(customer, /Recent transactions/);
-  assert.match(customer, /customer-banking/);
-  assert.match(customer, /customer_statement/);
+  assert.match(customer, /"queue"/);
+  assert.doesNotMatch(customer, /setCustomerArea\("banking"\)/);
+  assert.doesNotMatch(customer, /<WalletCards \/> Accounts/);
+  assert.doesNotMatch(
+    customer,
+    /Promise\.all\(\[refreshServices\(\), refreshPortfolio\(\)\]\)/,
+  );
+  assert.doesNotMatch(customerWeb, /className="portal-switcher"/);
+  assert.match(customerWeb, /<span>My queue<\/span>/);
+  assert.match(customerWeb, /path="\/customer"[\s\S]*?<QueueHome/);
   assert.match(adminRoute, /surface="admin"/);
   assert.match(route, /requireActor\(request, "ADMIN"\)/);
   assert.match(schema, /qms_customer_accounts/);
