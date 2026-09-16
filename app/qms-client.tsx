@@ -434,8 +434,7 @@ export function QmsClient({ surface }: { surface: QmsSurface }) {
       return;
     announcedCall.current = latestCallId;
     const sentence = [
-      `${latestCallService}.`,
-      `Ticket number ${spokenDigits(latestCallNumber)}.`,
+      `${latestCallService.trim()} ticket number ${spokenDigits(latestCallNumber)}.`,
       `Please proceed to counter number ${spokenDigits(latestCallCounter ?? "Counter")}.`,
     ].join(" ");
     let remaining = 3;

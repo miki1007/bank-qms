@@ -1095,10 +1095,7 @@ function AdminOverview() {
     );
   const data = overview.data;
   return (
-    <AdminPage
-      title="Administration overview"
-      subtitle="System-wide identity, branch, configuration and security controls. Operational queue work remains in the Manager workspace."
-    >
+    <AdminPage title="Administration overview">
       <div className="grid kpi-grid">
         <Metric
           label="Active branches"
@@ -1703,10 +1700,7 @@ function ReportsPage() {
   };
   const r = report.data;
   return (
-    <ManagerPage
-      title="Operational reports"
-      subtitle="Dashboard and export use the same event-based metric definitions."
-    >
+    <ManagerPage title="Operational reports">
       <div className="row" style={{ justifyContent: "flex-end" }}>
         <button className="secondary row" onClick={download}>
           <Download size={18} />

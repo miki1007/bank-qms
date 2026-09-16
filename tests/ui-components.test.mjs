@@ -233,6 +233,14 @@ test("keeps admin, manager, and teller workspaces isolated with visible logout c
   assert.match(staffWeb, /Logging out…/);
   assert.match(productionAdministration, /@Roles\("ADMIN"\)/);
   assert.match(productionAdministration, /@Controller\("admin"\)/);
+  for (const removedCopy of [
+    "The server will apply FIFO order and the configured priority fairness limit.",
+    "Dashboard and export use the same event-based metric definitions.",
+    "System-wide identity, branch, configuration and security controls. Operational queue work remains in the Manager workspace.",
+  ]) {
+    assert.equal(hosted.includes(removedCopy), false);
+    assert.equal(staffWeb.includes(removedCopy), false);
+  }
 });
 
 test("ships full native Android customer and teller applications", async () => {

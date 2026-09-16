@@ -228,6 +228,17 @@ test("polished kiosk and display workspaces render", async ({ page }) => {
   await expect(
     page.getByRole("button", { name: /Enable voice|Voice on/i }),
   ).toBeVisible();
+  const displayViewport = await page.evaluate(() => ({
+    viewportHeight: window.innerHeight,
+    documentHeight: document.documentElement.scrollHeight,
+    bodyHeight: document.body.scrollHeight,
+  }));
+  expect(displayViewport.documentHeight).toBeLessThanOrEqual(
+    displayViewport.viewportHeight,
+  );
+  expect(displayViewport.bodyHeight).toBeLessThanOrEqual(
+    displayViewport.viewportHeight,
+  );
 });
 
 test("administrator and teller remain in their own polished workspaces", async ({

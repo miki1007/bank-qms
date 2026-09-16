@@ -25,9 +25,9 @@ export function spokenDigits(value: string) {
 }
 
 export function announcementText(call: AnnouncementTarget) {
+  const serviceName = call.serviceName.trim() || "Service";
   return [
-    `${call.serviceName.trim()}.`,
-    `Ticket number ${spokenDigits(call.publicNumber)}.`,
+    `${serviceName} ticket number ${spokenDigits(call.publicNumber)}.`,
     `Please proceed to counter number ${spokenDigits(call.counterLabel)}.`,
   ].join(" ");
 }
