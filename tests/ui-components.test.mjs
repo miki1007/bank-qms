@@ -109,6 +109,23 @@ test("keeps reconnect and reduced-motion safety states visible", async () => {
   assert.match(css, /focus-visible/);
 });
 
+test("keeps the public display navy, fully styled, and viewport-bound", async () => {
+  const css = await read("../apps/display-web/src/display.css");
+
+  for (const selector of [
+    ".display-tools",
+    ".ticket-panel",
+    ".flight-board",
+    ".flight-row",
+    ".display-footer",
+  ]) {
+    assert.ok(css.includes(selector), `Missing display style: ${selector}`);
+  }
+  assert.match(css, /height:\s*100dvh/);
+  assert.match(css, /#07192c/);
+  assert.doesNotMatch(css, /#071f18|#0a2a20|#124d3b/);
+});
+
 test("provides two installable mobile apps on the shared queue backend", async () => {
   const customerPage = await read("../app/customer-app/page.tsx");
   const staffPage = await read("../app/staff-app/page.tsx");

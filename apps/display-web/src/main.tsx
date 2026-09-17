@@ -324,7 +324,11 @@ function App() {
             {connected ? "Live" : "Reconnecting · safe view"}
           </div>
           <button
-            className={"display-tool " + (audioEnabled ? "audio-active" : "")}
+            className={
+              "display-tool " +
+              (audioEnabled ? "audio-active " : "") +
+              (voiceMode === "unavailable" ? "audio-error" : "")
+            }
             onClick={() => void setAnnouncements(!audioEnabled)}
             title={
               voiceMode === "ready"
