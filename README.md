@@ -1,4 +1,12 @@
-# Bank QMS
+# OOSD Course Project: Bank Queue Management System
+
+## Group Members
+
+1. Mikiyas Bayle
+2. Alazar Andualem
+3. Nebiyeliul Asmamaw
+
+## Project Overview
 
 Bank QMS is the academic queue-management showcase branded as **WorldLink Bank**. The supplied WorldLink emblem is used with the project owner's direction. The customer showcase includes clearly labelled, synthetic account balances and activity for product demonstration; it is not connected to core banking and cannot move real funds.
 
@@ -25,7 +33,7 @@ The customer and teller products are also packaged as separate applications. The
 - Argon2id password, private lookup-code, and device-secret hashing
 - Short-lived JWT access tokens plus rotating, hashed refresh sessions in strict HTTP-only cookies
 - PostgreSQL transactions and `FOR UPDATE SKIP LOCKED` for atomic Call Next
-- Deterministic priority fairness: no more than the configured consecutive-priority limit while standard tickets wait
+- Strict FIFO ticket ordering; priority service is not enabled.
 - Immutable ticket events and administrative audit logs
 - Vitest/Jest-style unit tests, Supertest integration tests, Testing Library, Playwright, and concurrency tests
 
@@ -60,7 +68,7 @@ pnpm dev
 
 The hosted showcase exposes independent queues for Summit, CMC, Ayat, Piyassa, 4 Killo, Stadium, Megenagna, Mexico, Bole, Shola, and Lideta. Summit demo staff use `admin.dev`, `manager.dev`, and `teller.one` through `teller.four`; other hosted branch usernames append the branch code (for example, `admin.dev.cmc`). Each teller has an administrator-controlled counter assignment and cannot switch identities or counters from the teller console. Passwords and device secrets for the canonical PostgreSQL deployment come only from your `.env` values.
 
-The customer web/PWA uses a virtual-queue reservation model: one active remote ticket per customer per branch, three remote reservations per day, a ten-minute cancellation cooldown, expiry/no-show abuse controls, and branch arrival-code check-in. A customer who checks in on time keeps the original booking timestamp; unconfirmed reservations cannot be called. Priority is only requested remotely and becomes active after staff verification. While standard customers wait, the configured fairness rule calls at most two priority tickets consecutively by default.
+The customer web/PWA uses a virtual-queue reservation model: one active remote ticket per customer per branch, limited daily reservations, cancellation cooldowns, expiry/no-show controls, and branch arrival-code check-in. A customer who checks in on time keeps the original booking timestamp; unconfirmed reservations cannot be called. Waiting tickets are called in strict FIFO order; priority service is disabled.
 
 ## Mobile builds
 
