@@ -8,8 +8,7 @@
 
 ## Project Overview
 
-Bank QMS is the academic queue-management showcase branded as **WorldLink Bank**. The supplied WorldLink emblem is used with the project owner's direction. The customer showcase includes clearly labelled, synthetic account balances and activity for product demonstration; it is not connected to core banking and cannot move real funds.
-
+Bank QMS is the academic queue-management showcase branded as **WorldLink Bank**. 
 The product has eight connected entry points backed by the same domain rules:
 
 | Surface           | Purpose                                                                         | Local URL                       |
@@ -131,8 +130,6 @@ pnpm db:migrate
 pnpm db:seed
 ```
 
-Do not delete volumes or reset a shared/pilot database without an explicit backup and approval. Operational records are not hard-deleted through normal APIs.
-
 ## Deployment
 
 Deploy PostgreSQL and the NestJS API behind HTTPS, serve the four Vite web clients from their approved origins, proxy `/api/v1` and `/realtime` to the API, then inject the exact origin list and all secrets at runtime. Apply migrations from a controlled release job before starting the new API image. Details: [deployment](docs/operations/deployment.md), [backup and restore](docs/operations/backup-and-restore.md), and [known limitations](docs/known-limitations.md).
@@ -140,13 +137,5 @@ Deploy PostgreSQL and the NestJS API behind HTTPS, serve the four Vite web clien
 ## Private hosted showcase
 
 The owner-only Sites URL is a constrained portfolio preview. It contains `/customer`, `/kiosk`, `/teller`, `/manager`, `/admin`, and `/display`, all connected to one persistent queue adapter. Administrator, manager, and teller sessions cannot replace one another; the current actor must log out before a different staff identity signs in. `/admin` is a separately authenticated administration workspace, while `/manager` contains only branch operations and reporting. The customer page includes an identity-scoped, synthetic read-only portfolio and CSV statement alongside the working queue flow. That runtime cannot open PostgreSQL TCP connections or host the canonical Socket.IO process, so it uses D1 and authoritative polling. This adapter is not the production backend and is explained in `docs/implementation-decisions.md`; the production target remains NestJS/PostgreSQL/Socket.IO.
-
-## Security notes
-
-- Never commit `.env`, database credentials, JWT keys, device secrets, signing keys, access tokens, refresh tokens, or lookup codes.
-- Administrator, manager, and teller authorization is enforced by mutually exclusive backend roles, branch scope, and teller counter-session ownership checks. Admin-only configuration routes reject managers and tellers; manager operations reject administrators and tellers; teller routes reject administrators and managers.
-- Customer and staff access tokens stay in memory. Refresh tokens are rotated and hashed server-side; browsers receive them only through HTTP-only cookies, while native Android clients receive them over TLS and encrypt them at rest with Android Keystore AES-GCM.
-- Public display events contain public ticket number, counter, service, and call time only—never customer data, lookup proof, tokens, private notes, or priority reasons.
-- Logs and health responses must not include credentials or request authorization material.
 
 Troubleshooting: if the API fails at startup, check that all required variables are non-placeholder and `DATABASE_URL` uses PostgreSQL. A kiosk/display `403` means its device code/secret does not match the seeded registration. A staff `401` means the account is inactive/temporarily locked or the locally chosen password differs from the seeded value. In development, correct `.env` and rerun `NODE_ENV=development pnpm db:seed`; reseeding safely refreshes the demo password hashes, clears temporary lockouts, and invalidates stale staff sessions.
